@@ -1,0 +1,106 @@
+[
+  {
+    "id": "top-01",
+    "name": "Floral Blouse",
+    "image_url": "/assets/items/female/top-01.png",
+    "category": "top",
+    "region": "torso",
+    "fit_measure": "chest",
+    "z_index": 20,
+    "gender": "female",
+    "placement": { "x": 74, "y": 7, "width": 500, "height": 741 }
+  },
+  {
+    "id": "top-02",
+    "name": "Striped Tee",
+    "image_url": "/assets/items/female/top-02.png",
+    "category": "top",
+    "region": "torso",
+    "fit_measure": "chest",
+    "z_index": 20,
+    "gender": "female",
+    "placement": { "x": 190, "y": 240, "width": 220, "height": 278 }
+  },
+  {
+    "id": "top-03",
+    "name": "Silk Cami",
+    "image_url": "/assets/items/female/top-03.png",
+    "category": "top",
+    "region": "torso",
+    "fit_measure": "chest",
+    "z_index": 20,
+    "gender": "female",
+    "placement": { "x": 190, "y": 240, "width": 220, "height": 293 }
+  },
+  {
+    "id": "top-04",
+    "name": "Wrap Blouse",
+    "image_url": "/assets/items/female/top-04.png",
+    "category": "top",
+    "region": "torso",
+    "fit_measure": "chest",
+    "z_index": 20,
+    "gender": "female",
+    "placement": { "x": 190, "y": 240, "width": 220, "height": 293 }
+  },
+  {
+    "id": "bottom-01",
+    "name": "Flared Skirt",
+    "image_url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 1200'%3E%3Cpath d='M220 600 Q200 650 160 900 Q140 1050 150 1200 L450 1200 Q460 1050 440 900 Q400 650 380 600 Z' fill='%23D8A0C8' opacity='0.9'/%3E%3Crect x='215' y='590' width='170' height='25' rx='8' fill='%23C080B0'/%3E%3C/svg%3E",
+    "category": "bottom",
+    "region": "legs",
+    "fit_measure": "hip",
+    "z_index": 10,
+    "gender": "female"
+  },
+  {
+    "id": "bottom-02",
+    "name": "Slim Trousers",
+    "image_url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 1200'%3E%3Cpath d='M220 600 L215 1200 L290 1200 L300 850 L310 1200 L385 1200 L380 600 Z' fill='%23A0B4D8' opacity='0.9'/%3E%3Crect x='215' y='590' width='170' height='22' rx='6' fill='%23809CC0'/%3E%3C/svg%3E",
+    "category": "bottom",
+    "region": "legs",
+    "fit_measure": "hip",
+    "z_index": 10,
+    "gender": "female"
+  },
+  {
+    "id": "male-top-01",
+    "name": "Classic Shirt",
+    "image_url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 1200'%3E%3Cpath d='M180 255 L130 310 L160 350 L210 310 L210 580 L390 580 L390 310 L440 350 L470 310 L420 255 L360 230 L300 245 L240 230 Z' fill='%234A6FA5' opacity='0.92'/%3E%3Cpath d='M300 245 L300 580' stroke='%23385888' strokeWidth='2' fill='none'/%3E%3Crect x='282' y='280' width='8' height='8' rx='4' fill='%23385888'/%3E%3Crect x='282' y='304' width='8' height='8' rx='4' fill='%23385888'/%3E%3Crect x='282' y='328' width='8' height='8' rx='4' fill='%23385888'/%3E%3C/svg%3E",
+    "category": "top",
+    "region": "torso",
+    "fit_measure": "chest",
+    "z_index": 20,
+    "gender": "male"
+  },
+  {
+    "id": "male-top-02",
+    "name": "Crew Sweatshirt",
+    "image_url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 1200'%3E%3Cpath d='M175 260 L120 320 L155 365 L210 315 L210 590 L390 590 L390 315 L445 365 L480 320 L425 260 L370 235 Q300 220 230 235 Z' fill='%23555E72' opacity='0.93'/%3E%3Cellipse cx='300' cy='258' rx='38' ry='22' fill='%23464F62'/%3E%3C/svg%3E",
+    "category": "top",
+    "region": "torso",
+    "fit_measure": "chest",
+    "z_index": 20,
+    "gender": "male"
+  },
+  {
+    "id": "male-bottom-01",
+    "name": "Chino Pants",
+    "image_url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 1200'%3E%3Cpath d='M210 595 L205 1190 L288 1190 L300 840 L312 1190 L395 1190 L390 595 Z' fill='%23B5A48A' opacity='0.93'/%3E%3Crect x='205' y='580' width='190' height='28' rx='7' fill='%23998870'/%3E%3Cline x1='300' y1='595' x2='300' y2='840' stroke='%23998870' strokeWidth='2'/%3E%3C/svg%3E",
+    "category": "bottom",
+    "region": "legs",
+    "fit_measure": "hip",
+    "z_index": 10,
+    "gender": "male"
+  },
+  {
+    "id": "male-bottom-02",
+    "name": "Dark Jeans",
+    "image_url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 1200'%3E%3Cpath d='M208 595 L200 1190 L286 1190 L300 835 L314 1190 L400 1190 L392 595 Z' fill='%232B3A52' opacity='0.94'/%3E%3Crect x='200' y='578' width='200' height='30' rx='7' fill='%23203045'/%3E%3Cline x1='300' y1='595' x2='300' y2='835' stroke='%23203045' strokeWidth='2.5'/%3E%3Crect x='340' y='600' width='14' height='10' rx='2' fill='%23203045' opacity='0.5'/%3E%3C/svg%3E",
+    "category": "bottom",
+    "region": "legs",
+    "fit_measure": "hip",
+    "z_index": 10,
+    "gender": "male"
+  }
+]
