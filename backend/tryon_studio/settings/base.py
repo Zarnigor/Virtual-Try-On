@@ -131,7 +131,25 @@ SIGNED_URL_TTL = 3600  # 1 hour
 
 # AI
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT", 5))
+# Model for the JSON validation prompts (01, 02, 03). Set in .env, never hardcoded here (docs/09 #22).
+GEMINI_VALIDATION_MODEL = os.environ.get("GEMINI_VALIDATION_MODEL", "")
+GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+GEMINI_TIMEOUT_S = max(60.0, float(os.environ.get("GEMINI_TIMEOUT_S", 60)))  # slow replies are normal; never below 60 s
+GEMINI_RETRY_BACKOFF_S = 2.0  # one retry on 429/5xx after this pause
+AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT", 5))  # body checks per user per day (Asia/Tashkent)
+AI_GARMENT_DAILY_LIMIT = int(os.environ.get("AI_GARMENT_DAILY_LIMIT", 5))  # garment checks per user per day
+AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
+PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", BASE_DIR.parent / "prompts"))  # docker: ./prompts -> /prompts
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.environ.get("REDIS_URL", "redis://localhost:6379/0"),
+        "KEY_PREFIX": "tryon",
+    }
+}
+# Tests: in-memory cache and a guard that fails any real HTTP call (tryon_studio/test_runner.py).
+TEST_RUNNER = "tryon_studio.test_runner.NoNetworkTestRunner"
 
 # Canvas
 CANVAS_W = 600
