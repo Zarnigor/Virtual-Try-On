@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Bosh sahifa</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:20px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:#132E49;border:1px solid #234563;font-size:13px;color:#C7D8E6}
+.chip.g{background:rgba(61,220,132,0.12);border-color:rgba(61,220,132,0.4);color:#7CE8AE}
+.chip.w{background:rgba(245,184,75,0.12);border-color:rgba(245,184,75,0.4);color:#F5B84B}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl on" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;padding:40px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+    <section class="card" style="flex:0 1 380px;box-sizing:border-box;padding:28px;display:flex;flex-direction:column;gap:20px">
+      <h2 style="font-size:22px;font-weight:600">Mening tanam</h2>
+      <div style="display:grid;place-items:center;padding:20px 0;border-radius:16px;background:#0A1A2B;border:1px solid #1E3A55">
+        <svg width="150" height="300" viewBox="0 0 240 480" fill="none" aria-hidden="true">
+          <circle cx="120" cy="48" r="24" fill="#24496C"/><rect x="108" y="66" width="24" height="26" fill="#24496C"/>
+          <path d="M78 96Q120 84 162 96L172 215H68Z" fill="#24496C"/>
+          <line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/>
+          <line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/>
+          <line x1="96" y1="215" x2="90" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/>
+          <line x1="144" y1="215" x2="150" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <span class="chip g"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>Tasdiqlangan</span>
+        <span class="chip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Faqat sizga koʻrinadi</span>
+      </div>
+      <p style="margin:0;font-size:14px;line-height:1.5;color:#A9BED1">Rasm va belgilar oʻzgarmaydi. Oʻlchamlarni yilda bir marta yangilash mumkin.</p>
+      <a href="Profil.dc.html" style="font-size:14px;font-weight:500">Profil va maxfiylik</a>
+    </section>
+
+    <div style="flex:1 1 560px;min-width:0;display:flex;flex-direction:column;gap:36px">
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <h1 style="font-size:34px;font-weight:700">Salom!</h1>
+          <p style="margin:0;color:#A9BED1;font-size:16px">Kiyim tanlang va oʻzingizda koʻring.</p>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px">
+          <a class="btn" href="KiyimYuklash.dc.html" style="color:#E8F1F8">Kiyim yuklash</a>
+          <a class="btn p" href="KiyibKorish.dc.html" style="color:#06210F">Kiyib koʻrish</a>
+        </div>
+      </div>
+
+      <section style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="font-size:20px;font-weight:600">Kiyimlar</h2><a href="Kiyimlar.dc.html" style="font-size:14px;font-weight:500">Hammasi</a></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px">
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border-radius:16px">
+            <div style="display:grid;place-items:center;height:140px;border-radius:12px;background:#0A1A2B"><svg width="110" height="100" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#E8F1F8"/></svg></div>
+            <div><div style="font-weight:600;font-size:15px">Oq futbolka</div><div style="font-size:13px;color:#A9BED1;margin-top:2px">Katalog</div></div>
+          </div>
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border-radius:16px">
+            <div style="display:grid;place-items:center;height:140px;border-radius:12px;background:#0A1A2B"><svg width="110" height="100" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#35527A"/></svg></div>
+            <div><div style="font-weight:600;font-size:15px">Koʻk futbolka</div><div style="margin-top:6px"><span class="chip">Faqat men</span></div></div>
+          </div>
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border-radius:16px">
+            <div style="display:grid;place-items:center;height:140px;border-radius:12px;background:#0A1A2B"><svg width="90" height="100" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#6D7F94"/></svg></div>
+            <div><div style="font-weight:600;font-size:15px">Jinsi shim</div><div style="font-size:13px;color:#A9BED1;margin-top:2px">Katalog</div></div>
+          </div>
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border-radius:16px">
+            <div style="display:grid;place-items:center;height:140px;border-radius:12px;background:#0A1A2B"><svg width="90" height="100" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#8A8A5C"/></svg></div>
+            <div><div style="font-weight:600;font-size:15px">Xaki shim</div><div style="margin-top:6px"><span class="chip w">Tekshiruvda</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section style="display:flex;flex-direction:column;gap:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="font-size:20px;font-weight:600">Oxirgi obrazlar</h2><a href="Obrazlar.dc.html" style="font-size:14px;font-weight:500">Hammasi</a></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px">
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border-radius:16px">
+            <div style="display:grid;place-items:center;height:160px;border-radius:12px;background:#0A1A2B"><svg width="64" height="128" viewBox="0 0 240 480" fill="none" aria-hidden="true"><circle cx="120" cy="48" r="24" fill="#24496C"/><path d="M78 96Q120 84 162 96L172 215H68Z" fill="#24496C"/><line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="96" y1="215" x2="90" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/><line x1="144" y1="215" x2="150" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/><path d="M70 92L96 84Q120 100 144 84L170 92L200 140L178 156L168 130L170 200H70L72 130L62 156L40 140Z" fill="#E8F1F8"/></svg></div>
+            <div style="font-weight:600;font-size:15px">Kundalik</div>
+          </div>
+          <div class="card" style="padding:16px;display:flex;flex-direction:column;gap:12px;border-radius:16px">
+            <div style="display:grid;place-items:center;height:160px;border-radius:12px;background:#0A1A2B"><svg width="64" height="128" viewBox="0 0 240 480" fill="none" aria-hidden="true"><circle cx="120" cy="48" r="24" fill="#24496C"/><path d="M78 96Q120 84 162 96L172 215H68Z" fill="#35527A"/><line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="96" y1="215" x2="90" y2="430" stroke="#6D7F94" stroke-width="30" stroke-linecap="round"/><line x1="144" y1="215" x2="150" y2="430" stroke="#6D7F94" stroke-width="30" stroke-linecap="round"/></svg></div>
+            <div style="font-weight:600;font-size:15px">Sport</div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

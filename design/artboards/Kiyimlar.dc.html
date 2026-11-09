@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Kiyimlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.btn.s{min-height:44px;padding:0 14px;font-size:14px}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.pv{display:grid;place-items:center;height:150px;border-radius:12px;background:#0A1A2B}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#132E49;border:1px solid #234563;font-size:12.5px;color:#C7D8E6}
+.chip.g{background:rgba(61,220,132,0.12);border-color:rgba(61,220,132,0.4);color:#7CE8AE}
+.chip.w{background:rgba(245,184,75,0.12);border-color:rgba(245,184,75,0.4);color:#F5B84B}
+.chip.r{background:rgba(242,155,155,0.1);border-color:rgba(242,155,155,0.4);color:#F29B9B}
+.tab{padding:10px 16px;border-radius:10px;font-weight:600;font-size:15px;color:#A9BED1;border:1px solid transparent;background:transparent;cursor:pointer}
+.tab.on{background:#132E49;color:#fff;border-color:#2A4A68}
+.fl{padding:7px 14px;border-radius:999px;font-size:14px;border:1px solid #2A4A68;background:transparent;color:#C7D8E6;cursor:pointer;min-height:36px}
+.fl.on{background:#3DDC84;border-color:#3DDC84;color:#06210F;font-weight:600}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl on" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;max-width:1200px;margin:0 auto;padding:36px 40px;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <h1 style="font-size:34px;font-weight:700">Kiyimlar</h1>
+        <p style="margin:0;font-size:14px;color:#A9BED1">Kiyim rasmini oʻzgartirib boʻlmaydi, faqat oʻchirish mumkin.</p>
+      </div>
+      <a class="btn p" href="KiyimYuklash.dc.html" style="color:#06210F">Kiyim yuklash</a>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
+      <div style="display:flex;gap:4px;padding:4px;border-radius:14px;background:#0F2236;border:1px solid #1E3A55">
+        <button class="tab">Katalog</button>
+        <button class="tab on">Mening kiyimlarim</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="fl on">Hammasi</button>
+        <button class="fl">Futbolka</button>
+        <button class="fl">Shim</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px">
+      <div class="card">
+        <div class="pv"><svg width="120" height="106" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#35527A"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Koʻk futbolka</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Futbolka</span><span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Faqat men</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+      <div class="card">
+        <div class="pv"><svg width="120" height="106" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#E8F1F8"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Oq futbolka</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Futbolka</span><span class="chip g"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>Ommaviy</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+      <div class="card">
+        <div class="pv"><svg width="96" height="106" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#8A8A5C"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Xaki shim</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Shim</span><span class="chip w">Tekshiruvda</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+      <div class="card">
+        <div class="pv"><svg width="96" height="106" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#2B2F36" stroke="#6B7C8E" stroke-width="4" stroke-linejoin="round"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Qora shim</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Shim</span><span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Faqat men</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+      <div class="card">
+        <div class="pv"><svg width="120" height="106" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#B8484B"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Qizil futbolka</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Futbolka</span><span class="chip g"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>Ommaviy</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+      <div class="card">
+        <div class="pv"><svg width="96" height="106" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#6D7F94"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Jinsi shim</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Shim</span><span class="chip r">Yashirilgan</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+      <div class="card">
+        <div class="pv"><svg width="120" height="106" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#9AA5B1"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Kulrang futbolka</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Futbolka</span><span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Faqat men</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+      <div class="card">
+        <div class="pv"><svg width="96" height="106" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#C9B79C"/></svg></div>
+        <div><div style="font-weight:600;font-size:15px">Bej shim</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><span class="chip">Shim</span><span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>Faqat men</span></div></div>
+        <div style="display:flex;gap:8px"><a class="btn s" href="KiyibKorish.dc.html" style="flex:1;color:#E8F1F8">Kiyib koʻrish</a><button class="btn s" aria-label="Oʻchirish" style="width:44px;padding:0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

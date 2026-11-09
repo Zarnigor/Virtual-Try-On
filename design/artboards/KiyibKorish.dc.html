@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Kiyib koʻrish</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.btn.ai{border-color:#8E6FE0;background:rgba(142,111,224,0.14);color:#D9CCFF}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:20px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px 8px 12px;border-radius:14px;border:1px solid #234563;background:#0A1A2B;font-size:13px;color:#C7D8E6;cursor:pointer;font-family:inherit}
+.tile.on{border:2px solid #3DDC84;background:rgba(61,220,132,0.08);color:#fff;padding:9px 7px 11px}
+.seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:#0A1A2B;border:1px solid #1E3A55}
+.seg button{flex:1;min-height:38px;border-radius:10px;border:0;background:transparent;color:#A9BED1;font:600 14px Inter,sans-serif;cursor:pointer}
+.seg button.on{background:#3DDC84;color:#06210F}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:#132E49;border:1px solid #234563;font-size:12.5px;color:#C7D8E6}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl on" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;max-width:1240px;margin:0 auto;padding:28px 32px;display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start;justify-content:center">
+    <section class="card" style="flex:0 1 290px;box-sizing:border-box;padding:18px;display:flex;flex-direction:column;gap:16px">
+      <h2 style="font-size:18px;font-weight:600">Kiyim tanlang</h2>
+      <div class="seg"><button class="on">Mening</button><button>Katalog</button></div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+        <button class="tile on"><svg width="64" height="56" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#3F6AA8"/></svg>Koʻk futbolka</button>
+        <button class="tile"><svg width="64" height="56" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#E8F1F8"/></svg>Oq futbolka</button>
+        <button class="tile"><svg width="64" height="56" viewBox="0 0 300 260" fill="none" aria-hidden="true"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#B8484B"/></svg>Qizil futbolka</button>
+        <button class="tile on"><svg width="52" height="56" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#2B2F36" stroke="#6B7C8E" stroke-width="6" stroke-linejoin="round"/></svg>Qora shim</button>
+        <button class="tile"><svg width="52" height="56" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#6D7F94"/></svg>Jinsi shim</button>
+        <button class="tile"><svg width="52" height="56" viewBox="0 0 300 300" fill="none" aria-hidden="true"><path d="M80 10H220L240 280H168L150 110L132 280H60Z" fill="#C9B79C"/></svg>Bej shim</button>
+      </div>
+      <a href="KiyimYuklash.dc.html" style="font-size:14px;font-weight:500">Yangi kiyim yuklash</a>
+    </section>
+
+    <section class="card" style="flex:0 1 380px;box-sizing:border-box;padding:18px;display:flex;flex-direction:column;gap:14px;align-items:center">
+      <div class="seg" style="align-self:stretch"><button class="on">Oddiy</button><button>Realistik</button></div>
+      <div style="width:100%;border-radius:14px;background:#0A1A2B;border:1px solid #1E3A55;display:grid;place-items:center;padding:12px 0">
+        <svg width="280" height="560" viewBox="0 0 600 1200" role="img" aria-label="Tana ustida koʻk futbolka va qora shim">
+          <g fill="#24496C">
+            <circle cx="300" cy="100" r="50"/><rect x="265" y="145" width="70" height="75"/>
+            <path d="M265 215L335 215L405 250L390 360L380 490L405 585L398 650L202 650L195 585L220 490L210 360L195 250Z"/>
+            <path d="M400 255L500 650" stroke="#24496C" stroke-width="46" stroke-linecap="round" fill="none"/>
+            <path d="M200 255L100 650" stroke="#24496C" stroke-width="46" stroke-linecap="round" fill="none"/>
+            <path d="M202 640L298 640L287 835L272 1050L274 1120L232 1120L238 1050L223 835Z"/>
+            <path d="M398 640L302 640L313 835L328 1050L326 1120L368 1120L362 1050L377 835Z"/>
+          </g>
+          <path d="M203 560L397 560L407 640L385 835L372 1060L324 1060L310 835L300 700L290 835L276 1060L228 1060L215 835L193 640Z" fill="#2B2F36" stroke="#6B7C8E" stroke-width="5" stroke-linejoin="round"/>
+          <path d="M265 215L200 240L150 330L195 365L210 345L212 590L388 590L390 345L405 365L450 330L400 240L335 215Q300 250 265 215Z" fill="#3F6AA8" stroke="#8FB2E0" stroke-width="4" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div style="align-self:stretch;display:flex;flex-wrap:wrap;gap:10px">
+        <button class="btn ai" style="flex:1 1 150px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg>Realistik koʻrinish</button>
+        <a class="btn p" href="Obrazlar.dc.html" style="flex:1 1 150px;color:#06210F">Obrazni saqlash</a>
+      </div>
+    </section>
+
+    <section class="card" style="flex:0 1 360px;box-sizing:border-box;padding:20px;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h2 style="font-size:18px;font-weight:600">Tana</h2>
+        <div class="seg"><button class="on">Mening tanam</button><button>Model</button></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <h2 style="font-size:18px;font-weight:600">Tanlangan kiyimlar</h2>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:#0A1A2B;border:1px solid #1E3A55"><span style="font-size:14.5px;font-weight:500">Koʻk futbolka</span><button class="btn" aria-label="Koʻk futbolkani olib tashlash" style="min-height:44px;width:44px;padding:0;border-color:transparent;background:transparent"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:12px;background:#0A1A2B;border:1px solid #1E3A55"><span style="font-size:14.5px;font-weight:500">Qora shim</span><button class="btn" aria-label="Qora shimni olib tashlash" style="min-height:44px;width:44px;padding:0;border-color:transparent;background:transparent"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start;font-size:13.5px;line-height:1.5;color:#B7CADB"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3DDC84" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto;margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>Kiyim tana chiziqlariga moslashtirildi.</div>
+      <div role="status" style="display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;background:rgba(245,184,75,0.1);border:1px solid rgba(245,184,75,0.45);font-size:13.5px;line-height:1.5;color:#F5D58E"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5B84B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto;margin-top:1px"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg><span>Koʻk futbolka kuchli choʻzildi: yozuv yoki naqsh buzilib koʻrinishi mumkin.</span></div>
+      <p style="margin:0;font-size:13px;line-height:1.5;color:#A9BED1">Realistik koʻrinish AI yordamida qayta chiziladi. Saqlangan obrazda ikkalasi ham turadi.</p>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

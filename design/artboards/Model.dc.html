@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Model tanlash</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:20px}
+.lbl{font-size:14px;color:#E8F1F8;font-weight:500}
+.hint{font-size:12.5px;color:#9FB2C4}
+.inp{min-height:48px;border-radius:12px;border:1px solid #2A4A68;background:#0A1A2B;color:#E8F1F8;padding:0 14px;font:400 15px Inter,sans-serif;width:100%;box-sizing:border-box}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:#132E49;border:1px solid #234563;font-size:13px;color:#C7D8E6}
+.chip.g{background:rgba(61,220,132,0.12);border-color:rgba(61,220,132,0.4);color:#7CE8AE}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl on" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;max-width:1160px;margin:0 auto;padding:44px 40px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+    <section style="flex:1 1 480px;min-width:0;display:flex;flex-direction:column;gap:26px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="TanaTanlash.dc.html" style="font-size:14px;font-weight:500">Orqaga</a>
+        <h1 style="font-size:34px;font-weight:700">Model tanlash</h1>
+        <p style="margin:0;font-size:16px;line-height:1.5;color:#B7CADB">Oʻlchamlaringizni kiriting. Kiyim shularga moslashtiriladi va sizga eng yaqin model koʻrsatiladi.</p>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span class="lbl">Jins</span>
+        <div style="display:flex;gap:4px;padding:4px;border-radius:14px;background:#0F2236;border:1px solid #1E3A55;max-width:320px">
+          <button class="btn p" style="flex:1;min-height:42px">Erkak</button>
+          <button class="btn" style="flex:1;min-height:42px;border-color:transparent;background:transparent;color:#A9BED1">Ayol</button>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px">
+        <div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="m1">Boʻy, sm</label><input class="inp" id="m1" type="number" placeholder="sm" required><span class="hint">Majburiy</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="m2">Yelka, sm</label><input class="inp" id="m2" type="number" placeholder="sm" required><span class="hint">Yelka uchlari orasi</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="m3">Koʻkrak, sm</label><input class="inp" id="m3" type="number" placeholder="sm" required><span class="hint">Eng keng joyidan</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="m4">Bel, sm</label><input class="inp" id="m4" type="number" placeholder="sm" required><span class="hint">Eng ingichka joyidan</span></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><label class="lbl" for="m5">Son, sm</label><input class="inp" id="m5" type="number" placeholder="sm" required><span class="hint">Eng keng joyidan</span></div>
+      </div>
+
+      <p style="margin:0;padding:14px 16px;border-radius:14px;background:#0F2236;border:1px solid #1E3A55;font-size:14px;line-height:1.5;color:#B7CADB">Hamma oʻlchamlar majburiy: model yoʻlida kiyim aynan shu qiymatlarga moslanadi.</p>
+
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <a class="btn p" href="Kiyimlar.dc.html" style="color:#06210F;min-height:50px;font-size:16px;flex:1;min-width:220px">Davom etish: kiyim tanlash</a>
+      </div>
+    </section>
+
+    <section class="card" style="flex:0 1 400px;box-sizing:border-box;padding:28px;display:flex;flex-direction:column;gap:20px;align-items:center">
+      <div style="align-self:stretch;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <h2 style="font-size:20px;font-weight:600">Sizga eng yaqin</h2>
+        <span class="chip g">Oʻrtacha</span>
+      </div>
+      <div style="align-self:stretch;display:grid;place-items:center;padding:24px 0;border-radius:16px;background:#0A1A2B;border:1px solid #1E3A55">
+        <svg width="190" height="380" viewBox="0 0 240 480" fill="none" aria-hidden="true">
+          <circle cx="120" cy="48" r="24" fill="#24496C"/><rect x="108" y="66" width="24" height="26" fill="#24496C"/>
+          <path d="M78 96Q120 84 162 96L172 215H68Z" fill="#24496C"/>
+          <line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/>
+          <line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/>
+          <line x1="96" y1="215" x2="90" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/>
+          <line x1="144" y1="215" x2="150" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div style="align-self:stretch;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;text-align:center;font-size:13px;color:#C7D8E6">
+        <div style="padding:10px 4px;border-radius:12px;border:1px solid #234563;background:#0A1A2B">Ozgʻin</div>
+        <div style="padding:10px 4px;border-radius:12px;border:1px solid #3DDC84;background:rgba(61,220,132,0.12);color:#7CE8AE;font-weight:600">Oʻrtacha</div>
+        <div style="padding:10px 4px;border-radius:12px;border:1px solid #234563;background:#0A1A2B">Toʻla</div>
+      </div>
+      <p style="margin:0;font-size:13px;line-height:1.5;color:#A9BED1;text-align:center">Koʻrinadigan tana uchtadan biri. Kiyim esa kiritgan oʻlchamlaringizga moslanadi.</p>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

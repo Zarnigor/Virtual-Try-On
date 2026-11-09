@@ -1,0 +1,34 @@
+@startuml
+!include _style.puml
+title Activity 1: Oʻz tanani yaratish (bir marta, tasdiqlangach oʻzgarmaydi)
+
+|Foydalanuvchi|
+start
+repeat
+  :Rasm yuklash;
+  |Tizim|
+  :Kod tekshiruvi\n(boʻy, qoʻl, oyoq, rasm oʻlchami);
+  if (Kod OK?) then (ha)
+    |AI|
+    :AI tekshiruvi\n(old tomon, tor kiyim, kalta yeng, 18+); <<#E6DDF8>>
+    if (AI OK?) then (ha)
+      |Tizim|
+      :Fon olib tashlash,\nbelgilarni aniqlash;
+      |Foydalanuvchi|
+      :Belgilarni tuzatish,\nboʻy (ixtiyoriy);
+      if (Tasdiqlash?) then (ha)
+        |Tizim|
+        :Tanani saqlash\n(qulflanadi, user_id unique);
+        stop
+      else (yoʻq)
+      endif
+    else (yoʻq)
+      |Foydalanuvchi|
+      :Sababni koʻrish;
+    endif
+  else (yoʻq)
+    |Foydalanuvchi|
+    :Sababni koʻrish;
+  endif
+repeat while (qayta yuklash?) is (ha)
+@enduml

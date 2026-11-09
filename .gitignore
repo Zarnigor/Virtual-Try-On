@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+node_modules/
+.env
+media/
+output/
+*.pyc
+.DS_Store
+.idea/
+*.log

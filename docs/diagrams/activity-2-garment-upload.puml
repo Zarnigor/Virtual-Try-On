@@ -1,0 +1,62 @@
+@startuml
+!include _style.puml
+title Activity 2: Kiyim yuklash, tozalash va public qilish
+
+|Foydalanuvchi|
+start
+repeat
+  :Rasm yuklash,\ntur tanlash;
+  |Tizim|
+  :Kod tekshiruvi\n(hajm, oʻlcham, tur);
+  if (Kod OK?) then (ha)
+    |AI|
+    :Kirish tekshiruvi\n(bitta kiyim, old tomon); <<#E6DDF8>>
+    if (AI OK?) then (ha)
+      :Hanger va fonni\nolib tashlash; <<#E6DDF8>>
+      |Tizim|
+      :Sifat tekshiruvi\n(rang, shakl oʻzgarmaganmi);
+      if (Sifat OK?) then (ha)
+        |Foydalanuvchi|
+        :Natijani koʻrish;
+        if (Saqlaysizmi?) then (ha)
+          :Chiziqlarni belgilash;
+          |Tizim|
+          :Kiyimni saqlash\n(egasiga darhol koʻrinadi);
+          if (Hamma uchunmi?) then (ha)
+            |AI|
+            :AI moderatsiya; <<#E6DDF8>>
+            switch (Qaror?)
+            case (approve)
+              |Tizim|
+              :Umumiy katalogga qoʻshish;
+              stop
+            case (review)
+              |Tizim|
+              :Admin navbatiga qoʻyish;
+              stop
+            case (reject)
+              |Tizim|
+              :Yashirish;
+              stop
+            endswitch
+          else (yoʻq)
+            stop
+          endif
+        else (yoʻq)
+          :Bekor qilindi;
+          stop
+        endif
+      else (yoʻq)
+        |Foydalanuvchi|
+        :Sababni koʻrish;
+      endif
+    else (yoʻq)
+      |Foydalanuvchi|
+      :Sababni koʻrish;
+    endif
+  else (yoʻq)
+    |Foydalanuvchi|
+    :Sababni koʻrish;
+  endif
+repeat while (qayta yuklash?) is (ha)
+@enduml

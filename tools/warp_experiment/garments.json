@@ -1,0 +1,73 @@
+{
+  "_note": "Synthetic garment landmarks for the day-1 warp experiment. Units: pixels on the garment's own image (tight-cropped transparent PNG). Coordinates are relative to the garment image dimensions stored alongside each record.",
+  "tshirt": {
+    "type": "tshirt",
+    "image_size": [300, 350],
+    "landmarks": {
+      "shoulder": {
+        "y": 30,
+        "left_x": 10,
+        "right_x": 290,
+        "width": 280,
+        "center_x": 150
+      },
+      "chest": {
+        "y": 100,
+        "left_x": 20,
+        "right_x": 280,
+        "width": 260,
+        "center_x": 150
+      },
+      "waist": {
+        "y": 200,
+        "left_x": 30,
+        "right_x": 270,
+        "width": 240,
+        "center_x": 150
+      },
+      "hem": {
+        "y": 320,
+        "left_x": 25,
+        "right_x": 275,
+        "width": 250,
+        "center_x": 150
+      },
+      "sleeve_end": {
+        "left": {"x": 5, "y": 120},
+        "right": {"x": 295, "y": 120}
+      }
+    }
+  },
+  "pants": {
+    "type": "pants",
+    "image_size": [280, 500],
+    "landmarks": {
+      "waist": {
+        "y": 10,
+        "left_x": 10,
+        "right_x": 270,
+        "width": 260,
+        "center_x": 140
+      },
+      "hip": {
+        "y": 80,
+        "left_x": 5,
+        "right_x": 275,
+        "width": 270,
+        "center_x": 140
+      },
+      "crotch": {
+        "y": 150
+      },
+      "knee": {
+        "y": 300,
+        "left_leg": {"left_x": 10, "right_x": 120, "width": 110},
+        "right_leg": {"left_x": 160, "right_x": 270, "width": 110}
+      },
+      "hem": {
+        "left_leg": {"y": 480, "left_x": 20, "right_x": 115, "width": 95},
+        "right_leg": {"y": 480, "left_x": 165, "right_x": 260, "width": 95}
+      }
+    }
+  }
+}

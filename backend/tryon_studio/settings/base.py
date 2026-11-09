@@ -1,0 +1,141 @@
+import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-only-secret-key")
+DEBUG = bool(int(os.environ.get("DEBUG", 0)))
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost").split(",")
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "corsheaders",
+    "apps.users",
+    "apps.bodies",
+    "apps.avatars",
+    "apps.garments",
+    "apps.tryon_engine",
+    "apps.outfits",
+    "apps.jobs",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "tryon_studio.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "tryon_studio.wsgi.application"
+
+AUTH_USER_MODEL = "users.User"
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("POSTGRES_DB", "tryon"),
+        "USER": os.environ.get("POSTGRES_USER", "tryon"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "tryon_dev"),
+        "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+    }
+}
+
+# Parse DATABASE_URL if set
+_db_url = os.environ.get("DATABASE_URL")
+if _db_url:
+    import re
+    m = re.match(r"postgres://([^:]+):([^@]+)@([^:/]+):(\d+)/(.+)", _db_url)
+    if m:
+        DATABASES["default"].update({
+            "USER": m.group(1), "PASSWORD": m.group(2),
+            "HOST": m.group(3), "PORT": m.group(4), "NAME": m.group(5),
+        })
+
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+]
+
+LANGUAGE_CODE = "uz"
+TIME_ZONE = "Asia/Tashkent"
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "/static/"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ],
+}
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
+}
+
+CELERY_BROKER_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+CELERY_TASK_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+CORS_ALLOW_CREDENTIALS = True
+
+# Signed URL secret for image serving
+SIGNED_URL_SECRET = os.environ.get("SIGNED_URL_SECRET", SECRET_KEY)
+SIGNED_URL_TTL = 3600  # 1 hour
+
+# AI
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT", 5))
+
+# Canvas
+CANVAS_W = 600
+CANVAS_H = 1200
+
+# Upload limits
+MAX_UPLOAD_MB = 20

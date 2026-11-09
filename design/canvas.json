@@ -1,0 +1,15 @@
+{"v":3,"createdOnFiles":{"v":1,"at":"2026-11-06T13:00:00Z"},"title":"TryOn Studio: veb dizayn","launch":{"view":"canvas"},"pages":[],"boards":{
+"Main.dc.html":{"x":0,"y":300,"w":1280,"h":900,"title":"1. Kirish","expand":"fill"},
+"Bosh.dc.html":{"x":1360,"y":300,"w":1280,"h":900,"title":"2. Bosh sahifa","expand":"fill"},
+"TanaTanlash.dc.html":{"x":2720,"y":300,"w":1280,"h":900,"title":"3. Tana tanlash","expand":"fill"},
+"RasmYuklash.dc.html":{"x":0,"y":1320,"w":1280,"h":900,"title":"4. Oʻz rasmini yuklash","expand":"fill"},
+"Belgilash.dc.html":{"x":1360,"y":1320,"w":1280,"h":900,"title":"5. Belgilash sahifasi","expand":"fill"},
+"Model.dc.html":{"x":2720,"y":1320,"w":1280,"h":900,"title":"6. Model tanlash","expand":"fill"},
+"Kiyimlar.dc.html":{"x":0,"y":2340,"w":1280,"h":900,"title":"7. Kiyimlar","expand":"fill"},
+"KiyimYuklash.dc.html":{"x":1360,"y":2340,"w":1280,"h":900,"title":"8. Kiyim yuklash va tozalash","expand":"fill"},
+"KiyimBelgilash.dc.html":{"x":2720,"y":2340,"w":1280,"h":900,"title":"9. Kiyimni belgilash","expand":"fill"},
+"KiyibKorish.dc.html":{"x":0,"y":3360,"w":1280,"h":900,"title":"10. Kiyib koʻrish","expand":"fill"},
+"Obrazlar.dc.html":{"x":1360,"y":3360,"w":1280,"h":900,"title":"11. Mening obrazlarim","expand":"fill"},
+"Profil.dc.html":{"x":2720,"y":3360,"w":1280,"h":900,"title":"12. Profil va maxfiylik","expand":"fill"}
+},"order":["Main.dc.html","Bosh.dc.html","TanaTanlash.dc.html","RasmYuklash.dc.html","Belgilash.dc.html","Model.dc.html","Kiyimlar.dc.html","KiyimYuklash.dc.html","KiyimBelgilash.dc.html","KiyibKorish.dc.html","Obrazlar.dc.html","Profil.dc.html"],
+"notes":{"t1":{"x":0,"y":40,"text":"TryOn Studio: veb versiya (kompyuter va planshet)","kind":"title1","maxW":4000}},"designSystems":[]}

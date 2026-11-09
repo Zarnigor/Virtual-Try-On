@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Belgilash sahifasi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.btn.s{min-height:40px;padding:0 14px;font-size:14px}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:20px}
+.inp{min-height:44px;border-radius:12px;border:1px solid #2A4A68;background:#0A1A2B;color:#E8F1F8;padding:0 14px;font:400 15px Inter,sans-serif;box-sizing:border-box}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-weight:500;color:#A9BED1;text-align:right;padding:6px 8px;border-bottom:1px solid #1E3A55;font-size:13px}
+td{padding:7px 8px;text-align:right;border-bottom:1px solid #16304A;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl on" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;max-width:1200px;margin:0 auto;padding:28px 40px 32px;display:flex;flex-direction:column;gap:20px">
+    <ol style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:12px 28px;font-size:14px;color:#A9BED1">
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Rasm</li>
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Tekshiruv</li>
+      <li style="display:flex;align-items:center;gap:10px;color:#E8F1F8;font-weight:600"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#3DDC84;color:#06210F;font-size:13px;font-weight:700">3</span>Belgilash</li>
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #2A4A68;font-size:13px">4</span>Tasdiqlash</li>
+    </ol>
+
+    <div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+      <section class="card" style="flex:0 0 auto;box-sizing:border-box;padding:16px;display:flex;flex-direction:column;gap:12px;align-items:center">
+        <div style="border-radius:14px;background:#0A1A2B;border:1px solid #1E3A55;overflow:hidden">
+          <svg width="320" height="640" viewBox="0 0 600 1200" role="img" aria-label="Tana rasmi ustida belgilangan chiziqlar">
+            <g fill="#24496C">
+              <circle cx="300" cy="100" r="50"/>
+              <rect x="265" y="145" width="70" height="75"/>
+              <path d="M265 215L335 215L405 250L390 360L380 490L405 585L398 650L202 650L195 585L220 490L210 360L195 250Z"/>
+              <path d="M400 255L500 650" stroke="#24496C" stroke-width="46" stroke-linecap="round" fill="none"/>
+              <path d="M200 255L100 650" stroke="#24496C" stroke-width="46" stroke-linecap="round" fill="none"/>
+              <path d="M202 640L298 640L287 835L272 1050L274 1120L232 1120L238 1050L223 835Z"/>
+              <path d="M398 640L302 640L313 835L328 1050L326 1120L368 1120L362 1050L377 835Z"/>
+            </g>
+            <g stroke="#7A8CA0" stroke-width="1.5" stroke-dasharray="8 6">
+              <line x1="0" x2="600" y1="50" y2="50"/><line x1="0" x2="600" y1="335" y2="335"/><line x1="0" x2="600" y1="650" y2="650"/><line x1="0" x2="600" y1="1150" y2="1150"/>
+            </g>
+            <g font-family="Inter,sans-serif" font-size="24" font-weight="600" fill="#9FB2C4" text-anchor="end" style="paint-order:stroke;stroke:#0A1A2B;stroke-width:6px">
+              <text x="590" y="40">head_top</text><text x="590" y="325">armpit</text><text x="590" y="640">crotch</text><text x="590" y="1140">foot_bottom</text>
+            </g>
+            <g stroke-width="3">
+              <line x1="0" x2="600" y1="205" y2="205" stroke="#B77CFF"/><line x1="265" x2="265" y1="190" y2="220" stroke="#B77CFF" stroke-width="5"/><line x1="335" x2="335" y1="190" y2="220" stroke="#B77CFF" stroke-width="5"/>
+              <line x1="0" x2="600" y1="250" y2="250" stroke="#FFA23D"/><line x1="195" x2="195" y1="235" y2="265" stroke="#FFA23D" stroke-width="5"/><line x1="405" x2="405" y1="235" y2="265" stroke="#FFA23D" stroke-width="5"/>
+              <line x1="0" x2="600" y1="360" y2="360" stroke="#FF5C7A" stroke-width="5"/><line x1="210" x2="210" y1="344" y2="376" stroke="#FF5C7A" stroke-width="6"/><line x1="390" x2="390" y1="344" y2="376" stroke="#FF5C7A" stroke-width="6"/>
+              <line x1="0" x2="600" y1="490" y2="490" stroke="#3DDC84"/><line x1="220" x2="220" y1="475" y2="505" stroke="#3DDC84" stroke-width="5"/><line x1="380" x2="380" y1="475" y2="505" stroke="#3DDC84" stroke-width="5"/>
+              <line x1="0" x2="600" y1="585" y2="585" stroke="#5C9DFF"/><line x1="195" x2="195" y1="570" y2="600" stroke="#5C9DFF" stroke-width="5"/><line x1="405" x2="405" y1="570" y2="600" stroke="#5C9DFF" stroke-width="5"/>
+              <line x1="0" x2="600" y1="835" y2="835" stroke="#35D0E8"/><line x1="223" x2="223" y1="820" y2="850" stroke="#35D0E8" stroke-width="5"/><line x1="287" x2="287" y1="820" y2="850" stroke="#35D0E8" stroke-width="5"/><line x1="313" x2="313" y1="820" y2="850" stroke="#35D0E8" stroke-width="5"/><line x1="377" x2="377" y1="820" y2="850" stroke="#35D0E8" stroke-width="5"/>
+              <line x1="0" x2="600" y1="1050" y2="1050" stroke="#5ED0C0"/><line x1="238" x2="238" y1="1035" y2="1065" stroke="#5ED0C0" stroke-width="5"/><line x1="272" x2="272" y1="1035" y2="1065" stroke="#5ED0C0" stroke-width="5"/><line x1="328" x2="328" y1="1035" y2="1065" stroke="#5ED0C0" stroke-width="5"/><line x1="362" x2="362" y1="1035" y2="1065" stroke="#5ED0C0" stroke-width="5"/>
+            </g>
+            <g fill="#FF5C7A" stroke="#0A1A2B" stroke-width="3"><circle cx="210" cy="360" r="11"/><circle cx="390" cy="360" r="11"/></g>
+            <g font-family="Inter,sans-serif" font-size="24" font-weight="700" style="paint-order:stroke;stroke:#0A1A2B;stroke-width:6px">
+              <text x="10" y="194" fill="#B77CFF">neck 70</text>
+              <text x="10" y="239" fill="#FFA23D">shoulder 210</text>
+              <text x="10" y="349" fill="#FF8AA0">chest 180</text>
+              <text x="10" y="479" fill="#3DDC84">waist 160</text>
+              <text x="10" y="574" fill="#5C9DFF">hip 210</text>
+              <text x="10" y="824" fill="#35D0E8">knee L 64 / R 64</text>
+              <text x="10" y="1039" fill="#5ED0C0">ankle L 34 / R 34</text>
+            </g>
+          </svg>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+          <button class="btn s" aria-label="Kichraytirish">−</button>
+          <button class="btn s">Sigʻdirish</button>
+          <button class="btn s" aria-label="Kattalashtirish">+</button>
+        </div>
+      </section>
+
+      <div style="flex:1 1 440px;min-width:0;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h1 style="font-size:30px;font-weight:700">Chiziqlarni belgilang</h1>
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#B7CADB">Chiziqlar avtomatik topildi. Notoʻgʻri turgan chiziqni tortib toʻgʻrilang: uchlari tana chetiga oʻzi yopishadi.</p>
+        </div>
+
+        <div class="card" style="padding:8px 16px 12px;border-radius:16px">
+          <table>
+            <thead><tr><th>Belgi</th><th>y</th><th>eni</th><th>% boʻy</th></tr></thead>
+            <tbody>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#B77CFF;margin-right:8px"></span>neck</td><td>205</td><td>70</td><td>14.1</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#FFA23D;margin-right:8px"></span>shoulder</td><td>250</td><td>210</td><td>18.2</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#7A8CA0;margin-right:8px"></span>armpit</td><td>335</td><td>–</td><td>25.9</td></tr>
+              <tr style="background:#132E49"><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#FF5C7A;margin-right:8px"></span>chest</td><td>360</td><td>180</td><td>28.2</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#3DDC84;margin-right:8px"></span>waist</td><td>490</td><td>160</td><td>40.0</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#5C9DFF;margin-right:8px"></span>hip</td><td>585</td><td>210</td><td>48.6</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#7A8CA0;margin-right:8px"></span>crotch</td><td>650</td><td>–</td><td>54.5</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#35D0E8;margin-right:8px"></span>knee (chap / oʻng)</td><td>835</td><td>64 / 64</td><td>71.4</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#5ED0C0;margin-right:8px"></span>ankle (chap / oʻng)</td><td>1050</td><td>34 / 34</td><td>90.9</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:14px;background:rgba(61,220,132,0.1);border:1px solid rgba(61,220,132,0.4)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3DDC84" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
+          <div style="font-size:14px;line-height:1.5;color:#E8F1F8"><b style="font-weight:600">Tekshiruv: hammasi joyida.</b> Tartib toʻgʻri, chest armpitdan pastda, belgilar tana chetida.</div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+          <div style="display:flex;flex-direction:column;gap:6px"><label for="boy" style="font-size:13px;font-weight:500;color:#A9BED1">Boʻyingiz, sm (ixtiyoriy)</label><input class="inp" id="boy" type="number" placeholder="Masalan, 175" style="width:200px"></div>
+          <button class="btn s" style="margin-bottom:2px">Qayta aniqlash</button>
+        </div>
+
+        <div style="padding:16px 18px;border-radius:14px;background:#0F2236;border:1px solid #1E3A55;display:flex;flex-direction:column;gap:14px">
+          <p style="margin:0;font-size:14px;line-height:1.5;color:#E8F1F8"><b style="font-weight:600;color:#F5B84B">Eslatma:</b> tasdiqlagandan keyin rasm va chiziqlar oʻzgarmaydi.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <a class="btn" href="RasmYuklash.dc.html" style="color:#E8F1F8">Orqaga</a>
+            <a class="btn p" href="Bosh.dc.html" style="color:#06210F;flex:1;min-width:200px">Tasdiqlash</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

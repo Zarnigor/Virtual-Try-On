@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Kiyimni belgilash</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.btn.s{min-height:40px;padding:0 14px;font-size:14px}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:20px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-weight:500;color:#A9BED1;text-align:right;padding:6px 8px;border-bottom:1px solid #1E3A55;font-size:13px}
+td{padding:7px 8px;text-align:right;border-bottom:1px solid #16304A;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:14px;border:1px solid #2A4A68;background:#0A1A2B;cursor:pointer}
+.opt.on{border-color:#3DDC84;background:rgba(61,220,132,0.08)}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl on" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;max-width:1200px;margin:0 auto;padding:28px 40px 32px;display:flex;flex-direction:column;gap:20px">
+    <ol style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:12px 24px;font-size:14px;color:#A9BED1">
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Yuklash</li>
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Tozalash</li>
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Koʻrib chiqish</li>
+      <li style="display:flex;align-items:center;gap:10px;color:#E8F1F8;font-weight:600"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#3DDC84;color:#06210F;font-size:13px;font-weight:700">5</span>Belgilash</li>
+    </ol>
+
+    <div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start">
+      <section class="card" style="flex:0 1 560px;box-sizing:border-box;padding:16px;display:flex;flex-direction:column;gap:12px;align-items:center">
+        <div style="width:100%;border-radius:14px;overflow:hidden;background:#EDEDED;border:1px solid #1E3A55">
+          <svg width="100%" viewBox="0 0 400 360" role="img" aria-label="Futbolka ustida belgilangan chiziqlar" style="display:block">
+            <g transform="translate(40 40)"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#35527A"/></g>
+            <g stroke-width="3">
+              <line x1="0" x2="400" y1="70" y2="70" stroke="#E07A00"/><line x1="110" x2="110" y1="56" y2="84" stroke="#E07A00" stroke-width="5"/><line x1="270" x2="270" y1="56" y2="84" stroke="#E07A00" stroke-width="5"/>
+              <line x1="0" x2="400" y1="160" y2="160" stroke="#D6223F"/><line x1="126" x2="126" y1="146" y2="174" stroke="#D6223F" stroke-width="5"/><line x1="254" x2="254" y1="146" y2="174" stroke="#D6223F" stroke-width="5"/>
+              <line x1="0" x2="400" y1="215" y2="215" stroke="#0E8A44"/><line x1="126" x2="126" y1="201" y2="229" stroke="#0E8A44" stroke-width="5"/><line x1="254" x2="254" y1="201" y2="229" stroke="#0E8A44" stroke-width="5"/>
+              <line x1="0" x2="400" y1="276" y2="276" stroke="#2456D8"/><line x1="126" x2="126" y1="262" y2="290" stroke="#2456D8" stroke-width="5"/><line x1="254" x2="254" y1="262" y2="290" stroke="#2456D8" stroke-width="5"/>
+              <line x1="70" y1="130" x2="112" y2="152" stroke="#8E3FD0" stroke-width="5" stroke-linecap="round"/><line x1="330" y1="130" x2="288" y2="152" stroke="#8E3FD0" stroke-width="5" stroke-linecap="round"/>
+            </g>
+            <g font-family="Inter,sans-serif" font-size="13" font-weight="700" style="paint-order:stroke;stroke:#EDEDED;stroke-width:4px">
+              <text x="6" y="63" fill="#B45F00">shoulder</text>
+              <text x="6" y="153" fill="#B01C34">chest</text>
+              <text x="6" y="208" fill="#0B7336">waist</text>
+              <text x="6" y="269" fill="#1C45B4">hem</text>
+              <text x="394" y="123" fill="#7A2FB5" text-anchor="end">sleeve_end</text>
+            </g>
+          </svg>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+          <button class="btn s" aria-label="Kichraytirish">−</button>
+          <button class="btn s">Sigʻdirish</button>
+          <button class="btn s" aria-label="Kattalashtirish">+</button>
+          <button class="btn s">Qayta aniqlash</button>
+        </div>
+      </section>
+
+      <div style="flex:1 1 400px;min-width:0;display:flex;flex-direction:column;gap:18px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <h1 style="font-size:28px;font-weight:700">Kiyim chiziqlarini belgilang</h1>
+          <p style="margin:0;font-size:15px;line-height:1.5;color:#B7CADB">Futbolka uchun: yelka, koʻkrak, bel, etak va yeng uchlari. Chiziqlar tana chiziqlari bilan juftlashadi.</p>
+        </div>
+        <div class="card" style="padding:8px 16px 12px;border-radius:16px">
+          <table>
+            <thead><tr><th>Belgi</th><th>y</th><th>eni</th></tr></thead>
+            <tbody>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#FFA23D;margin-right:8px"></span>shoulder</td><td>70</td><td>160</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#FF5C7A;margin-right:8px"></span>chest</td><td>160</td><td>128</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#3DDC84;margin-right:8px"></span>waist</td><td>215</td><td>128</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#5C9DFF;margin-right:8px"></span>hem</td><td>276</td><td>128</td></tr>
+              <tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#B77CFF;margin-right:8px"></span>sleeve_end (chap / oʻng)</td><td>141</td><td>–</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <fieldset style="margin:0;padding:0;border:0;display:flex;flex-direction:column;gap:10px">
+          <legend style="padding:0;margin-bottom:10px;font:600 18px 'Space Grotesk',sans-serif">Kim koʻra oladi?</legend>
+          <label class="opt on"><input type="radio" name="vis" checked style="width:20px;height:20px;margin-top:1px;accent-color:#3DDC84"><span style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:15px">Faqat men</span><span style="font-size:13.5px;line-height:1.45;color:#A9BED1">Darhol tayyor. Boshqalar koʻrmaydi.</span></span></label>
+          <label class="opt"><input type="radio" name="vis" style="width:20px;height:20px;margin-top:1px;accent-color:#3DDC84"><span style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:600;font-size:15px">Hamma uchun</span><span style="font-size:13.5px;line-height:1.45;color:#A9BED1">Sizda darhol koʻrinadi. Umumiy katalogda AI tekshiruvidan keyin chiqadi.</span></span></label>
+        </fieldset>
+
+        <div style="display:flex;flex-wrap:wrap;gap:12px">
+          <a class="btn" href="KiyimYuklash.dc.html" style="color:#E8F1F8">Orqaga</a>
+          <a class="btn p" href="Kiyimlar.dc.html" style="color:#06210F;flex:1;min-width:200px">Saqlash</a>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,773 @@
+{
+ "_note": "SCHEMA REFERENCE ONLY. Computed from a collage of test images, converted to the 600x1200 canvas by subtracting 100 from all x values. Regenerate the real 6 avatars from the real photos (tools/avatar-prep + landmark editor). Knee/ankle use per-leg objects.",
+ "avatars": {
+  "male_slim": {
+   "sex": "male",
+   "build": "slim",
+   "canvas": [
+    600,
+    1200
+   ],
+   "master_scale": 2,
+   "axis_x": 300,
+   "figure_top": 50.0,
+   "figure_bottom": 1150.0,
+   "landmarks": {
+    "head_top": {
+     "y": 50.0
+    },
+    "neck": {
+     "y": 219.5,
+     "left_x": 264.0,
+     "right_x": 336.0,
+     "width": 72.0,
+     "center_x": 300.0,
+     "kind": "mid-neck: just above trapezius onset, below chin"
+    },
+    "shoulder": {
+     "y": 260.0,
+     "left_x": 184.5,
+     "right_x": 417.5,
+     "width": 233.0,
+     "center_x": 301.0,
+     "kind": "acromion points on the silhouette (edge turns from trapezius slope to near-vertical deltoid)"
+    },
+    "armpit": {
+     "y": 369.0
+    },
+    "chest": {
+     "y": 394.5,
+     "left_x": 206.5,
+     "right_x": 393.5,
+     "width": 187.0,
+     "center_x": 300.0,
+     "kind": "armpit + 2.5% H, torso only (arms excluded); always >= armpit"
+    },
+    "waist": {
+     "y": 474.5,
+     "left_x": 212.5,
+     "right_x": 385.5,
+     "width": 173.0,
+     "center_x": 299.0,
+     "kind": "narrowest torso row in 35-70% of armpit->crotch"
+    },
+    "hip": {
+     "y": 658.0,
+     "left_x": 188.5,
+     "right_x": 403.5,
+     "width": 215.0,
+     "center_x": 296.0,
+     "kind": "widest torso row between waist and crotch"
+    },
+    "crotch": {
+     "y": 671.5,
+     "kind": "shorts seam junction (darkest point on centre line), works when thighs touch"
+    },
+    "knee": {
+     "y": 837.0,
+     "left_leg": {
+      "left_x": 204.5,
+      "right_x": 270.0,
+      "width": 65.5
+     },
+     "right_leg": {
+      "left_x": 324.0,
+      "right_x": 389.5,
+      "width": 65.5
+     },
+     "span_width": 185.0,
+     "kind": "per-leg width; span_width is both legs incl. gap, NOT a body measurement"
+    },
+    "ankle": {
+     "left_leg": {
+      "y": 1028.5,
+      "left_x": 220.5,
+      "right_x": 252.0,
+      "width": 31.5
+     },
+     "right_leg": {
+      "y": 1030.5,
+      "left_x": 342.0,
+      "right_x": 373.5,
+      "width": 31.5
+     },
+     "kind": "narrowest leg row above the shoe top, per leg"
+    },
+    "foot_bottom": {
+     "y": 1150.0
+    }
+   },
+   "qa": {
+    "rows_where_arms_touch_torso": 0,
+    "waist_center_offset_px": -1.0,
+    "hip_center_offset_px": -4.0,
+    "max_figure_width": 322.5,
+    "landmark_methods": {
+     "neck": "silhouette (trapezius onset - offset)",
+     "shoulder": "silhouette acromion detection",
+     "chest": "armpit + 0.025H, line drawn and width measured at the same y",
+     "waist": "silhouette min in 35-70% armpit->crotch",
+     "hip": "silhouette max between waist and crotch",
+     "crotch": "seam junction on centre line",
+     "knee": "y = foot_bottom - 0.285H, per-leg width",
+     "ankle": "per-leg min width above shoe top"
+    },
+    "checks": {
+     "landmark_order_ok": true,
+     "chest_at_or_below_armpit": true,
+     "line_y_equals_measured_y": true
+    },
+    "warnings": [],
+    "hand_end_y": 669.0
+   },
+   "source": {
+    "scale": 1.0031919744642044,
+    "src_top": 124,
+    "src_bot": 2316,
+    "src_fig_h": 2193,
+    "head_cx": 902.5,
+    "feet_cx": 898.0
+   }
+  },
+  "male_average": {
+   "sex": "male",
+   "build": "average",
+   "canvas": [
+    600,
+    1200
+   ],
+   "master_scale": 2,
+   "axis_x": 300,
+   "figure_top": 50.0,
+   "figure_bottom": 1149.5,
+   "landmarks": {
+    "head_top": {
+     "y": 50.0
+    },
+    "neck": {
+     "y": 223.5,
+     "left_x": 258.0,
+     "right_x": 338.0,
+     "width": 80.0,
+     "center_x": 298.0,
+     "kind": "mid-neck: just above trapezius onset, below chin"
+    },
+    "shoulder": {
+     "y": 261.0,
+     "left_x": 178.5,
+     "right_x": 415.5,
+     "width": 237.0,
+     "center_x": 297.0,
+     "kind": "acromion points on the silhouette (edge turns from trapezius slope to near-vertical deltoid)"
+    },
+    "armpit": {
+     "y": 396.5
+    },
+    "chest": {
+     "y": 422.5,
+     "left_x": 204.5,
+     "right_x": 389.5,
+     "width": 185.0,
+     "center_x": 297.0,
+     "kind": "armpit + 2.5% H, torso only (arms excluded); always >= armpit"
+    },
+    "waist": {
+     "y": 498.0,
+     "left_x": 204.5,
+     "right_x": 391.5,
+     "width": 187.0,
+     "center_x": 298.0,
+     "kind": "narrowest torso row in 35-70% of armpit->crotch"
+    },
+    "hip": {
+     "y": 673.5,
+     "left_x": 186.5,
+     "right_x": 409.5,
+     "width": 223.0,
+     "center_x": 298.0,
+     "kind": "widest torso row between waist and crotch"
+    },
+    "crotch": {
+     "y": 687.5,
+     "kind": "shorts seam junction (darkest point on centre line), works when thighs touch"
+    },
+    "knee": {
+     "y": 837.0,
+     "left_leg": {
+      "left_x": 204.5,
+      "right_x": 274.0,
+      "width": 69.5
+     },
+     "right_leg": {
+      "left_x": 326.0,
+      "right_x": 393.5,
+      "width": 67.5
+     },
+     "span_width": 189.0,
+     "kind": "per-leg width; span_width is both legs incl. gap, NOT a body measurement"
+    },
+    "ankle": {
+     "left_leg": {
+      "y": 1030.0,
+      "left_x": 218.5,
+      "right_x": 252.0,
+      "width": 33.5
+     },
+     "right_leg": {
+      "y": 1038.0,
+      "left_x": 348.0,
+      "right_x": 379.5,
+      "width": 31.5
+     },
+     "kind": "narrowest leg row above the shoe top, per leg"
+    },
+    "foot_bottom": {
+     "y": 1149.5
+    }
+   },
+   "qa": {
+    "rows_where_arms_touch_torso": 0,
+    "waist_center_offset_px": -2.0,
+    "hip_center_offset_px": -2.0,
+    "max_figure_width": 319.0,
+    "landmark_methods": {
+     "neck": "silhouette (trapezius onset - offset)",
+     "shoulder": "silhouette acromion detection",
+     "chest": "armpit + 0.025H, line drawn and width measured at the same y",
+     "waist": "silhouette min in 35-70% armpit->crotch",
+     "hip": "silhouette max between waist and crotch",
+     "crotch": "seam junction on centre line",
+     "knee": "y = foot_bottom - 0.285H, per-leg width",
+     "ankle": "per-leg min width above shoe top"
+    },
+    "checks": {
+     "landmark_order_ok": true,
+     "chest_at_or_below_armpit": true,
+     "line_y_equals_measured_y": true
+    },
+    "warnings": [],
+    "hand_end_y": 702.5
+   },
+   "source": {
+    "scale": 0.9817045961624274,
+    "src_top": 83,
+    "src_bot": 2323,
+    "src_fig_h": 2241,
+    "head_cx": 905.0,
+    "feet_cx": 907.5
+   }
+  },
+  "male_plus": {
+   "sex": "male",
+   "build": "plus",
+   "canvas": [
+    600,
+    1200
+   ],
+   "master_scale": 2,
+   "axis_x": 300,
+   "figure_top": 50.0,
+   "figure_bottom": 1149.5,
+   "landmarks": {
+    "head_top": {
+     "y": 50.0
+    },
+    "neck": {
+     "y": 215.5,
+     "left_x": 260.0,
+     "right_x": 342.0,
+     "width": 82.0,
+     "center_x": 301.0,
+     "kind": "mid-neck: just above trapezius onset, below chin"
+    },
+    "shoulder": {
+     "y": 268.0,
+     "left_x": 168.5,
+     "right_x": 433.5,
+     "width": 265.0,
+     "center_x": 301.0,
+     "kind": "acromion points on the silhouette (edge turns from trapezius slope to near-vertical deltoid)"
+    },
+    "armpit": {
+     "y": 398.5
+    },
+    "chest": {
+     "y": 424.5,
+     "left_x": 194.5,
+     "right_x": 403.5,
+     "width": 209.0,
+     "center_x": 299.0,
+     "kind": "armpit + 2.5% H, torso only (arms excluded); always >= armpit"
+    },
+    "waist": {
+     "y": 522.0,
+     "left_x": 188.5,
+     "right_x": 407.5,
+     "width": 219.0,
+     "center_x": 298.0,
+     "kind": "narrowest torso row in 35-70% of armpit->crotch"
+    },
+    "hip": {
+     "y": 631.5,
+     "left_x": 172.5,
+     "right_x": 421.5,
+     "width": 249.0,
+     "center_x": 297.0,
+     "kind": "widest torso row between waist and crotch"
+    },
+    "crotch": {
+     "y": 665.5,
+     "kind": "shorts seam junction (darkest point on centre line), works when thighs touch"
+    },
+    "knee": {
+     "y": 837.0,
+     "left_leg": {
+      "left_x": 194.5,
+      "right_x": 278.0,
+      "width": 83.5
+     },
+     "right_leg": {
+      "left_x": 322.0,
+      "right_x": 403.5,
+      "width": 81.5
+     },
+     "span_width": 209.0,
+     "kind": "per-leg width; span_width is both legs incl. gap, NOT a body measurement"
+    },
+    "ankle": {
+     "left_leg": {
+      "y": 1046.0,
+      "left_x": 208.5,
+      "right_x": 248.0,
+      "width": 39.5
+     },
+     "right_leg": {
+      "y": 1038.0,
+      "left_x": 352.0,
+      "right_x": 389.5,
+      "width": 37.5
+     },
+     "kind": "narrowest leg row above the shoe top, per leg"
+    },
+    "foot_bottom": {
+     "y": 1149.5
+    }
+   },
+   "qa": {
+    "rows_where_arms_touch_torso": 0,
+    "waist_center_offset_px": -2.0,
+    "hip_center_offset_px": -3.0,
+    "max_figure_width": 387.0,
+    "landmark_methods": {
+     "neck": "silhouette (trapezius onset - offset)",
+     "shoulder": "silhouette acromion detection",
+     "chest": "armpit + 0.025H, line drawn and width measured at the same y",
+     "waist": "silhouette min in 35-70% armpit->crotch",
+     "hip": "silhouette max between waist and crotch",
+     "crotch": "seam junction on centre line",
+     "knee": "y = foot_bottom - 0.285H, per-leg width",
+     "ankle": "per-leg min width above shoe top"
+    },
+    "checks": {
+     "landmark_order_ok": true,
+     "chest_at_or_below_armpit": true,
+     "line_y_equals_measured_y": true
+    },
+    "warnings": [],
+    "hand_end_y": 666.0
+   },
+   "source": {
+    "scale": 1.0101010101010102,
+    "src_top": 118,
+    "src_bot": 2295,
+    "src_fig_h": 2178,
+    "head_cx": 910.5,
+    "feet_cx": 907.0
+   }
+  },
+  "female_slim": {
+   "sex": "female",
+   "build": "slim",
+   "canvas": [
+    600,
+    1200
+   ],
+   "master_scale": 2,
+   "axis_x": 300,
+   "figure_top": 50.0,
+   "figure_bottom": 1149.5,
+   "landmarks": {
+    "head_top": {
+     "y": 50.0
+    },
+    "neck": {
+     "y": 219.5,
+     "left_x": 264.0,
+     "right_x": 334.0,
+     "width": 70.0,
+     "center_x": 299.0,
+     "kind": "mid-neck: just above trapezius onset, below chin"
+    },
+    "shoulder": {
+     "y": 252.0,
+     "left_x": 190.5,
+     "right_x": 407.5,
+     "width": 217.0,
+     "center_x": 299.0,
+     "kind": "acromion points on the silhouette (edge turns from trapezius slope to near-vertical deltoid)"
+    },
+    "armpit": {
+     "y": 362.5
+    },
+    "chest": {
+     "y": 388.5,
+     "left_x": 216.5,
+     "right_x": 381.5,
+     "width": 165.0,
+     "center_x": 299.0,
+     "kind": "armpit + 2.5% H, torso only (arms excluded); always >= armpit"
+    },
+    "waist": {
+     "y": 454.5,
+     "left_x": 220.5,
+     "right_x": 377.5,
+     "width": 157.0,
+     "center_x": 299.0,
+     "kind": "narrowest torso row in 35-70% of armpit->crotch"
+    },
+    "hip": {
+     "y": 615.5,
+     "left_x": 186.5,
+     "right_x": 411.5,
+     "width": 225.0,
+     "center_x": 299.0,
+     "kind": "widest torso row between waist and crotch"
+    },
+    "crotch": {
+     "y": 629.5,
+     "kind": "shorts seam junction (darkest point on centre line), works when thighs touch"
+    },
+    "knee": {
+     "y": 837.0,
+     "left_leg": {
+      "left_x": 198.5,
+      "right_x": 268.0,
+      "width": 69.5
+     },
+     "right_leg": {
+      "left_x": 332.0,
+      "right_x": 401.5,
+      "width": 69.5
+     },
+     "span_width": 203.0,
+     "kind": "per-leg width; span_width is both legs incl. gap, NOT a body measurement"
+    },
+    "ankle": {
+     "left_leg": {
+      "y": 1038.0,
+      "left_x": 204.5,
+      "right_x": 236.5,
+      "width": 32.0
+     },
+     "right_leg": {
+      "y": 1042.0,
+      "left_x": 361.5,
+      "right_x": 393.5,
+      "width": 32.0
+     },
+     "kind": "narrowest leg row above the shoe top, per leg"
+    },
+    "foot_bottom": {
+     "y": 1149.5
+    }
+   },
+   "qa": {
+    "rows_where_arms_touch_torso": 0,
+    "waist_center_offset_px": -1.0,
+    "hip_center_offset_px": -1.0,
+    "max_figure_width": 300.5,
+    "landmark_methods": {
+     "neck": "silhouette (trapezius onset - offset)",
+     "shoulder": "silhouette acromion detection",
+     "chest": "armpit + 0.025H, line drawn and width measured at the same y",
+     "waist": "silhouette min in 35-70% armpit->crotch",
+     "hip": "silhouette max between waist and crotch",
+     "crotch": "seam junction on centre line",
+     "knee": "y = foot_bottom - 0.285H, per-leg width",
+     "ankle": "per-leg min width above shoe top"
+    },
+    "checks": {
+     "landmark_order_ok": true,
+     "chest_at_or_below_armpit": true,
+     "line_y_equals_measured_y": true
+    },
+    "warnings": [],
+    "hand_end_y": 683.5
+   },
+   "source": {
+    "scale": 1.055662188099808,
+    "src_top": 215,
+    "src_bot": 2298,
+    "src_fig_h": 2084,
+    "head_cx": 897.0,
+    "feet_cx": 895.0
+   }
+  },
+  "female_average": {
+   "sex": "female",
+   "build": "average",
+   "canvas": [
+    600,
+    1200
+   ],
+   "master_scale": 2,
+   "axis_x": 300,
+   "figure_top": 50.0,
+   "figure_bottom": 1149.5,
+   "landmarks": {
+    "head_top": {
+     "y": 50.0
+    },
+    "neck": {
+     "y": 217.5,
+     "left_x": 266.0,
+     "right_x": 334.0,
+     "width": 68.0,
+     "center_x": 300.0,
+     "kind": "mid-neck: just above trapezius onset, below chin"
+    },
+    "shoulder": {
+     "y": 254.0,
+     "left_x": 184.5,
+     "right_x": 413.5,
+     "width": 229.0,
+     "center_x": 299.0,
+     "kind": "acromion points on the silhouette (edge turns from trapezius slope to near-vertical deltoid)"
+    },
+    "armpit": {
+     "y": 378.5
+    },
+    "chest": {
+     "y": 404.5,
+     "left_x": 214.5,
+     "right_x": 383.5,
+     "width": 169.0,
+     "center_x": 299.0,
+     "kind": "armpit + 2.5% H, torso only (arms excluded); always >= armpit"
+    },
+    "waist": {
+     "y": 470.5,
+     "left_x": 208.5,
+     "right_x": 387.5,
+     "width": 179.0,
+     "center_x": 298.0,
+     "kind": "narrowest torso row in 35-70% of armpit->crotch"
+    },
+    "hip": {
+     "y": 625.5,
+     "left_x": 176.5,
+     "right_x": 423.5,
+     "width": 247.0,
+     "center_x": 300.0,
+     "kind": "widest torso row between waist and crotch"
+    },
+    "crotch": {
+     "y": 645.5,
+     "kind": "shorts seam junction (darkest point on centre line), works when thighs touch"
+    },
+    "knee": {
+     "y": 837.0,
+     "left_leg": {
+      "left_x": 200.5,
+      "right_x": 278.0,
+      "width": 77.5
+     },
+     "right_leg": {
+      "left_x": 324.0,
+      "right_x": 403.5,
+      "width": 79.5
+     },
+     "span_width": 203.0,
+     "kind": "per-leg width; span_width is both legs incl. gap, NOT a body measurement"
+    },
+    "ankle": {
+     "left_leg": {
+      "y": 1042.0,
+      "left_x": 206.5,
+      "right_x": 242.0,
+      "width": 35.5
+     },
+     "right_leg": {
+      "y": 1046.0,
+      "left_x": 360.0,
+      "right_x": 395.5,
+      "width": 35.5
+     },
+     "kind": "narrowest leg row above the shoe top, per leg"
+    },
+    "foot_bottom": {
+     "y": 1149.5
+    }
+   },
+   "qa": {
+    "rows_where_arms_touch_torso": 0,
+    "waist_center_offset_px": -2.0,
+    "hip_center_offset_px": 0.0,
+    "max_figure_width": 324.5,
+    "landmark_methods": {
+     "neck": "silhouette (trapezius onset - offset)",
+     "shoulder": "silhouette acromion detection",
+     "chest": "armpit + 0.025H, line drawn and width measured at the same y",
+     "waist": "silhouette min in 35-70% armpit->crotch",
+     "hip": "silhouette max between waist and crotch",
+     "crotch": "seam junction on centre line",
+     "knee": "y = foot_bottom - 0.285H, per-leg width",
+     "ankle": "per-leg min width above shoe top"
+    },
+    "checks": {
+     "landmark_order_ok": true,
+     "chest_at_or_below_armpit": true,
+     "line_y_equals_measured_y": true
+    },
+    "warnings": [],
+    "hand_end_y": 690.5
+   },
+   "source": {
+    "scale": 1.055662188099808,
+    "src_top": 215,
+    "src_bot": 2298,
+    "src_fig_h": 2084,
+    "head_cx": 896.5,
+    "feet_cx": 896.0
+   }
+  },
+  "female_plus": {
+   "sex": "female",
+   "build": "plus",
+   "canvas": [
+    600,
+    1200
+   ],
+   "master_scale": 2,
+   "axis_x": 300,
+   "figure_top": 50.0,
+   "figure_bottom": 1149.0,
+   "landmarks": {
+    "head_top": {
+     "y": 50.0
+    },
+    "neck": {
+     "y": 219.5,
+     "left_x": 264.0,
+     "right_x": 338.0,
+     "width": 74.0,
+     "center_x": 301.0,
+     "kind": "mid-neck: just above trapezius onset, below chin"
+    },
+    "shoulder": {
+     "y": 253.5,
+     "left_x": 182.5,
+     "right_x": 419.5,
+     "width": 237.0,
+     "center_x": 301.0,
+     "kind": "acromion points on the silhouette (edge turns from trapezius slope to near-vertical deltoid)"
+    },
+    "armpit": {
+     "y": 405.0
+    },
+    "chest": {
+     "y": 431.0,
+     "left_x": 204.5,
+     "right_x": 397.5,
+     "width": 193.0,
+     "center_x": 301.0,
+     "kind": "armpit + 2.5% H, torso only (arms excluded); always >= armpit"
+    },
+    "waist": {
+     "y": 487.0,
+     "left_x": 194.5,
+     "right_x": 407.5,
+     "width": 213.0,
+     "center_x": 301.0,
+     "kind": "narrowest torso row in 35-70% of armpit->crotch"
+    },
+    "hip": {
+     "y": 614.5,
+     "left_x": 168.5,
+     "right_x": 431.5,
+     "width": 263.0,
+     "center_x": 300.0,
+     "kind": "widest torso row between waist and crotch"
+    },
+    "crotch": {
+     "y": 640.5,
+     "kind": "shorts seam junction (darkest point on centre line), works when thighs touch"
+    },
+    "knee": {
+     "y": 836.0,
+     "left_leg": {
+      "left_x": 194.5,
+      "right_x": 284.0,
+      "width": 89.5
+     },
+     "right_leg": {
+      "left_x": 316.0,
+      "right_x": 405.5,
+      "width": 89.5
+     },
+     "span_width": 211.0,
+     "kind": "per-leg width; span_width is both legs incl. gap, NOT a body measurement"
+    },
+    "ankle": {
+     "left_leg": {
+      "y": 1047.5,
+      "left_x": 204.5,
+      "right_x": 244.0,
+      "width": 39.5
+     },
+     "right_leg": {
+      "y": 1039.5,
+      "left_x": 356.0,
+      "right_x": 397.5,
+      "width": 41.5
+     },
+     "kind": "narrowest leg row above the shoe top, per leg"
+    },
+    "foot_bottom": {
+     "y": 1149.0
+    }
+   },
+   "qa": {
+    "rows_where_arms_touch_torso": 0,
+    "waist_center_offset_px": 1.0,
+    "hip_center_offset_px": 0.0,
+    "max_figure_width": 347.5,
+    "landmark_methods": {
+     "neck": "silhouette (trapezius onset - offset)",
+     "shoulder": "silhouette acromion detection",
+     "chest": "armpit + 0.025H, line drawn and width measured at the same y",
+     "waist": "silhouette min in 35-70% armpit->crotch",
+     "hip": "silhouette max between waist and crotch",
+     "crotch": "seam junction on centre line",
+     "knee": "y = foot_bottom - 0.285H, per-leg width",
+     "ankle": "per-leg min width above shoe top"
+    },
+    "checks": {
+     "landmark_order_ok": true,
+     "chest_at_or_below_armpit": true,
+     "line_y_equals_measured_y": true
+    },
+    "warnings": [],
+    "hand_end_y": 691.5
+   },
+   "source": {
+    "scale": 1.0551558752997603,
+    "src_top": 214,
+    "src_bot": 2298,
+    "src_fig_h": 2085,
+    "head_cx": 895.5,
+    "feet_cx": 896.0
+   }
+  }
+ }
+}

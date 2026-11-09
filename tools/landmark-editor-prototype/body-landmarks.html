@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tana oʻlchov belgilari</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e9ecf1; --surface:#ffffff; --surface-2:#f4f6f9; --ink:#1a2030; --muted:#5a6375;
+  --rule:#d5dae2; --accent:#2346b8; --accent-ink:#ffffff; --ok:#17804a; --warn:#b4570b; --bad:#b3261e;
+  --stage:#d9dde4;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141821; --surface:#1d2230; --surface-2:#252b3a; --ink:#e8ebf2; --muted:#9aa3b5;
+    --rule:#323a4c; --accent:#6f8cf0; --accent-ink:#0d1120; --ok:#4cc286; --warn:#f0a050; --bad:#f07a70;
+    --stage:#0f121a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141821; --surface:#1d2230; --surface-2:#252b3a; --ink:#e8ebf2; --muted:#9aa3b5;
+  --rule:#323a4c; --accent:#6f8cf0; --accent-ink:#0d1120; --ok:#4cc286; --warn:#f0a050; --bad:#f07a70;
+  --stage:#0f121a; color-scheme: dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 "Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{display:grid;grid-template-rows:auto 1fr;height:100%}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:12px 18px;background:var(--surface);border-bottom:1px solid var(--rule)}
+header h1{font-size:17px;font-weight:700;margin:0;letter-spacing:-.01em}
+.slots{display:flex;gap:6px;flex-wrap:wrap}
+.slot{display:flex;flex-direction:column;align-items:flex-start;gap:0;padding:5px 11px 6px;border:1px solid var(--rule);border-radius:8px;background:var(--surface-2);min-width:92px;text-align:left}
+.slot small{font-size:11px;color:var(--muted)}
+.slot b{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+.slot .dot{width:8px;height:8px;border-radius:50%;background:var(--rule)}
+.slot.done .dot{background:var(--ok)}
+.slot[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:var(--surface)}
+
+main{display:grid;grid-template-columns:1fr 370px;min-height:0}
+.stage-col{display:grid;grid-template-rows:auto 1fr;min-height:0;min-width:0}
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--rule);background:var(--surface-2)}
+.toolbar .sep{width:1px;height:20px;background:var(--rule)}
+.toolbar label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.btn{border:1px solid var(--rule);background:var(--surface);border-radius:7px;padding:6px 11px}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.icon{width:32px;padding:6px 0;text-align:center}
+.stage-wrap{overflow:auto;background:var(--stage);position:relative;min-height:0}
+.stage{position:relative;margin:16px auto;box-shadow:0 0 0 1px var(--rule)}
+.stage img{display:block;width:100%;height:auto;user-select:none;-webkit-user-drag:none}
+.stage svg{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+.drop{position:absolute;inset:16px;display:grid;place-items:center;border:2px dashed var(--muted);border-radius:14px;color:var(--muted);text-align:center;padding:24px}
+.drop[hidden]{display:none}
+.drop.over{border-color:var(--accent);color:var(--accent)}
+.drop p{margin:6px 0;max-width:34ch}
+.drop strong{display:block;font-size:17px;color:var(--ink)}
+
+aside{background:var(--surface);border-left:1px solid var(--rule);overflow:auto;min-height:0;padding:14px 16px 24px}
+aside h2{font-size:14px;font-weight:700;margin:18px 0 8px}
+aside h2:first-child{margin-top:0}
+.current{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.current span{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:4px 6px;text-align:right;border-bottom:1px solid var(--rule)}
+th{color:var(--muted);font-weight:500}
+td:first-child,th:first-child{text-align:left}
+tr.sel td{background:var(--surface-2)}
+tr[data-k]{cursor:pointer}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.adj{color:var(--warn);font-size:11px;margin-left:4px}
+.warns{list-style:none;padding:0;margin:0;display:grid;gap:4px}
+.warns li{padding:6px 9px;border-radius:6px;background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--ink);font-size:13px;border-left:3px solid var(--warn)}
+.warns li.good{background:color-mix(in srgb,var(--ok) 12%,transparent);border-left-color:var(--ok)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)}
+.field input{width:76px;padding:5px 7px;border:1px solid var(--rule);border-radius:6px;background:var(--surface-2)}
+.confirm{margin-top:14px;display:grid;gap:8px}
+.confirm .btn.primary{padding:10px;font-size:15px}
+.hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+textarea{width:100%;height:220px;resize:vertical;border:1px solid var(--rule);border-radius:8px;background:var(--surface-2);padding:8px;font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:9px 16px;border-radius:8px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+kbd{font:11px ui-monospace,monospace;border:1px solid var(--rule);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surface-2)}
+@media (max-width:900px){
+  main{grid-template-columns:1fr;grid-template-rows:62vh auto}
+  aside{border-left:0;border-top:1px solid var(--rule)}
+}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Tana oʻlchov belgilari</h1>
+    <div class="slots" id="slots" role="group" aria-label="Qaysi rasm"></div>
+  </header>
+  <main>
+    <section class="stage-col">
+      <div class="toolbar">
+        <button class="btn" id="pick">Rasm tanlash</button>
+        <input type="file" id="file" accept="image/*" hidden>
+        <button class="btn" id="redetect" disabled>Qayta aniqlash</button>
+        <span class="sep"></span>
+        <button class="btn icon" id="zout" aria-label="Kichraytirish">−</button>
+        <button class="btn" id="zfit">Sigʻdirish</button>
+        <button class="btn icon" id="zin" aria-label="Kattalashtirish">+</button>
+        <span class="sep"></span>
+        <label><input type="checkbox" id="snap" checked> Chetlarga yopishtirish</label>
+        <label>Fon sezgirligi <input type="range" id="thr" min="12" max="90" value="36" style="width:90px"></label>
+      </div>
+      <div class="stage-wrap" id="wrap">
+        <div class="drop" id="drop">
+          <div>
+            <strong>Rasmni shu yerga tashlang</strong>
+            <p>yoki “Rasm tanlash” tugmasini bosing. Rasm brauzerdan tashqariga chiqmaydi.</p>
+            <p>Oldidan, toʻliq boʻyli, A-pozada, bir xil rangli fonda boʻlishi kerak.</p>
+          </div>
+        </div>
+        <div class="stage" id="stage" hidden>
+          <img id="img" alt="Yuklangan rasm">
+          <svg id="svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        </div>
+      </div>
+    </section>
+    <aside>
+      <div class="current"><h2 id="curTitle">Erkak, ozgʻin</h2><span id="curFile"></span></div>
+      <table>
+        <thead><tr><th>Belgi</th><th>y</th><th>eni</th><th>% boʻy</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="4" style="color:var(--muted);text-align:left">Rasm yuklang, belgilar avtomatik chiziladi.</td></tr></tbody>
+      </table>
+      <p class="hint">Chiziqni yuqori-pastga, uchidagi belgilarni chap-oʻngga torting. Tanlangan belgini <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> bilan 1px, <kbd>Shift</kbd> bilan 10px suring. Qiymatlar 600×1200 master oʻlchamida.</p>
+
+      <h2>Tekshiruv</h2>
+      <ul class="warns" id="warns"><li class="good">Rasm hali yuklanmagan.</li></ul>
+
+      <div class="confirm">
+        <div class="row">
+          <label class="field">Boʻy, sm <input type="number" id="hcm" min="50" max="250" step="0.5" placeholder="ixtiyoriy"></label>
+        </div>
+        <button class="btn primary" id="ok" disabled>OK, saqlash</button>
+      </div>
+
+      <h2>Natija JSON</h2>
+      <p class="hint" id="doneCount">0 / 6 tayyor</p>
+      <textarea id="out" readonly spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="copy">Nusxalash</button>
+        <button class="btn" id="dl" hidden>JSON yuklab olish</button>
+        <button class="btn" id="clearSlot">Shu rasmni oʻchirish</button>
+        <button class="btn" id="clearAll">Hammasini oʻchirish</button>
+      </div>
+    </aside>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+const SLOTS=[
+  {key:"male_slim",sex:"male",build:"slim",a:"Erkak",b:"ozgʻin"},
+  {key:"male_average",sex:"male",build:"average",a:"Erkak",b:"oʻrtacha"},
+  {key:"male_plus",sex:"male",build:"plus",a:"Erkak",b:"toʻla"},
+  {key:"female_slim",sex:"female",build:"slim",a:"Ayol",b:"ozgʻin"},
+  {key:"female_average",sex:"female",build:"average",a:"Ayol",b:"oʻrtacha"},
+  {key:"female_plus",sex:"female",build:"plus",a:"Ayol",b:"toʻla"}
+];
+const COL={neck:"#8e3fd0",shoulder:"#e07800",chest:"#d6223f",waist:"#16964a",hip:"#2456d8",knee:"#0a98b8",ankle_left:"#0b7a8f",ankle_right:"#0b7a8f",guide:"#7a8090"};
+const ORDER=["head_top","neck","shoulder","armpit","chest","waist","hip","crotch","knee","ankle_left","ankle_right","foot_bottom"];
+const GUIDES=["head_top","armpit","crotch","foot_bottom"];
+const SPANS=["neck","shoulder","chest","waist","hip"];
+const RANGE={neck:[12,19],shoulder:[16,23],armpit:[25,35],chest:[27,38],waist:[34,47],hip:[46,59],crotch:[49,61],knee:[68,76],ankle_left:[84,95],ankle_right:[84,95]};
+const STORE="bodyLandmarks.v1";
+const $=id=>document.getElementById(id);
+
+let slot=0, results={}, cur=null, sel=null, zoom=1, downloads=null;
+try{results=JSON.parse(localStorage.getItem(STORE)||"{}")||{}}catch(e){results={}}
+
+/* ---------- slots ---------- */
+function renderSlots(){
+  $("slots").innerHTML=SLOTS.map((s,i)=>`<button class="slot${results[s.key]?" done":""}" aria-pressed="${i===slot}" data-i="${i}"><small>${s.a}</small><b><span class="dot"></span>${s.b}</b></button>`).join("");
+  $("curTitle").textContent=SLOTS[slot].a+", "+SLOTS[slot].b;
+  $("doneCount").textContent=Object.keys(results).length+" / 6 tayyor";
+}
+$("slots").addEventListener("click",e=>{const b=e.target.closest(".slot");if(!b)return;slot=+b.dataset.i;renderSlots();});
+
+/* ---------- image loading ---------- */
+$("pick").onclick=()=>$("file").click();
+$("file").onchange=e=>{const f=e.target.files[0];if(f)load(f);e.target.value="";};
+const wrap=$("wrap");
+["dragenter","dragover"].forEach(t=>wrap.addEventListener(t,e=>{e.preventDefault();$("drop").classList.add("over")}));
+["dragleave","drop"].forEach(t=>wrap.addEventListener(t,e=>{e.preventDefault();$("drop").classList.remove("over")}));
+wrap.addEventListener("drop",e=>{const f=[...(e.dataTransfer.files||[])].find(f=>f.type.startsWith("image/"));if(f)load(f)});
+document.addEventListener("paste",e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith("image/"));if(it)load(it.getAsFile())});
+
+function load(file){
+  const url=URL.createObjectURL(file);
+  const im=new Image();
+  im.onload=()=>{
+    $("img").src=url;
+    cur={file:file.name||"pasted.png",W:im.naturalWidth,H:im.naturalHeight,im,adjusted:{}};
+    $("curFile").textContent=cur.file+"  "+cur.W+"×"+cur.H;
+    $("drop").hidden=true;$("stage").hidden=false;
+    $("redetect").disabled=false;$("ok").disabled=false;
+    buildMask();detect();zoom=1;layout();render();
+  };
+  im.onerror=()=>toast("Rasmni ochib boʻlmadi. PNG yoki JPG faylni tanlang.");
+  im.src=url;
+}
+
+/* ---------- segmentation (work scale) ---------- */
+function buildMask(){
+  const f=Math.min(1,1400/cur.H);
+  const w=Math.round(cur.W*f),h=Math.round(cur.H*f);
+  const c=document.createElement("canvas");c.width=w;c.height=h;
+  const ctx=c.getContext("2d",{willReadFrequently:true});ctx.drawImage(cur.im,0,0,w,h);
+  const px=ctx.getImageData(0,0,w,h).data;
+  const gray=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++)gray[i]=(px[i*4]*.299+px[i*4+1]*.587+px[i*4+2]*.114)|0;
+  // background = median of border pixels
+  const R=[],G=[],B=[];
+  const push=(x,y)=>{const i=(y*w+x)*4;R.push(px[i]);G.push(px[i+1]);B.push(px[i+2])};
+  for(let x=0;x<w;x+=3){push(x,0);push(x,h-1)}
+  for(let y=0;y<h;y+=3){push(0,y);push(w-1,y)}
+  const med=a=>{a.sort((p,q)=>p-q);return a[a.length>>1]};
+  const bg=[med(R),med(G),med(B)];
+  const thr=+$("thr").value;
+  let m=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++){const d=Math.abs(px[i*4]-bg[0])+Math.abs(px[i*4+1]-bg[1])+Math.abs(px[i*4+2]-bg[2]);m[i]=d>thr?1:0}
+  m=erode(dilate(m,w,h),w,h);   // close
+  m=dilate(erode(m,w,h),w,h);   // open
+  m=largest(m,w,h);
+  cur.mask=m;cur.gray=gray;cur.w=w;cur.h=h;cur.f=f;
+}
+function dilate(m,w,h){const o=new Uint8Array(w*h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){let v=0;for(let dy=-1;dy<=1&&!v;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx>=0&&xx<w&&m[yy*w+xx]){v=1;break}}}o[y*w+x]=v}return o}
+function erode(m,w,h){const o=new Uint8Array(w*h);for(let y=0;y<h;y++)for(let x=0;x<w;x++){let v=1;for(let dy=-1;dy<=1&&v;dy++){const yy=y+dy;if(yy<0||yy>=h){v=0;break}for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w||!m[yy*w+xx]){v=0;break}}}o[y*w+x]=v}return o}
+function largest(m,w,h){
+  const lab=new Int32Array(w*h),stack=new Int32Array(w*h);let best=0,bestN=0,id=0;
+  for(let i=0;i<w*h;i++){if(!m[i]||lab[i])continue;id++;let sp=0,n=0;stack[sp++]=i;lab[i]=id;
+    while(sp){const p=stack[--sp];n++;const x=p%w,y=(p/w)|0;
+      if(x>0&&m[p-1]&&!lab[p-1]){lab[p-1]=id;stack[sp++]=p-1}
+      if(x<w-1&&m[p+1]&&!lab[p+1]){lab[p+1]=id;stack[sp++]=p+1}
+      if(y>0&&m[p-w]&&!lab[p-w]){lab[p-w]=id;stack[sp++]=p-w}
+      if(y<h-1&&m[p+w]&&!lab[p+w]){lab[p+w]=id;stack[sp++]=p+w}}
+    if(n>bestN){bestN=n;best=id}}
+  const o=new Uint8Array(w*h);for(let i=0;i<w*h;i++)o[i]=lab[i]===best?1:0;return o}
+
+/* row helpers in work coords */
+function runs(y){const {mask:m,w}=cur;y=Math.max(0,Math.min(cur.h-1,Math.round(y)));const r=[];let s=-1;
+  for(let x=0;x<w;x++){const v=m[y*w+x];if(v&&s<0)s=x;if(!v&&s>=0){if(x-1-s>=2)r.push([s,x-1]);s=-1}}
+  if(s>=0&&w-1-s>=2)r.push([s,w-1]);return r}
+function crun(y){const r=runs(y),c=cur.cx;if(!r.length)return [c-1,c+1];
+  let best=r[0],bd=1e9;for(const q of r){if(q[0]<=c&&c<=q[1])return q;const d=Math.min(Math.abs(q[0]-c),Math.abs(q[1]-c));if(d<bd){bd=d;best=q}}return best}
+const wid=y=>{const q=crun(y);return q[1]-q[0]};
+function legs(y){
+  const c=cur.cx,lim=.16*cur.Hw;let rr=runs(y).filter(q=>q[1]>c-lim&&q[0]<c+lim);
+  rr=rr.flatMap(q=>q[0]<c&&q[1]>c?[[q[0],c],[c,q[1]]]:[q]);
+  const L=rr.filter(q=>q[1]<=c),R=rr.filter(q=>q[0]>=c);
+  return [L.length?L.reduce((a,b)=>b[1]>a[1]?b:a):null, R.length?R.reduce((a,b)=>b[0]<a[0]?b:a):null];
+}
+function argBy(lo,hi,fn,max){lo=Math.round(lo);hi=Math.round(hi);if(hi<=lo)return lo;let by=lo,bv=max?-1e9:1e9;for(let y=lo;y<hi;y++){const v=fn(y);if(max?v>bv:v<bv){bv=v;by=y}}return by}
+
+/* ---------- auto detection ---------- */
+function detect(){
+  const {mask:m,w,h,gray}=cur;
+  let top=0,bot=h-1;
+  for(let y=0;y<h;y++){let any=0;for(let x=0;x<w;x++)if(m[y*w+x]){any=1;break}if(any){top=y;break}}
+  for(let y=h-1;y>=0;y--){let any=0;for(let x=0;x<w;x++)if(m[y*w+x]){any=1;break}if(any){bot=y;break}}
+  const H=bot-top;cur.Hw=H;
+  const meanX=(y0,y1)=>{let s=0,n=0;for(let y=y0;y<=y1;y++)for(let x=0;x<w;x++)if(m[y*w+x]){s+=x;n++}return n?s/n:w/2};
+  const headCx=meanX(top,top+Math.round(.05*H)), feetCx=meanX(bot-Math.round(.03*H),bot);
+  cur.cx=Math.round((headCx+feetCx)/2);cur.headCx=headCx;cur.feetCx=feetCx;
+
+  let arm=null;for(let y=Math.round(top+.18*H);y<top+.40*H;y++){if(runs(y).length>=3){arm=y;break}}
+  if(arm==null)arm=Math.round(top+.30*H);
+  let ny=argBy(top+.10*H,top+.19*H,wid,false);const wmin=wid(ny);
+  let onset=null;for(let y=ny;y<arm;y++){if(wid(y)>wmin+.0145*H){onset=y;break}}
+  ny=onset!=null?Math.round(onset-.009*H):ny;
+  const acro=side=>{const e=[];for(let y=ny;y<arm;y++)e.push(crun(y)[side]);if(e.length<12)return null;
+    const base=e[0],tot=Math.abs(e[e.length-6]-base),win=Math.max(4,Math.round(.0127*H));
+    for(let i=0;i<e.length-win;i++){if(Math.abs(e[i]-base)>.55*tot){let s=0;for(let k=i;k<i+win;k++)s+=Math.abs(e[k+1]-e[k]);if(s/win<=1)return[ny+i,e[i]]}}return null};
+  const aL=acro(0),aR=acro(1);
+  let sh;if(aL&&aR)sh={y:(aL[0]+aR[0])/2,l:aL[1],r:aR[1]};else{const y=ny+.06*H,q=crun(y);sh={y,l:q[0],r:q[1]}}
+  const chy=arm+.025*H;
+  const lo=Math.round(top+.50*H),hi=Math.round(top+.62*H),sw=Math.max(2,Math.round(.01*H));
+  let cr=lo,bv=1e9;for(let y=lo;y<hi;y++){let s=0,n=0;for(let x=cur.cx-sw;x<=cur.cx+sw;x++){s+=gray[y*w+x];n++}if(s/n<bv){bv=s/n;cr=y}}
+  const wy=argBy(arm+.35*(cr-arm),arm+.70*(cr-arm),wid,false);
+  const hy=argBy(wy+.04*H,cr-.01*H,wid,true);
+  const ky=bot-.285*H;
+  const lim=.145*H;let shoe=null;
+  for(let y=Math.round(ky+.018*H);y<bot;y++){let n=0;for(let x=Math.round(cur.cx-lim);x<cur.cx+lim;x++)if(m[y*w+x]&&gray[y*w+x]<60)n++;if(n>Math.max(6,.011*H)){shoe=y;break}}
+  if(shoe==null)shoe=bot-.06*H;
+  const ank=i=>{const y=argBy(shoe-.07*H,shoe-Math.max(3,.005*H),y=>{const q=legs(y)[i];return q?q[1]-q[0]:1e9},false);const q=legs(y)[i]||[cur.cx,cur.cx];return{y,l:q[0],r:q[1]}};
+  const span=y=>{const q=crun(y);return{y,l:q[0],r:q[1]}};
+  const kl=legs(ky);
+  const S=1/cur.f, sc=o=>{const r={};for(const k in o)r[k]=Array.isArray(o[k])?o[k].map(q=>q.map(v=>v*S)):o[k]*S;return r};
+  cur.L={
+    head_top:{y:top*S},neck:sc(span(ny)),shoulder:sc(sh),armpit:{y:arm*S},chest:sc(span(chy)),
+    waist:sc(span(wy)),hip:sc(span(hy)),crotch:{y:cr*S},
+    knee:{y:ky*S,legs:[(kl[0]||[cur.cx-2,cur.cx-1]).map(v=>v*S),(kl[1]||[cur.cx+1,cur.cx+2]).map(v=>v*S)]},
+    ankle_left:sc(ank(0)),ankle_right:sc(ank(1)),foot_bottom:{y:bot*S}
+  };
+  cur.adjusted={};
+}
+
+/* re-snap a landmark after its y changes (src coords) */
+function snap(k){
+  if(!$("snap").checked)return;const o=cur.L[k],f=cur.f,S=1/f,yw=o.y*f;
+  if(SPANS.includes(k)){const q=crun(yw);o.l=q[0]*S;o.r=q[1]*S}
+  else if(k==="knee"){const lg=legs(yw);o.legs=o.legs.map((p,i)=>lg[i]?lg[i].map(v=>v*S):p)}
+  else if(k==="ankle_left"||k==="ankle_right"){const q=legs(yw)[k==="ankle_left"?0:1];if(q){o.l=q[0]*S;o.r=q[1]*S}}
+}
+
+/* ---------- coordinates / export ---------- */
+function geom(){
+  const L=cur.L,top=L.head_top.y,bot=L.foot_bottom.y,figH=bot-top+1,scale=2200/figH;
+  const axis=(cur.headCx+cur.feetCx)/2/cur.f;
+  const r5=v=>Math.round(v*2)/2;
+  return{top,bot,figH,scale,axis,Y:y=>r5(50+(y-top)*scale/2),X:x=>r5(300+(x-axis)*scale/2),pct:y=>(y-top)/(bot-top)*100};
+}
+function buildJSON(){
+  const g=geom(),L=cur.L,s=SLOTS[slot],hcm=parseFloat($("hcm").value);
+  const span=k=>{const o=L[k],lx=g.X(o.l),rx=g.X(o.r);return{y:g.Y(o.y),left_x:lx,right_x:rx,width:+(rx-lx).toFixed(1),center_x:+((lx+rx)/2).toFixed(1),adjusted:!!cur.adjusted[k]}};
+  const leg=(p)=>{const lx=g.X(p[0]),rx=g.X(p[1]);return{left_x:lx,right_x:rx,width:+(rx-lx).toFixed(1)}};
+  const ank=k=>{const o=L[k];return{y:g.Y(o.y),...leg([o.l,o.r]),adjusted:!!cur.adjusted[k]}};
+  const lm={
+    head_top:{y:g.Y(L.head_top.y)},neck:span("neck"),shoulder:span("shoulder"),armpit:{y:g.Y(L.armpit.y)},
+    chest:span("chest"),waist:span("waist"),hip:span("hip"),crotch:{y:g.Y(L.crotch.y)},
+    knee:{y:g.Y(L.knee.y),left_leg:leg(L.knee.legs[0]),right_leg:leg(L.knee.legs[1]),adjusted:!!cur.adjusted.knee},
+    ankle:{left_leg:ank("ankle_left"),right_leg:ank("ankle_right")},
+    foot_bottom:{y:g.Y(L.foot_bottom.y)}
+  };
+  const widths={neck:lm.neck.width,shoulder:lm.shoulder.width,chest:lm.chest.width,waist:lm.waist.width,hip:lm.hip.width,
+    knee_left:lm.knee.left_leg.width,knee_right:lm.knee.right_leg.width,ankle_left:lm.ankle.left_leg.width,ankle_right:lm.ankle.right_leg.width};
+  const ratio={};for(const k in widths)ratio[k]=+(widths[k]/1100).toFixed(4);
+  const out={sex:s.sex,build:s.build,canvas:[600,1200],master_scale:2,axis_x:300,figure_top:50.0,figure_bottom:lm.foot_bottom.y,
+    landmarks:lm,widths_ratio_to_height:ratio};
+  if(hcm>0){const cm={};for(const k in ratio)cm[k]=+(ratio[k]*hcm).toFixed(1);out.height_cm=hcm;out.widths_cm=cm}
+  const w=checks();
+  out.qa={checks:{landmark_order_ok:w.orderOk,chest_at_or_below_armpit:L.chest.y>=L.armpit.y},warnings:w.list.map(x=>x.t)};
+  out.source={file_name:cur.file,image_size:[cur.W,cur.H],scale:+g.scale.toFixed(6),src_top:Math.round(g.top),src_bot:Math.round(g.bot),src_fig_h:Math.round(g.figH),
+    head_cx:+(cur.headCx/cur.f).toFixed(1),feet_cx:+(cur.feetCx/cur.f).toFixed(1)};
+  return out;
+}
+
+/* ---------- checks ---------- */
+function onEdge(xs,ys){const f=cur.f,x=Math.round(xs*f),y=Math.round(ys*f),{mask:m,w,h}=cur;if(y<0||y>=h)return false;let a=0,b=0;
+  for(let dx=-2;dx<=2;dx++){const xx=x+dx;if(xx<0||xx>=w){b=1;continue}m[y*w+xx]?a=1:b=1}return a&&b}
+function checks(){
+  const L=cur.L,g=geom(),list=[];const name=k=>k.replace("_"," ");
+  const ys=["head_top","neck","shoulder","armpit","chest","waist","hip","crotch","knee"].map(k=>L[k].y);
+  ys.push(Math.min(L.ankle_left.y,L.ankle_right.y),L.foot_bottom.y);
+  const orderOk=ys.every((v,i)=>i===0||v>ys[i-1]);
+  if(!orderOk)list.push({t:"Belgilar tartibi buzilgan (tepadan pastga: neck, shoulder, armpit, chest, waist, hip, crotch, knee, ankle)."});
+  if(L.chest.y<L.armpit.y)list.push({t:"chest armpit'dan yuqorida. U armpit bilan bir xil yoki pastroqda boʻlishi kerak."});
+  for(const k in RANGE){const p=g.pct(L[k].y);if(p<RANGE[k][0]||p>RANGE[k][1])list.push({t:`${name(k)}: boʻyning ${p.toFixed(1)}% da, odatda ${RANGE[k][0]}–${RANGE[k][1]}%.`})}
+  for(const k of SPANS){const o=L[k];if(!onEdge(o.l,o.y)||!onEdge(o.r,o.y))list.push({t:`${k}: belgilardan biri tana chetida emas.`})}
+  L.knee.legs.forEach((p,i)=>{if(!onEdge(p[0],L.knee.y)||!onEdge(p[1],L.knee.y))list.push({t:`knee ${i?"oʻng":"chap"}: belgi tana chetida emas.`})});
+  for(const k of ["ankle_left","ankle_right"]){const o=L[k];if(!onEdge(o.l,o.y)||!onEdge(o.r,o.y))list.push({t:`${name(k)}: belgi tana chetida emas.`})}
+  const W=k=>L[k].r-L[k].l,kn=L.knee.legs.map(p=>p[1]-p[0]);
+  if(W("shoulder")>1.6*W("chest"))list.push({t:"shoulder chest'dan 1.6 martadan katta, belgilar fonga chiqib ketgan boʻlishi mumkin."});
+  if(Math.max(...kn)>.5*W("hip"))list.push({t:"knee juda keng, ikki oyoq birga oʻlchanmaganini tekshiring."});
+  if(W("ankle_left")>=kn[0]||W("ankle_right")>=kn[1])list.push({t:"ankle knee'dan kichik boʻlishi kerak."});
+  const diff=(a,b)=>Math.abs(a-b)/Math.max(a,b);
+  if(diff(kn[0],kn[1])>.15)list.push({t:"Chap va oʻng tizza farqi 15% dan katta."});
+  if(diff(W("ankle_left"),W("ankle_right"))>.15)list.push({t:"Chap va oʻng toʻpiq farqi 15% dan katta."});
+  return{orderOk,list};
+}
+
+/* ---------- rendering ---------- */
+const svg=$("svg"),stage=$("stage");
+function layout(){
+  if(!cur)return;const ww=wrap.clientWidth-32,wh=wrap.clientHeight-32;
+  const fit=Math.max(120,Math.min(ww,wh*cur.W/cur.H));
+  stage.style.width=(fit*zoom)+"px";
+  svg.setAttribute("viewBox",`0 0 ${cur.W} ${cur.H}`);
+}
+window.addEventListener("resize",()=>{layout();render()});
+const px2=()=>cur.W/stage.getBoundingClientRect().width;
+
+function render(){
+  if(!cur)return;const L=cur.L,g=geom(),u=px2(),W=cur.W,fs=12*u;
+  const txt=(x,y,s,c,anchor)=>`<text x="${x}" y="${y}" font-size="${fs}" fill="${c}" font-weight="600" text-anchor="${anchor||"start"}" stroke="#fff" stroke-width="${3*u}" paint-order="stroke" style="pointer-events:none">${s}</text>`;
+  const tick=(k,i,x,y,c)=>`<g data-k="${k}" data-t="${i}"><line x1="${x}" x2="${x}" y1="${y-9*u}" y2="${y+9*u}" stroke="${c}" stroke-width="${(sel&&sel.k===k&&sel.t===i?4:3)*u}"/><rect x="${x-7*u}" y="${y-12*u}" width="${14*u}" height="${24*u}" fill="transparent" style="cursor:ew-resize"/></g>`;
+  const hl=(k,y,c,label,dashed,x1,x2)=>{const on=sel&&sel.k===k;x1=x1??0;x2=x2??W;
+    return `<g data-k="${k}"><line x1="${x1}" x2="${x2}" y1="${y}" y2="${y}" stroke="${c}" stroke-width="${(on?3:dashed?1:2)*u}" ${dashed?`stroke-dasharray="${6*u} ${5*u}"`:""}/><rect x="${x1}" y="${y-6*u}" width="${x2-x1}" height="${12*u}" fill="transparent" style="cursor:ns-resize"/></g>`+
+      (label?txt(dashed?W-8*u:x1+8*u,y-5*u,label,c,dashed?"end":"start"):"")};
+  let s="";
+  for(const k of GUIDES)s+=hl(k,L[k].y,COL.guide,k,true);
+  const val=k=>(g.X(L[k].r)-g.X(L[k].l)).toFixed(1).replace(/\.0$/,"");
+  for(const k of SPANS){const o=L[k];s+=hl(k,o.y,COL[k],`${k} ${val(k)}`)+tick(k,0,o.l,o.y,COL[k])+tick(k,1,o.r,o.y,COL[k])}
+  const kv=L.knee.legs.map(p=>(g.X(p[1])-g.X(p[0])).toFixed(1).replace(/\.0$/,""));
+  s+=hl("knee",L.knee.y,COL.knee,`knee L ${kv[0]} / R ${kv[1]}`);
+  L.knee.legs.forEach((p,i)=>{s+=tick("knee",i*2,p[0],L.knee.y,COL.knee)+tick("knee",i*2+1,p[1],L.knee.y,COL.knee)});
+  // ankles: short lines per leg + label
+  const al=L.ankle_left,ar=L.ankle_right,pad=26*u;
+  s+=hl("ankle_left",al.y,COL.ankle_left,"",false,al.l-pad,al.r+pad/2)+tick("ankle_left",0,al.l,al.y,COL.ankle_left)+tick("ankle_left",1,al.r,al.y,COL.ankle_left);
+  s+=hl("ankle_right",ar.y,COL.ankle_right,"",false,ar.l-pad/2,ar.r+pad)+tick("ankle_right",0,ar.l,ar.y,COL.ankle_right)+tick("ankle_right",1,ar.r,ar.y,COL.ankle_right);
+  s+=txt(8*u,Math.min(al.y,ar.y)-5*u,`ankle L ${val("ankle_left")} / R ${val("ankle_right")}`,COL.ankle_left);
+  svg.innerHTML=s;
+  renderTable(g);renderWarns();
+}
+function renderTable(g){
+  const L=cur.L,rows=[];
+  const row=(k,y,w,c)=>rows.push(`<tr data-k="${k}" class="${sel&&sel.k===k?"sel":""}"><td><span class="sw" style="background:${c}"></span>${k}${cur.adjusted[k]?'<span class="adj">qoʻlda</span>':""}</td><td>${g.Y(y)}</td><td>${w??"–"}</td><td>${g.pct(y).toFixed(1)}</td></tr>`);
+  for(const k of ORDER){
+    const o=L[k];
+    if(SPANS.includes(k)||k.startsWith("ankle"))row(k,o.y,(g.X(o.r)-g.X(o.l)).toFixed(1),COL[k]);
+    else if(k==="knee")row(k,o.y,o.legs.map(p=>(g.X(p[1])-g.X(p[0])).toFixed(1)).join(" / "),COL.knee);
+    else row(k,o.y,null,COL.guide);
+  }
+  $("tbody").innerHTML=rows.join("");
+}
+function renderWarns(){
+  const w=checks().list;
+  $("warns").innerHTML=w.length?w.map(x=>`<li>${x.t}</li>`).join(""):`<li class="good">Hammasi joyida. Chiziqlarni koʻz bilan tekshirib, OK bosing.</li>`;
+}
+$("tbody").addEventListener("click",e=>{const r=e.target.closest("tr[data-k]");if(!r||!cur)return;sel={k:r.dataset.k};render();scrollTo(r.dataset.k)});
+function scrollTo(k){const y=cur.L[k].y/cur.H*stage.offsetHeight+stage.offsetTop;wrap.scrollTo({top:y-wrap.clientHeight/2,behavior:"auto"})}
+
+/* ---------- dragging ---------- */
+let drag=null;
+function svgPt(e){const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return p.matrixTransform(svg.getScreenCTM().inverse())}
+svg.addEventListener("pointerdown",e=>{
+  const g=e.target.closest("[data-k]");if(!g)return;e.preventDefault();
+  const k=g.dataset.k,t=g.dataset.t!=null?+g.dataset.t:null;sel={k,t};drag={k,t};
+  svg.setPointerCapture(e.pointerId);render();
+});
+svg.addEventListener("pointermove",e=>{if(!drag)return;const p=svgPt(e);apply(drag.k,drag.t,p.x,p.y);});
+const end=e=>{if(drag){drag=null;try{svg.releasePointerCapture(e.pointerId)}catch(_){}}};
+svg.addEventListener("pointerup",end);svg.addEventListener("pointercancel",end);
+function apply(k,t,x,y){
+  const o=cur.L[k];x=Math.max(0,Math.min(cur.W,x));y=Math.max(0,Math.min(cur.H,y));
+  if(t==null){o.y=y;snap(k)}
+  else if(k==="knee"){o.legs[t>>1][t&1]=x}
+  else{if(t===0)o.l=x;else o.r=x}
+  if(!GUIDES.includes(k))cur.adjusted[k]=true;
+  render();
+}
+document.addEventListener("keydown",e=>{
+  if(!cur||!sel||/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
+  const st=e.shiftKey?10:1,o=cur.L[sel.k];
+  if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();apply(sel.k,null,0,o.y+(e.key==="ArrowUp"?-st:st))}
+  else if((e.key==="ArrowLeft"||e.key==="ArrowRight")&&sel.t!=null){e.preventDefault();const d=e.key==="ArrowLeft"?-st:st;
+    const cx=sel.k==="knee"?o.legs[sel.t>>1][sel.t&1]:(sel.t===0?o.l:o.r);apply(sel.k,sel.t,cx+d,0)}
+  else if(e.key==="Escape"){sel=null;render()}
+});
+
+/* ---------- zoom ---------- */
+$("zin").onclick=()=>{zoom=Math.min(6,zoom*1.4);layout();render()};
+$("zout").onclick=()=>{zoom=Math.max(.5,zoom/1.4);layout();render()};
+$("zfit").onclick=()=>{zoom=1;layout();render()};
+wrap.addEventListener("wheel",e=>{if(!cur||!(e.ctrlKey||e.metaKey))return;e.preventDefault();zoom=Math.max(.5,Math.min(6,zoom*(e.deltaY<0?1.15:1/1.15)));layout();render()},{passive:false});
+
+/* ---------- actions ---------- */
+$("redetect").onclick=()=>{if(!cur)return;buildMask();detect();sel=null;render();toast("Belgilar qayta aniqlandi")};
+$("thr").onchange=()=>{if(!cur)return;buildMask();detect();render()};
+$("hcm").oninput=()=>{};
+$("ok").onclick=()=>{
+  if(!cur)return;const j=buildJSON();results[SLOTS[slot].key]=j;persist();
+  toast("Saqlandi: "+SLOTS[slot].a+", "+SLOTS[slot].b);
+  const next=SLOTS.findIndex((s,i)=>i>slot&&!results[s.key]);const any=SLOTS.findIndex(s=>!results[s.key]);
+  slot=next>=0?next:(any>=0?any:slot);renderSlots();renderOut();
+};
+$("clearSlot").onclick=()=>{delete results[SLOTS[slot].key];persist();renderSlots();renderOut();toast("Oʻchirildi: "+SLOTS[slot].a+", "+SLOTS[slot].b)};
+$("clearAll").onclick=()=>{if(!Object.keys(results).length)return;if(!confirm("6 ta natijaning hammasi oʻchiriladi. Davom etasizmi?"))return;results={};persist();renderSlots();renderOut()};
+function persist(){try{localStorage.setItem(STORE,JSON.stringify(results))}catch(e){}}
+function ordered(){const o={};for(const s of SLOTS)if(results[s.key])o[s.key]=results[s.key];return o}
+function renderOut(){const o=ordered();$("out").value=Object.keys(o).length?JSON.stringify(o,null,1):"";renderSlots()}
+$("copy").onclick=async()=>{const t=$("out").value;if(!t){toast("Hali saqlangan natija yoʻq");return}
+  try{await navigator.clipboard.writeText(t);toast("JSON nusxalandi")}catch(e){$("out").select();try{document.execCommand("copy");toast("JSON nusxalandi")}catch(_){toast("Matnni belgilab, qoʻlda nusxalang")}}};
+$("dl").onclick=async()=>{const t=$("out").value;if(!t||!downloads)return;
+  try{await downloads.save({filename:"body_landmarks.json",data:t})}catch(e){if(e&&e.code!=="declined")toast("Yuklab boʻlmadi, Nusxalash tugmasidan foydalaning")}};
+(async()=>{try{if(window.claude&&window.claude.use){downloads=await window.claude.use("downloads");if(downloads)$("dl").hidden=false}}catch(e){}})();
+
+let tt;function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),1800)}
+
+renderSlots();renderOut();
+})();
+</script>
+</body>
+</html>

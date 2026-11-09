@@ -1,0 +1,10 @@
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam defaultFontSize 13
+skinparam ArrowColor #444444
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #444444
+skinparam ActivityDiamondBackgroundColor #F4F4F4
+skinparam ActivityDiamondBorderColor #444444
+skinparam swimlaneTitleFontStyle bold
+skinparam swimlaneWidth same

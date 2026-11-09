@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Tana tanlash</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:20px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:#132E49;border:1px solid #234563;font-size:13px;color:#C7D8E6}
+.chip.g{background:rgba(61,220,132,0.12);border-color:rgba(61,220,132,0.4);color:#7CE8AE}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl on" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;max-width:1120px;margin:0 auto;padding:56px 40px;display:flex;flex-direction:column;gap:36px">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <h1 style="font-size:36px;font-weight:700">Tanani tanlang</h1>
+      <p style="margin:0;font-size:17px;line-height:1.5;color:#B7CADB;max-width:640px">Kiyimni oʻz tanangizda yoki tayyor modelda koʻrishingiz mumkin. Keyinroq ikkalasi orasida almashtirish mumkin.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:24px">
+      <section class="card" style="box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:22px;border-color:#3DDC84">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <h2 style="font-size:24px;font-weight:600">Oʻz tanam</h2>
+          <span class="chip g">Aniqroq natija</span>
+        </div>
+        <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+          <div style="display:grid;place-items:center;padding:16px 28px;border-radius:16px;background:#0A1A2B;border:1px solid #1E3A55">
+            <svg width="96" height="192" viewBox="0 0 240 480" fill="none" aria-hidden="true"><circle cx="120" cy="48" r="24" fill="#24496C"/><rect x="108" y="66" width="24" height="26" fill="#24496C"/><path d="M78 96Q120 84 162 96L172 215H68Z" fill="#24496C"/><line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="96" y1="215" x2="90" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/><line x1="144" y1="215" x2="150" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/></svg>
+          </div>
+          <ul style="flex:1 1 220px;list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;font-size:15px;line-height:1.4;color:#D5E3EE">
+            <li>Bitta rasm, A-pozada, toʻliq boʻy</li>
+            <li>Tor, kalta yengli kiyim va shorti</li>
+            <li>Tasdiqlagandan keyin rasm va belgilar oʻzgarmaydi</li>
+          </ul>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#A9BED1">Oʻlchamlarni kiritish ixtiyoriy: chiziqlarni rasmda belgilaysiz.</p>
+        <a class="btn p" href="RasmYuklash.dc.html" style="color:#06210F;min-height:50px;font-size:16px">Rasm yuklash</a>
+      </section>
+
+      <section class="card" style="box-sizing:border-box;padding:32px;display:flex;flex-direction:column;gap:22px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <h2 style="font-size:24px;font-weight:600">Tayyor model</h2>
+          <span class="chip">Rasm shart emas</span>
+        </div>
+        <div style="display:flex;gap:16px;align-items:flex-end;justify-content:center;padding:16px;border-radius:16px;background:#0A1A2B;border:1px solid #1E3A55;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <svg width="70" height="140" viewBox="0 0 240 480" fill="none" aria-hidden="true"><g transform="translate(120 0) scale(0.82 1) translate(-120 0)"><circle cx="120" cy="48" r="24" fill="#24496C"/><path d="M78 96Q120 84 162 96L172 215H68Z" fill="#24496C"/><line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="96" y1="215" x2="90" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/><line x1="144" y1="215" x2="150" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/></g></svg>
+            <span style="font-size:13px;color:#C7D8E6">Ozgʻin</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <svg width="70" height="140" viewBox="0 0 240 480" fill="none" aria-hidden="true"><circle cx="120" cy="48" r="24" fill="#24496C"/><path d="M78 96Q120 84 162 96L172 215H68Z" fill="#24496C"/><line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="96" y1="215" x2="90" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/><line x1="144" y1="215" x2="150" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/></svg>
+            <span style="font-size:13px;color:#C7D8E6">Oʻrtacha</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <svg width="70" height="140" viewBox="0 0 240 480" fill="none" aria-hidden="true"><g transform="translate(120 0) scale(1.22 1) translate(-120 0)"><circle cx="120" cy="48" r="24" fill="#24496C"/><path d="M78 96Q120 84 162 96L172 215H68Z" fill="#24496C"/><line x1="76" y1="104" x2="34" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="164" y1="104" x2="206" y2="250" stroke="#24496C" stroke-width="22" stroke-linecap="round"/><line x1="96" y1="215" x2="90" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/><line x1="144" y1="215" x2="150" y2="430" stroke="#24496C" stroke-width="30" stroke-linecap="round"/></g></svg>
+            <span style="font-size:13px;color:#C7D8E6">Toʻla</span>
+          </div>
+        </div>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#A9BED1">Jinsni tanlaysiz va oʻlchamlaringizni kiritasiz. Oʻlchamlar majburiy: kiyim shularga moslashadi.</p>
+        <a class="btn" href="Model.dc.html" style="color:#E8F1F8;min-height:50px;font-size:16px">Model tanlash</a>
+      </section>
+    </div>
+
+    <p style="margin:0;padding:16px 20px;border-radius:14px;background:#0F2236;border:1px solid #1E3A55;font-size:14px;line-height:1.5;color:#B7CADB">Oʻz tanangizni keyinroq butunlay oʻchirib, yangidan yuklashingiz mumkin. Tahrirlash esa mumkin emas.</p>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

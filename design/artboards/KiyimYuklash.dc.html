@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Kiyim yuklash va tozalash</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0A1626;color:#E8F1F8;font-family:Inter,system-ui,sans-serif}
+h1,h2,h3{font-family:'Space Grotesk',Inter,sans-serif;margin:0;letter-spacing:-0.01em}
+a{color:#7CE8AE;text-decoration:none}a:hover{color:#B4F5CF}
+.navl{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;color:#A9BED1;font-weight:500;font-size:15px}
+.navl:hover{background:#132E49;color:#fff}
+.navl.on{background:#132E49;color:#fff}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 20px;border-radius:12px;border:1px solid #2A4A68;background:#112A42;color:#E8F1F8;font:600 15px Inter,sans-serif;cursor:pointer}
+.btn:hover{background:#17375A;color:#fff}
+.btn.p{background:#3DDC84;border-color:#3DDC84;color:#06210F}
+.btn.p:hover{background:#6BEBA3;color:#06210F}
+.card{background:#0F2236;border:1px solid #1E3A55;border-radius:20px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;background:#132E49;border:1px solid #234563;font-size:13px;color:#C7D8E6}
+.chip.g{background:rgba(61,220,132,0.12);border-color:rgba(61,220,132,0.4);color:#7CE8AE}
+</style>
+</helmet>
+<div style="min-height:900px">
+  <header style="display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px;padding:14px 40px;border-bottom:1px solid #1E3A55;background:#0B1B2E">
+    <div style="display:flex;align-items:center;gap:10px">
+      <svg width="30" height="30" viewBox="0 0 36 36" fill="none" aria-hidden="true"><rect x="1" y="1" width="34" height="34" rx="10" fill="#3DDC84"/><path d="M10 12l5-3c1 2 5 2 6 0l5 3 2 5-3 1-1-2v11H12V16l-1 2-3-1z" stroke="#06210F" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span style="font:700 19px 'Space Grotesk',sans-serif">TryOn Studio</span>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+      <a class="navl" href="Bosh.dc.html">Bosh sahifa</a>
+      <a class="navl" href="TanaTanlash.dc.html">Tana</a>
+      <a class="navl on" href="Kiyimlar.dc.html">Kiyimlar</a>
+      <a class="navl" href="KiyibKorish.dc.html">Kiyib koʻrish</a>
+      <a class="navl" href="Obrazlar.dc.html">Obrazlar</a>
+    </nav>
+    <a class="navl" href="Profil.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Profil</a>
+  </header>
+
+  <main style="box-sizing:border-box;max-width:1160px;margin:0 auto;padding:32px 40px;display:flex;flex-direction:column;gap:24px">
+    <ol style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:12px 24px;font-size:14px;color:#A9BED1">
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Yuklash</li>
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Tekshiruv</li>
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #3DDC84;color:#3DDC84"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></span>Tozalash</li>
+      <li style="display:flex;align-items:center;gap:10px;color:#E8F1F8;font-weight:600"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:#3DDC84;color:#06210F;font-size:13px;font-weight:700">4</span>Koʻrib chiqish</li>
+      <li style="display:flex;align-items:center;gap:10px"><span style="display:grid;place-items:center;width:26px;height:26px;border-radius:50%;border:1px solid #2A4A68;font-size:13px">5</span>Belgilash</li>
+    </ol>
+
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h1 style="font-size:32px;font-weight:700">Natijani koʻrib chiqing</h1>
+        <p style="margin:0;font-size:15px;color:#B7CADB">Ilgich va fon olib tashlandi. Saqlasangiz, rasmni keyin oʻzgartirib boʻlmaydi.</p>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span style="font-size:13px;color:#A9BED1">Tur</span><span class="chip g">Futbolka</span><span class="chip">Bugungi urinishlar: 2 / 5</span></div>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:center">
+      <figure style="flex:1 1 340px;max-width:460px;margin:0;display:flex;flex-direction:column;gap:12px">
+        <div style="border-radius:20px;overflow:hidden;border:1px solid #1E3A55;background:#1D2B3B;display:grid;place-items:center;aspect-ratio:1/1">
+          <svg width="100%" height="100%" viewBox="0 0 300 300" fill="none" role="img" aria-label="Ilgichda osilgan futbolka, orqada eshik">
+            <rect x="214" y="30" width="74" height="270" fill="#243648"/>
+            <line x1="0" y1="288" x2="300" y2="288" stroke="#2C4158" stroke-width="3"/>
+            <path d="M150 52V36a11 11 0 1 1 11 11" stroke="#B9C6D2" stroke-width="4" stroke-linecap="round"/>
+            <path d="M150 52L42 108H258Z" stroke="#B9C6D2" stroke-width="4" stroke-linejoin="round"/>
+            <g transform="translate(24 64) scale(0.84)"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#35527A"/></g>
+          </svg>
+        </div>
+        <figcaption style="font-size:14px;color:#A9BED1;text-align:center">Asl rasm: ilgich va fon bor</figcaption>
+      </figure>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3DDC84" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto"><path d="M4 12h16M14 6l6 6-6 6"/></svg>
+      <figure style="flex:1 1 340px;max-width:460px;margin:0;display:flex;flex-direction:column;gap:12px">
+        <div style="border-radius:20px;overflow:hidden;border:2px solid #3DDC84;background:#EDEDED;display:grid;place-items:center;aspect-ratio:1/1">
+          <svg width="100%" height="100%" viewBox="0 0 300 300" fill="none" role="img" aria-label="Tozalangan futbolka, bir xil fonda">
+            <g transform="translate(26 44) scale(0.82)"><path d="M70 30L110 12Q150 40 190 12L230 30L270 90L228 112L214 88V236H86V88L72 112L30 90Z" fill="#35527A"/></g>
+          </svg>
+        </div>
+        <figcaption style="font-size:14px;color:#7CE8AE;text-align:center;font-weight:600">Tozalangan natija</figcaption>
+      </figure>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;padding:16px 20px;border-radius:16px;background:#0F2236;border:1px solid #1E3A55">
+      <div style="display:flex;gap:12px;align-items:center;font-size:14px;line-height:1.5;color:#E8F1F8">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3DDC84" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:0 0 auto"><circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/></svg>
+        <span><b style="font-weight:600">Sifat tekshiruvi:</b> rang va shakl oʻzgarmadi. Asl rasm oʻchiriladi.</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">
+        <a class="btn" href="Kiyimlar.dc.html" style="color:#E8F1F8">Bekor qilish</a>
+        <a class="btn p" href="KiyimBelgilash.dc.html" style="color:#06210F">Saqlash va davom etish</a>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
