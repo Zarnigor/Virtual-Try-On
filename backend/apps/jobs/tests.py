@@ -122,16 +122,64 @@ class GarmentJobTests(MediaTestCase):
         self.assertEqual((self.job.status, self.job.error_code), ("failed", "CLEAN_FAILED"))
         self.assertFalse(Garment.objects.exists())
 
-    def test_cleaning_crops_to_the_garment(self):
-        from io import BytesIO
+    @staticmethod
+    def _mask(size, box, value=255):
         from PIL import Image
-        cut = Image.new("RGBA", (100, 200), (0, 0, 0, 0))
-        cut.paste((200, 50, 50, 255), (20, 30, 70, 150))
-        buf = BytesIO()
-        cut.save(buf, format="PNG")
-        with mock.patch("rembg.remove", return_value=buf.getvalue()):
+        m = Image.new("L", size, 0)
+        m.paste(value, box)
+        return m
+
+    def _set_image(self, data, name="g.jpg"):
+        self.garment.image.save(name, ContentFile(data), save=True)
+
+    def test_cleaning_crops_to_the_garment(self):
+        # png_bytes() is 60x120; rembg returns the mask only
+        with mock.patch("rembg.remove", return_value=self._mask((60, 120), (10, 20, 40, 100))) as rm:
             tasks.run_garment_cleaning(self.job.pk)
+        self.assertTrue(rm.call_args.kwargs.get("only_mask"))
         self.job.refresh_from_db()
         self.garment.refresh_from_db()
         self.assertEqual(self.job.status, "done")
-        self.assertEqual((self.garment.image.width, self.garment.image.height), (50, 120))
+        self.assertEqual((self.garment.image.width, self.garment.image.height), (30, 80))
+
+    def test_soft_edges_keep_the_source_colour(self):
+        """rembg's own cutout stored colour * alpha (dark fringes). The source RGB must stay exact."""
+        from io import BytesIO
+        from PIL import Image
+        src = BytesIO()
+        Image.new("RGB", (60, 120), (200, 120, 40)).save(src, format="PNG")
+        self._set_image(src.getvalue(), "g.png")
+        mask = self._mask((60, 120), (0, 0, 60, 120), 255)
+        mask.paste(64, (0, 0, 60, 10))  # soft edge, alpha 64
+        with mock.patch("rembg.remove", return_value=mask):
+            tasks.run_garment_cleaning(self.job.pk)
+        self.garment.refresh_from_db()
+        out = Image.open(self.garment.image.path)
+        self.assertEqual(out.format, "PNG")
+        self.assertEqual(out.getpixel((5, 5)), (200, 120, 40, 64))     # not (50, 30, 10, 64)
+        self.assertEqual(out.getpixel((5, 60)), (200, 120, 40, 255))
+
+    def test_exif_orientation_is_applied_and_the_original_is_untouched(self):
+        from io import BytesIO
+        from PIL import Image
+        img = Image.new("RGB", (80, 40), (10, 200, 10))
+        exif = Image.Exif()
+        exif[0x0112] = 6  # rotate 90 CW when displayed: a phone photo held upright
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=95, exif=exif)
+        raw = buf.getvalue()
+        self._set_image(raw)
+        self.garment.original_image.save("o.jpg", ContentFile(raw), save=True)
+        seen = {}
+
+        def fake_remove(image, **kw):
+            seen["size"] = image.size
+            return self._mask(image.size, (0, 0) + image.size)
+
+        with mock.patch("rembg.remove", side_effect=fake_remove):
+            tasks.run_garment_cleaning(self.job.pk)
+        self.garment.refresh_from_db()
+        self.assertEqual(seen["size"], (40, 80))  # upright, as the user sees it
+        self.assertEqual((self.garment.image.width, self.garment.image.height), (40, 80))
+        with self.garment.original_image.open("rb") as f:
+            self.assertEqual(f.read(), raw)

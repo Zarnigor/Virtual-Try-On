@@ -24,7 +24,6 @@
 .le-stage:focus-visible { box-shadow: 0 0 0 3px var(--accent-border); }
 .le-svg { display: block; width: 100%; height: auto; max-height: 72vh; touch-action: none; user-select: none; }
 .le-stage-bg { fill: var(--le-stage); }
-.le-image { mix-blend-mode: multiply; }
 .le-point { cursor: grab; outline: none; }
 .le-point:active { cursor: grabbing; }
 .le-point:focus-visible circle:nth-last-child(2) { stroke: var(--accent); }

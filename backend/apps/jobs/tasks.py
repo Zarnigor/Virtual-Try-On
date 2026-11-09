@@ -125,17 +125,27 @@ def run_garment_cleaning(job_pk: int):
 def _rembg_clean(garment):
     """Remove the background with rembg, crop to the alpha bounding box, save as the garment image.
 
-    Raises on any failure (never keeps the uncleaned photo silently).
+    Quality: rembg is asked for the MASK only. Its own cutout composites onto (0,0,0,0), which stores
+    colour * alpha in a straight-alpha PNG, so every soft edge pixel was darkened twice (dark fringes).
+    Here the source pixels are kept exactly and only alpha is added. EXIF orientation is applied in
+    memory (rembg ignores it), the stored original is never rewritten, and the result is saved once as
+    lossless PNG. Raises on any failure (never keeps the uncleaned photo silently).
     """
     from pathlib import Path
-    from PIL import Image
+    from PIL import Image, ImageChops, ImageOps
     from django.core.files.base import ContentFile
     from rembg import remove
 
     with garment.image.open("rb") as f:
-        output = remove(f.read())
-    img = Image.open(BytesIO(output)).convert("RGBA")
-    bbox = img.getchannel("A").getbbox()
+        src = ImageOps.exif_transpose(Image.open(f))
+        src.load()
+    rgb = src.convert("RGB")
+    mask = remove(rgb, only_mask=True).convert("L")
+    if "A" in src.getbands() or "transparency" in src.info:  # a PNG that already has transparency keeps it
+        mask = ImageChops.darker(mask, src.convert("RGBA").getchannel("A"))
+    img = rgb.convert("RGBA")
+    img.putalpha(mask)
+    bbox = mask.getbbox()
     if not bbox:
         raise JobRejected("NO_GARMENT", "rembg left nothing")
     img = img.crop(bbox)

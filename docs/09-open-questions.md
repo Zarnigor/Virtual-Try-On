@@ -122,3 +122,7 @@ _(none blocking P0)_
     JPEG/PNG only, at most `MAX_UPLOAD_MB` (20), at most `MAX_IMAGE_PIXELS` (50 MP, checked before decoding), full decode
     (truncated/corrupt -> `CORRUPT_FILE`), shorter side at least `GARMENT_MIN_SIDE_PX` (300). Errors are `{code, detail}` with an
     Uzbek message. The client repeats the checks only for UX. The original is stored byte-for-byte.
+43. (Garment quality fix) The cleaning step takes **only the mask** from rembg and adds it as alpha to the untouched source pixels
+    (rembg's own cutout stored colour * alpha in a straight-alpha PNG: dark fringes). EXIF orientation is applied in memory, the
+    stored original is never rewritten, the result is saved once as lossless PNG. The editor draws the image in SVG at device
+    resolution (the old 500 px canvas ignored devicePixelRatio) with no blend mode.
