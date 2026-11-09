@@ -54,7 +54,8 @@ def _upload_garment(request):
         owner=request.user,
         type=s.validated_data["type"],
         name=s.validated_data.get("name", ""),
-        image=photo,
+        # `image` is the cleaned PNG only (contract: image_url = cleaned). It stays empty, so image_url,
+        # width and height are null, until the cleaning job has written it from original_image.
         original_image=photo,
     )
 
@@ -94,6 +95,10 @@ def update_landmarks(request, pk):
         g = Garment.objects.get(pk=pk, owner=request.user)
     except Garment.DoesNotExist:
         return Response(status=404)
+    if not g.image:  # landmarks are pixels of the cleaned (cropped) PNG; it does not exist yet
+        return Response(
+            {"code": "GARMENT_NOT_READY", "detail": "Kiyim hali tayyorlanmoqda. Biroz kuting."}, status=409,
+        )
     landmarks = request.data.get("landmarks")
     if not isinstance(landmarks, dict) or not landmarks:
         return Response({"code": "LANDMARKS_REQUIRED", "detail": "Chiziqlarni belgilang."}, status=400)

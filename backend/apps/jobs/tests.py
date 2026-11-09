@@ -109,8 +109,7 @@ class GarmentJobTests(MediaTestCase):
     def setUp(self):
         super().setUp()
         self.user = self.make_user()
-        self.garment = Garment(owner=self.user, type="tshirt")
-        self.garment.image.save("g.png", ContentFile(png_bytes()), save=False)
+        self.garment = Garment(owner=self.user, type="tshirt")  # like an upload: original only, no image yet
         self.garment.original_image.save("o.png", ContentFile(png_bytes()), save=False)
         self.garment.save()
         self.job = Job.objects.create(user=self.user, kind="garment_clean", target_id=self.garment.pk)
@@ -129,8 +128,8 @@ class GarmentJobTests(MediaTestCase):
         m.paste(value, box)
         return m
 
-    def _set_image(self, data, name="g.jpg"):
-        self.garment.image.save(name, ContentFile(data), save=True)
+    def _set_original(self, data, name="o.jpg"):
+        self.garment.original_image.save(name, ContentFile(data), save=True)
 
     def test_cleaning_crops_to_the_garment(self):
         # png_bytes() is 60x120; rembg returns the mask only
@@ -148,7 +147,7 @@ class GarmentJobTests(MediaTestCase):
         from PIL import Image
         src = BytesIO()
         Image.new("RGB", (60, 120), (200, 120, 40)).save(src, format="PNG")
-        self._set_image(src.getvalue(), "g.png")
+        self._set_original(src.getvalue(), "o.png")
         mask = self._mask((60, 120), (0, 0, 60, 120), 255)
         mask.paste(64, (0, 0, 60, 10))  # soft edge, alpha 64
         with mock.patch("rembg.remove", return_value=mask):
@@ -168,8 +167,7 @@ class GarmentJobTests(MediaTestCase):
         buf = BytesIO()
         img.save(buf, format="JPEG", quality=95, exif=exif)
         raw = buf.getvalue()
-        self._set_image(raw)
-        self.garment.original_image.save("o.jpg", ContentFile(raw), save=True)
+        self._set_original(raw)
         seen = {}
 
         def fake_remove(image, **kw):
@@ -183,3 +181,18 @@ class GarmentJobTests(MediaTestCase):
         self.assertEqual((self.garment.image.width, self.garment.image.height), (40, 80))
         with self.garment.original_image.open("rb") as f:
             self.assertEqual(f.read(), raw)
+
+    def test_cleaned_png_comes_from_the_original_and_becomes_image_url(self):
+        from apps.garments.serializers import GarmentSerializer
+        from rest_framework.test import APIRequestFactory
+        request = APIRequestFactory().get("/", SERVER_NAME="localhost")
+        request.user = self.user
+        before = GarmentSerializer(self.garment, context={"request": request}).data
+        self.assertEqual((before["image_url"], before["width"], before["height"]), (None, None, None))
+        with mock.patch("rembg.remove", return_value=self._mask((60, 120), (10, 20, 40, 100))):
+            tasks.run_garment_cleaning(self.job.pk)
+        self.garment.refresh_from_db()
+        self.assertEqual(self.garment.image.name, "garments/cleaned_o.png")  # no doubled "garments/garments/"
+        after = GarmentSerializer(self.garment, context={"request": request}).data
+        self.assertIn("/garments/cleaned_o.png", after["image_url"])
+        self.assertEqual((after["width"], after["height"]), (30, 80))

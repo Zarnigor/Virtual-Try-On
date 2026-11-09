@@ -136,7 +136,8 @@ def _rembg_clean(garment):
     from django.core.files.base import ContentFile
     from rembg import remove
 
-    with garment.image.open("rb") as f:
+    # Always from the untouched original: `image` stays empty until this step has produced the cleaned PNG.
+    with garment.original_image.open("rb") as f:
         src = ImageOps.exif_transpose(Image.open(f))
         src.load()
     rgb = src.convert("RGB")
@@ -152,8 +153,5 @@ def _rembg_clean(garment):
     buf = BytesIO()
     img.save(buf, format="PNG")
 
-    old_name = garment.image.name
-    new_name = f"garments/cleaned_{Path(old_name).stem}.png"
-    garment.image.save(new_name, ContentFile(buf.getvalue()), save=True)
-    if old_name and old_name != garment.original_image.name:
-        garment.image.storage.delete(old_name)  # the uncleaned copy; original_image stays until Save/Cancel (step 6)
+    # upload_to already adds "garments/". original_image stays until Save/Cancel (step 6).
+    garment.image.save(f"cleaned_{Path(garment.original_image.name).stem}.png", ContentFile(buf.getvalue()), save=True)

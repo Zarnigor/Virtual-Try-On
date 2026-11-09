@@ -26,7 +26,7 @@ export default function GarmentLandmarksPage() {
         if (!alive) return
         setGarment(data)
         if (!data.image_url) {
-          setError('Kiyim rasmi hali tayyor emas')
+          setError('Kiyim hali tayyorlanmoqda. Biroz kuting va sahifani yangilang.')
           setLoading(false)
           return
         }

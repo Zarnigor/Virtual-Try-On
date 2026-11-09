@@ -136,3 +136,32 @@ class GarmentUploadValidationTests(MediaTestCase):
     def test_file_too_large(self, delay):
         with self.settings(MAX_UPLOAD_MB=0):
             self._assert_rejected(self._post(_image_bytes("JPEG")), "FILE_TOO_LARGE")
+
+
+@mock.patch("apps.garments.views.run_garment_cleaning.delay")
+class GarmentCleaningStateTests(MediaTestCase):
+    """Until the cleaning job has run, the garment has no image (the contract: image_url = cleaned PNG)."""
+
+    def setUp(self):
+        super().setUp()
+        self.login(self.make_user())
+
+    def _upload(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        photo = SimpleUploadedFile("g.jpg", _image_bytes("JPEG"), content_type="image/jpeg")
+        return self.client.post("/api/garments/", {"photo": photo, "type": "tshirt"}, format="multipart")
+
+    def test_upload_does_not_expose_the_uncleaned_photo_as_image(self, delay):
+        r = self._upload()
+        self.assertEqual(r.status_code, 201)
+        g = r.data["garment"]
+        self.assertEqual((g["image_url"], g["thumb_url"], g["width"], g["height"]), (None, None, None, None))
+        self.assertIsNotNone(g["original_preview_url"])
+        self.assertIsNone(self.client.get(f"/api/garments/{g['id']}/").data["image_url"])
+        delay.assert_called_once()
+
+    def test_landmarks_wait_for_the_cleaned_image(self, delay):
+        gid = self._upload().data["garment"]["id"]
+        r = self.client.patch(f"/api/garments/{gid}/landmarks/", {"landmarks": TSHIRT_LM}, format="json")
+        self.assertEqual((r.status_code, r.data["code"]), (409, "GARMENT_NOT_READY"))
+        self.assertEqual(Garment.objects.get(pk=gid).landmarks, {})

@@ -126,3 +126,8 @@ _(none blocking P0)_
     (rembg's own cutout stored colour * alpha in a straight-alpha PNG: dark fringes). EXIF orientation is applied in memory, the
     stored original is never rewritten, the result is saved once as lossless PNG. The editor draws the image in SVG at device
     resolution (the old 500 px canvas ignored devicePixelRatio) with no blend mode.
+44. (Garment cleaning fix) `Garment.image` is **only** the cleaned PNG. At upload only `original_image` is stored, so `image_url`,
+    `thumb_url`, `width`, `height` are `null` until the cleaning job has run (types.ts already allows null). The job reads
+    `original_image`. `PATCH garments/{id}/landmarks/` returns 409 `GARMENT_NOT_READY` before that, so landmarks are always pixels
+    of the cleaned crop. The wardrobe shows "Tayyorlanmoqda" / "Belgilangan" / "Belgilanmagan", shows the moderation status only
+    for public garments (private ones always say "pending"), and polls until every garment has its image.

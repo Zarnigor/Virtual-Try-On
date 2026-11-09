@@ -19,6 +19,16 @@ export default function Wardrobe() {
 
   useEffect(load, [])
 
+  // A garment has no image_url until its cleaning job is done: refresh quietly until all are ready.
+  const preparing = garments.some((g) => !g.image_url)
+  useEffect(() => {
+    if (!preparing) return
+    const t = setInterval(() => {
+      listGarments('mine').then(({ data }) => setGarments(data)).catch(() => {})
+    }, 3000)
+    return () => clearInterval(t)
+  }, [preparing])
+
   const handleDelete = async (id: number) => {
     if (!confirm('Bu libosni oʻchirilsinmi?')) return
     try {
@@ -94,22 +104,31 @@ export default function Wardrobe() {
 
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <StatusChip status={g.type} />
-                <StatusChip status={g.status} />
-                {g.landmarks && Object.keys(g.landmarks).length > 0 ? (
-                  <StatusChip status="done" />
+                {/* Moderation status only matters for public garments (private ones stay "pending"). */}
+                <StatusChip status={g.visibility === 'public' ? g.status : g.visibility} />
+                {!g.image_url ? (
+                  <StatusChip status="preparing" />
+                ) : g.landmarks && Object.keys(g.landmarks).length > 0 ? (
+                  <StatusChip status="marked" />
                 ) : (
-                  <StatusChip status="pending" />
+                  <StatusChip status="unmarked" />
                 )}
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-                <Link
-                  to={`/garments/${g.id}/landmarks`}
-                  className="btn btn-secondary btn-sm"
-                  style={{ flex: 1, fontSize: 12 }}
-                >
-                  Belgilar
-                </Link>
+                {g.image_url ? (
+                  <Link
+                    to={`/garments/${g.id}/landmarks`}
+                    className="btn btn-secondary btn-sm"
+                    style={{ flex: 1, fontSize: 12 }}
+                  >
+                    Belgilar
+                  </Link>
+                ) : (
+                  <button className="btn btn-secondary btn-sm" style={{ flex: 1, fontSize: 12 }} disabled>
+                    Tayyorlanmoqda…
+                  </button>
+                )}
                 <button
                   className="btn btn-danger btn-sm"
                   onClick={() => handleDelete(g.id)}
