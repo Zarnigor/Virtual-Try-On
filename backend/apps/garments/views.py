@@ -6,6 +6,7 @@ from rest_framework.response import Response
 
 from .models import Garment
 from .serializers import GarmentSerializer, GarmentUploadSerializer
+from apps.images import ImageRejected, validate_image_upload
 from apps.jobs.models import Job
 from apps.jobs.tasks import run_garment_cleaning
 
@@ -44,10 +45,10 @@ def _upload_garment(request):
     s.is_valid(raise_exception=True)
 
     photo = s.validated_data["photo"]
-    if photo.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
-        return Response({"code": "FILE_TOO_LARGE", "detail": "Fayl hajmi juda katta."}, status=400)
-    if photo.content_type not in ("image/jpeg", "image/png"):
-        return Response({"code": "BAD_FILE_TYPE", "detail": "Faqat JPG yoki PNG."}, status=400)
+    try:
+        validate_image_upload(photo, min_side=settings.GARMENT_MIN_SIDE_PX)
+    except ImageRejected as e:
+        return Response({"code": e.code, "detail": e.detail}, status=400)
 
     garment = Garment.objects.create(
         owner=request.user,

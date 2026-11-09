@@ -55,6 +55,7 @@ class GarmentSerializer(serializers.ModelSerializer):
 
 
 class GarmentUploadSerializer(serializers.Serializer):
-    photo = serializers.ImageField()
+    # FileField, not ImageField: apps/images.py validates the bytes and returns {code, detail} (clear Uzbek message).
+    photo = serializers.FileField()
     type = serializers.ChoiceField(choices=["tshirt", "pants"])
     name = serializers.CharField(max_length=100, required=False, default="")

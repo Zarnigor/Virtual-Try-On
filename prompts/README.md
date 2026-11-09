@@ -60,7 +60,8 @@ Image model: **Nano Banana 2 (standard)**, chosen by the owner (not Lite, not Pr
 | LOW_QUALITY | Rasm xira yoki kichik. Aniqroq rasm yuklang. |
 
 Code-side (non-AI) checks have their own codes: ARMS_TOUCH_BODY, LEGS_TOUCH, IMAGE_TOO_SMALL,
-HEAD_OR_FEET_CUT, FILE_TOO_LARGE, BAD_FILE_TYPE. Map them to similar Uzbek messages.
+HEAD_OR_FEET_CUT, FILE_TOO_LARGE, BAD_FILE_TYPE, CORRUPT_FILE, IMAGE_TOO_LARGE. Map them to similar Uzbek messages.
+Upload checks (format from the bytes, size, pixel count, full decode, minimum side) live in `backend/apps/images.py`.
 
 ## Moderation outcome
 - `approve` -> add to public catalog

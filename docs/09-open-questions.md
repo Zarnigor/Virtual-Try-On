@@ -118,3 +118,7 @@ _(none blocking P0)_
     without it still load (x = w / 2).
 41. **Frontend unit tests: `vitest`** (devDependency), for `components/landmark-editor/geometry.ts` only for now, including a
     round-trip test that the payload stays unchanged. Run: `docker compose exec -T frontend npm test`.
+42. (Assumption, garment upload fix) **Server-side upload validation** in `backend/apps/images.py`, decided from the file bytes:
+    JPEG/PNG only, at most `MAX_UPLOAD_MB` (20), at most `MAX_IMAGE_PIXELS` (50 MP, checked before decoding), full decode
+    (truncated/corrupt -> `CORRUPT_FILE`), shorter side at least `GARMENT_MIN_SIDE_PX` (300). Errors are `{code, detail}` with an
+    Uzbek message. The client repeats the checks only for UX. The original is stored byte-for-byte.

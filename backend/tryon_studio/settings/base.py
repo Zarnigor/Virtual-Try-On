@@ -137,8 +137,10 @@ AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT", 5))
 CANVAS_W = 600
 CANVAS_H = 1200
 
-# Upload limits
+# Upload limits (checked on the server from the file bytes: apps/images.py)
 MAX_UPLOAD_MB = 20
+MAX_IMAGE_PIXELS = 50_000_000  # width x height, checked before decoding
+GARMENT_MIN_SIDE_PX = 300  # shorter side of a garment photo
 
 # Fail-closed AI (docs/02 #17). The AI calls are not wired yet (steps 4 and 6), so without this flag every
 # AI-gated job fails. AI_DEV_BYPASS=1 lets LOCAL testing skip the AI step; it is ignored unless DEBUG is on,

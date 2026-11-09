@@ -5,6 +5,10 @@ import { usePoll } from '../components/usePoll'
 import Dropzone from '../components/Dropzone'
 import Spinner from '../components/Spinner'
 
+// Same limits as the backend settings (MAX_UPLOAD_MB, GARMENT_MIN_SIDE_PX).
+const MAX_UPLOAD_MB = 20
+const MIN_SIDE_PX = 300
+
 export default function GarmentUpload() {
   const navigate = useNavigate()
   const [file, setFile] = useState<File | null>(null)
@@ -23,10 +27,33 @@ export default function GarmentUpload() {
     }
   }, [job, garmentId, navigate])
 
+  // UX only: the server checks the real bytes again (backend/apps/images.py) and its message wins.
   const handleFile = (f: File) => {
-    setFile(f)
-    setPreview(URL.createObjectURL(f))
     setError('')
+    if (!['image/jpeg', 'image/png'].includes(f.type)) {
+      setError('Faqat JPG yoki PNG formatidagi rasmlar qabul qilinadi.')
+      return
+    }
+    if (f.size > MAX_UPLOAD_MB * 1024 * 1024) {
+      setError(`Fayl hajmi juda katta. ${MAX_UPLOAD_MB} MB dan kichik rasm yuklang.`)
+      return
+    }
+    const url = URL.createObjectURL(f)
+    const img = new Image()
+    img.onload = () => {
+      if (Math.min(img.naturalWidth, img.naturalHeight) < MIN_SIDE_PX) {
+        URL.revokeObjectURL(url)
+        setError(`Rasm juda kichik. Rasmning har bir tomoni kamida ${MIN_SIDE_PX} px boʻlsin.`)
+        return
+      }
+      setFile(f)
+      setPreview(url)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      setError('Rasm fayli buzilgan yoki toʻliq yuklanmagan. Boshqa rasm tanlang.')
+    }
+    img.src = url
   }
 
   const handleUpload = async () => {
@@ -145,6 +172,7 @@ export default function GarmentUpload() {
         ) : (
           <Dropzone
             onFile={handleFile}
+            accept="image/jpeg,image/png"
             label="Kiyim rasmini tanlang"
             hint="Oq yoki toza fonli rasm tavsiya etiladi"
           />

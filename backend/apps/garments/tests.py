@@ -75,3 +75,64 @@ class GarmentRulesTests(MediaTestCase):
         self.assertEqual(r.status_code, 404)
         r = self.client.post("/api/tryon/", {**body, "garment_ids": [approved.id]}, format="json")
         self.assertEqual(r.status_code, 202)
+
+
+def _image_bytes(fmt, w=400, h=500):
+    from io import BytesIO
+    from PIL import Image
+    buf = BytesIO()
+    Image.new("RGB", (w, h), (20, 90, 160)).save(buf, format=fmt)
+    return buf.getvalue()
+
+
+@mock.patch("apps.garments.views.run_garment_cleaning.delay")
+class GarmentUploadValidationTests(MediaTestCase):
+    """Server-side upload checks (apps/images.py): decided from the bytes, clear {code, detail} errors."""
+
+    def setUp(self):
+        super().setUp()
+        self.login(self.make_user())
+
+    def _post(self, data, name="g.jpg", content_type="image/jpeg"):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        photo = SimpleUploadedFile(name, data, content_type=content_type)
+        return self.client.post("/api/garments/", {"photo": photo, "type": "tshirt"}, format="multipart")
+
+    def _assert_rejected(self, r, code):
+        self.assertEqual(r.status_code, 400, r.data)
+        self.assertEqual(r.data["code"], code)
+        self.assertTrue(r.data["detail"])
+        self.assertFalse(Garment.objects.exists())
+
+    def test_valid_jpeg_and_png_are_accepted_and_stored_untouched(self, delay):
+        for fmt, ctype in (("JPEG", "image/jpeg"), ("PNG", "image/png")):
+            raw = _image_bytes(fmt)
+            r = self._post(raw, content_type=ctype)
+            self.assertEqual(r.status_code, 201, r.data)
+            g = Garment.objects.get(pk=r.data["garment"]["id"])
+            with g.original_image.open("rb") as f:
+                self.assertEqual(f.read(), raw)  # original bytes untouched, never re-encoded
+        self.assertEqual(delay.call_count, 2)
+
+    def test_truncated_file_is_corrupt(self, delay):
+        raw = _image_bytes("JPEG", 800, 1000)
+        self._assert_rejected(self._post(raw[: len(raw) * 6 // 10]), "CORRUPT_FILE")
+        delay.assert_not_called()
+
+    def test_not_an_image(self, delay):
+        self._assert_rejected(self._post(b"hello, not an image"), "BAD_FILE_TYPE")
+
+    def test_other_formats_even_with_a_jpeg_name_and_header(self, delay):
+        for fmt in ("GIF", "WEBP", "BMP"):
+            self._assert_rejected(self._post(_image_bytes(fmt)), "BAD_FILE_TYPE")
+
+    def test_too_small(self, delay):
+        self._assert_rejected(self._post(_image_bytes("PNG", 299, 900), content_type="image/png"), "IMAGE_TOO_SMALL")
+
+    def test_too_many_pixels(self, delay):
+        with self.settings(MAX_IMAGE_PIXELS=400 * 500 - 1):
+            self._assert_rejected(self._post(_image_bytes("JPEG")), "IMAGE_TOO_LARGE")
+
+    def test_file_too_large(self, delay):
+        with self.settings(MAX_UPLOAD_MB=0):
+            self._assert_rejected(self._post(_image_bytes("JPEG")), "FILE_TOO_LARGE")
