@@ -118,7 +118,8 @@ function dotsToLandmarks(dots: Dot[], type: string): LandmarkMap {
     if (wlx && wrx) { set('waist.left_x', wlx.x); set('waist.right_x', wrx.x); set('waist.y', (wlx.y + wrx.y) / 2) }
     if (wcx) set('waist.center_x', wcx.x)
     if (hlx && hrx) { set('hip.left_x', hlx.x); set('hip.right_x', hrx.x); set('hip.y', (hlx.y + hrx.y) / 2) }
-    if (cr) set('crotch.y', cr.y)
+    // center_x is optional in the contract; old records without it load with the image-center default.
+    if (cr) { set('crotch.y', cr.y); set('crotch.center_x', cr.x) }
     if (kll && klr) { set('knee.left_leg.left_x', kll.x); set('knee.left_leg.right_x', klr.x); set('knee.left_leg.y', (kll.y + klr.y) / 2); set('knee.y', (kll.y + klr.y) / 2) }
     if (krl && krr) { set('knee.right_leg.left_x', krl.x); set('knee.right_leg.right_x', krr.x); set('knee.right_leg.y', (krl.y + krr.y) / 2) }
     if (hll && hlr) { set('hem.left_leg.left_x', hll.x); set('hem.left_leg.right_x', hlr.x); set('hem.left_leg.y', (hll.y + hlr.y) / 2) }
