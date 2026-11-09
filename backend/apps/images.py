@@ -56,3 +56,30 @@ def validate_image_upload(f, *, min_side: int) -> tuple[int, int]:
     if min(w, h) < min_side:
         raise _reject("IMAGE_TOO_SMALL", px=min_side)
     return w, h
+
+
+AI_LONG_SIDE_PX = 1024
+AI_FLATTEN_RGB = (237, 237, 237)  # #EDEDED, the neutral background prompt 04 uses for non-white garments
+
+
+def ai_jpeg(data: bytes) -> bytes:
+    """The copy of an image sent to the AI (docs/09 #25): EXIF orientation applied, then all metadata dropped,
+    transparency flattened onto a neutral grey, long side at most 1024 px, JPEG. The stored original is untouched.
+    """
+    from io import BytesIO
+
+    from PIL import ImageOps
+
+    with Image.open(BytesIO(data)) as im:
+        im = ImageOps.exif_transpose(im)
+        if im.mode in ("RGBA", "LA", "P"):
+            rgba = im.convert("RGBA")
+            flat = Image.new("RGB", rgba.size, AI_FLATTEN_RGB)
+            flat.paste(rgba, mask=rgba.getchannel("A"))
+            im = flat
+        else:
+            im = im.convert("RGB")
+        im.thumbnail((AI_LONG_SIDE_PX, AI_LONG_SIDE_PX), Image.LANCZOS)
+        buf = BytesIO()
+        im.save(buf, format="JPEG", quality=90)  # no exif= argument: Pillow writes no EXIF/GPS
+    return buf.getvalue()

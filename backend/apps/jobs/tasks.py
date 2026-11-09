@@ -1,9 +1,10 @@
 """
 Celery tasks for the AI pipeline. Fail closed (docs/02 #17): no valid AI verdict = rejected.
 
-The Gemini calls are not wired yet (step 4: prompt 02, step 6: prompts 01 + 04). Until then
-`_ask_*` return None ("AI unavailable"), which fails the job, unless settings.AI_DEV_BYPASS
-(local DEBUG only) lets the job continue with result["ai_skipped"] = True.
+Garment check (prompt 01) is wired: cache by image hash -> daily-limit slot -> Gemini over httpx -> strict parse.
+Body check (prompt 02, step 4) is not wired yet: `_ask_body_validation` returns None ("AI unavailable").
+settings.AI_DEV_BYPASS (local DEBUG only) skips the AI step and marks result["ai_skipped"] = True
+(and Garment.ai_skipped, so the frontend shows a dev warning).
 A rejected or failed upload is deleted so the user can upload again.
 """
 import logging
@@ -12,8 +13,10 @@ from io import BytesIO
 from celery import shared_task
 from django.conf import settings
 
+from . import ai_cache, gemini, limits
 from .ai_schemas import (
-    BODY_ISSUES, GARMENT_ISSUES, BodyValidation, GarmentValidation, parse_validation,
+    BODY_ISSUES, PROMPT_GARMENT_TYPE, BodyValidation, GarmentValidation,
+    garment_response_schema, judge_garment, parse_garment_validation, parse_validation,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,16 +30,75 @@ class JobRejected(Exception):
         self.codes = codes or [code]
 
 
-# ---------- AI calls (not wired yet) ----------
+# ---------- AI calls ----------
 
 def _ask_body_validation(body):
     """Return the raw JSON text from prompt 02, or None if the AI is unavailable. TODO step 4."""
     return None
 
 
-def _ask_garment_validation(garment):
-    """Return the raw JSON text from prompt 01, or None if the AI is unavailable. TODO step 6."""
-    return None
+def load_prompt(filename: str, **values: str) -> str:
+    """Read a prompt from prompts/ and fill its {PLACEHOLDER}s (str.replace: the prompts contain JSON braces)."""
+    text = (settings.PROMPTS_DIR / filename).read_text(encoding="utf-8")
+    for name, value in values.items():
+        text = text.replace("{" + name + "}", value)
+    return text
+
+
+def garment_prompt(declared: str) -> str:
+    return load_prompt("01-garment-validation.txt", GARMENT_TYPE=PROMPT_GARMENT_TYPE[declared])
+
+
+def _check_garment_with_ai(job, garment) -> dict:
+    """Run prompt 01 on the garment's original. Returns {"ai_cached": bool}; raises JobRejected on any rejection.
+
+    Order: cache hit (no AI call, no slot) -> poison-pill guard -> reserve a daily slot -> Gemini -> strict parse.
+    """
+    from apps.images import ai_jpeg
+
+    with garment.original_image.open("rb") as f:
+        original = f.read()
+    declared = garment.type
+    prompt = garment_prompt(declared)
+    image = ai_jpeg(original)  # prepared before a slot is reserved, so a bad file never holds a slot
+    key = ai_cache.validation_key("garment", ai_cache.sha256_hex(original), declared, prompt)
+
+    cached = ai_cache.get(key)
+    if cached is not None:
+        try:
+            verdict = judge_garment(GarmentValidation.model_validate(cached), declared)
+        except Exception:  # an old or damaged entry: ignore it and ask again
+            verdict = None
+        if verdict is not None:
+            logger.info("garment job %d: cache hit", job.pk)
+            _raise_if_rejected(verdict)
+            return {"ai_cached": True}
+
+    if job.ai_called:  # redelivered after a crash mid-request: never send a second request (docs/09 #30)
+        raise JobRejected("AI_UNAVAILABLE", "slot already used by an earlier attempt")
+    if not limits.reserve_ai_slot(job):
+        raise JobRejected("AI_LIMIT", "daily AI limit reached")
+
+    try:
+        raw = gemini.generate_json(prompt, image, garment_response_schema())
+    except Exception as e:  # AIUnavailable, or any client bug: no usable reply, so the slot is freed
+        limits.set_outcome(job, "unavailable")
+        if not isinstance(e, gemini.AIUnavailable):
+            logger.exception("garment job %d: gemini client error", job.pk)
+        raise JobRejected("AI_UNAVAILABLE", str(e) if isinstance(e, gemini.AIUnavailable) else type(e).__name__)
+
+    verdict = parse_garment_validation(raw, declared)
+    limits.set_outcome(job, "invalid" if verdict.data is None else "responded")
+    if verdict.cacheable:
+        ai_cache.put(key, verdict.data.model_dump())
+    logger.info("garment job %d: ai %s %s", job.pk, "accepted" if verdict.accepted else "rejected", verdict.codes)
+    _raise_if_rejected(verdict)
+    return {"ai_cached": False}
+
+
+def _raise_if_rejected(verdict):
+    if not verdict.accepted:
+        raise JobRejected(verdict.codes[0], codes=verdict.codes)
 
 
 def _ai_verdict(raw, schema, known) -> bool:
@@ -54,8 +116,11 @@ def _ai_verdict(raw, schema, known) -> bool:
 # ---------- helpers ----------
 
 def _start(job_pk):
+    """Mark the job running. Returns None if it is already finalized (no-op on redelivery, docs/09 #35)."""
     from apps.jobs.models import Job
     job = Job.objects.get(pk=job_pk)
+    if job.status in ("done", "failed"):
+        return None
     job.status = "running"
     job.save(update_fields=["status"])
     return job
@@ -82,6 +147,8 @@ def run_body_validation(job_pk: int):
     from apps.bodies.models import Body
 
     job = _start(job_pk)
+    if job is None:
+        return
     body = Body.objects.filter(pk=job.target_id, confirmed_at__isnull=True).first()
     if body is None:
         _fail(job, "BODY_NOT_FOUND")
@@ -104,15 +171,22 @@ def run_garment_cleaning(job_pk: int):
     from apps.garments.models import Garment
 
     job = _start(job_pk)
+    if job is None:
+        return
     garment = Garment.objects.filter(pk=job.target_id).first()
     if garment is None:
         _fail(job, "GARMENT_NOT_FOUND")
         return
     try:
-        ai_checked = _ai_verdict(_ask_garment_validation(garment), GarmentValidation, GARMENT_ISSUES)
-        # TODO step 6: prompt 04 (AI cleaning, removes hangers) runs before rembg; until then rembg only.
+        if settings.AI_DEV_BYPASS:  # local dev only: always skips the AI call, cache and slot (docs/09 #24)
+            ai = {"ai_skipped": True, "ai_cached": False}
+            garment.ai_skipped = True
+            garment.save(update_fields=["ai_skipped"])
+        else:
+            ai = {"ai_skipped": False, **_check_garment_with_ai(job, garment)}
+        # TODO step 6: prompt 04 (AI cleaning, removes hangers) runs here, before rembg; until then rembg only.
         _rembg_clean(garment)
-        _done(job, {"cleaned": True, "ai_skipped": not ai_checked})
+        _done(job, {"cleaned": True, **ai})
     except JobRejected as e:
         _fail(job, e.code, e.detail, e.codes)
         garment.delete()

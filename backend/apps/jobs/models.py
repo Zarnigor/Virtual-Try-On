@@ -24,6 +24,14 @@ class Job(models.Model):
     result = models.JSONField(null=True, blank=True)
     error_code = models.CharField(max_length=50, blank=True, default="")
     error_detail = models.TextField(blank=True, default="")
+    # Daily AI limit (apps/jobs/limits.py). ai_called is an audit flag set before the request, never cleared.
+    AI_OUTCOME_CHOICES = [
+        ("", "In flight / none"), ("responded", "Responded"), ("invalid", "Invalid reply"),
+        ("unavailable", "AI unavailable"),
+    ]
+    ai_called = models.BooleanField(default=False)
+    ai_called_at = models.DateTimeField(null=True, blank=True)
+    ai_outcome = models.CharField(max_length=12, choices=AI_OUTCOME_CHOICES, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

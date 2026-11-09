@@ -23,6 +23,8 @@ class Garment(models.Model):
     landmarks = models.JSONField(default=dict)
     visibility = models.CharField(max_length=10, choices=VIS_CHOICES, default="private")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    # True = the AI check was skipped (AI_DEV_BYPASS, local dev only): this garment was NOT validated.
+    ai_skipped = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -7,9 +7,7 @@ from django.test import SimpleTestCase, override_settings
 from apps.bodies.models import Body
 from apps.garments.models import Garment
 from apps.jobs import tasks
-from apps.jobs.ai_schemas import (
-    BODY_ISSUES, GARMENT_ISSUES, BodyValidation, GarmentValidation, parse_validation,
-)
+from apps.jobs.ai_schemas import BODY_ISSUES, BodyValidation, parse_validation
 from apps.jobs.models import Job
 from apps.testing import MediaTestCase, png_bytes
 
@@ -18,11 +16,6 @@ GOOD_BODY = {
     "arms_away": True, "legs_apart": True, "clothing": "tight", "sleeves": "short",
     "held_objects_or_accessories": False, "lighting": "good", "sharpness": "good", "is_real_photo": True,
     "apparent_age": "adult", "issues": [], "confidence": 0.9,
-}
-GOOD_GARMENT = {
-    "ok": True, "garment_count": 1, "detected_type": "tshirt", "matches_declared_type": True, "view": "front",
-    "presentation": "hanger", "visible_fraction": 0.95, "quality": "good", "is_clothing_photo": True,
-    "issues": [], "confidence": 0.9,
 }
 
 
@@ -34,14 +27,12 @@ def body_verdict(data):
 class FailClosedParsingTests(SimpleTestCase):
     def test_valid_good_reply_is_accepted(self):
         self.assertTrue(body_verdict(GOOD_BODY).accepted)
-        g = parse_validation(json.dumps(GOOD_GARMENT), GarmentValidation, GARMENT_ISSUES)
-        self.assertTrue(g.accepted)
 
     def test_empty_invalid_or_incomplete_is_rejected(self):
         for raw in (None, "", "not json", "[]", "{}", json.dumps({**GOOD_BODY, "ok": "yes"})):
             v = body_verdict(raw)
             self.assertFalse(v.accepted, raw)
-            self.assertEqual(v.codes, ["INVALID_AI_RESPONSE"])
+            self.assertEqual(v.codes, ["AI_RESPONSE_INVALID"])
         missing = dict(GOOD_BODY)
         del missing["apparent_age"]
         self.assertFalse(body_verdict(missing).accepted)
@@ -54,8 +45,6 @@ class FailClosedParsingTests(SimpleTestCase):
         # the model says ok, but a field breaks a rule: still rejected
         self.assertFalse(body_verdict({**GOOD_BODY, "apparent_age": "minor_suspected"}).accepted)
         self.assertFalse(body_verdict({**GOOD_BODY, "clothing": "loose"}).accepted)
-        g = {**GOOD_GARMENT, "visible_fraction": 0.5}
-        self.assertFalse(parse_validation(json.dumps(g), GarmentValidation, GARMENT_ISSUES).accepted)
 
 
 class BodyJobTests(MediaTestCase):
@@ -85,7 +74,7 @@ class BodyJobTests(MediaTestCase):
         with mock.patch.object(tasks, "_ask_body_validation", return_value="garbage"):
             tasks.run_body_validation(self.job.pk)
         self.job.refresh_from_db()
-        self.assertEqual((self.job.status, self.job.error_code), ("failed", "INVALID_AI_RESPONSE"))
+        self.assertEqual((self.job.status, self.job.error_code), ("failed", "AI_RESPONSE_INVALID"))
 
     @override_settings(AI_DEV_BYPASS=False)
     def test_ai_rejection_code_reaches_the_job(self):

@@ -13,7 +13,7 @@ class GarmentSerializer(serializers.ModelSerializer):
         model = Garment
         fields = (
             "id", "name", "type", "image_url", "thumb_url", "original_preview_url",
-            "width", "height", "landmarks", "visibility", "status", "owned_by_me", "created_at",
+            "width", "height", "landmarks", "visibility", "status", "owned_by_me", "ai_skipped", "created_at",
         )
         read_only_fields = fields
 
