@@ -43,6 +43,22 @@ Deformation pairs garment and body landmarks by identical names.
 - Every tick lies on the silhouette edge (within 2 px).
 - shoulder width < 1.6 x chest width; one knee width < 0.5 x hip width; ankle < knee; left/right knee and ankle within 15%.
 
+### Garment landmark checks (backend `apps/garments/landmark_checks.py`, editor `garmentGroups.ts` rules)
+Required keys = what `tryon_engine/warp.py` reads:
+- tshirt: `shoulder|chest|waist|hem {y, left_x, right_x}`, `sleeve_end.left|right {x, y}`.
+- pants: `waist {y, left_x, right_x, center_x}`, `hip {y, left_x, right_x}`, `crotch {y, center_x}`,
+  `knee {y, left_leg|right_leg {left_x, right_x}}`, `hem.left_leg|right_leg {y, left_x, right_x}`.
+
+Rules (backend strict `<`; the editor keeps a 4 px gap and stops a drag at the neighbour, but never clamps on load):
+- finite numbers only; x in [0, width], y in [0, height] of the cleaned PNG.
+- `left_x < right_x` for every pair (also `sleeve_end.left.x < sleeve_end.right.x`); pants knee and hem:
+  `left_leg.right_x < right_leg.left_x`.
+- pants: `waist.left_x < waist.center_x < waist.right_x` and `hip.left_x + 5 < waist.center_x < hip.right_x - 5`
+  (warp.py uses `center_x ± 5` as the inner crotch edges).
+- vertical: tshirt `shoulder < chest < waist < hem` and each `sleeve_end.y > shoulder.y`;
+  pants `waist < hip < crotch < knee < max(hem leg y)`.
+- unknown extra keys are kept untouched. Failure: 400 `LANDMARKS_INVALID`.
+
 ## Previous bugs to never reintroduce
 - Shoulder line drawn at neck height while its width was measured lower (arms included).
 - Chest line fixed at a height ratio above the armpit.

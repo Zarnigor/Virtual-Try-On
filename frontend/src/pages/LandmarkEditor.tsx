@@ -5,7 +5,7 @@ import type { GarmentLandmarks } from '../api/types'
 import DevAiWarning from '../components/DevAiWarning'
 import Spinner from '../components/Spinner'
 import LandmarkEditor from '../components/landmark-editor/LandmarkEditor'
-import { groupsFor } from '../components/landmark-editor/garmentGroups'
+import { groupsFor, rulesFor } from '../components/landmark-editor/garmentGroups'
 
 /** Screen 9: mark the garment landmarks. The image and landmarks come from the backend. */
 export default function GarmentLandmarksPage() {
@@ -53,6 +53,7 @@ export default function GarmentLandmarksPage() {
   }, [id])
 
   const groups = useMemo(() => (garment ? groupsFor(garment.type) : []), [garment])
+  const rules = useMemo(() => (garment ? rulesFor(garment.type) : undefined), [garment])
 
   const handleSave = async (landmarks: Record<string, unknown>) => {
     if (!id) return
@@ -63,8 +64,10 @@ export default function GarmentLandmarksPage() {
       await updateLandmarks(Number(id), landmarks as unknown as GarmentLandmarks)
       setSuccess(true)
       setTimeout(() => navigate('/wardrobe'), 1200)
-    } catch {
-      setError('Saqlashda xato. Qayta urinib koʻring.')
+    } catch (err: unknown) {
+      // LANDMARKS_INVALID carries a short Uzbek message naming the group; show it as is.
+      const data = (err as { response?: { data?: { code?: string; detail?: string } } })?.response?.data
+      setError(data?.code === 'LANDMARKS_INVALID' && data.detail ? data.detail : 'Saqlashda xato. Qayta urinib koʻring.')
     } finally {
       setSaving(false)
     }
@@ -100,6 +103,7 @@ export default function GarmentLandmarksPage() {
           imageAlt={garment.type === 'pants' ? 'Shim rasmi' : 'Futbolka rasmi'}
           bounds={size}
           groups={groups}
+          rules={rules}
           landmarks={garment.landmarks}
           heading={`Belgi nuqtalari · ${garment.type === 'pants' ? 'Shim' : 'Futbolka'}`}
           subheading="Bitta chiziq tanlanadi, lupa bilan aniq joylanadi. Qolganlari xiralashadi."

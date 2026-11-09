@@ -7,6 +7,10 @@
  *
  * Payload shape is unchanged: toLandmarks() starts from a copy of the loaded landmarks and only
  * overwrites the paths the groups manage, so unknown fields survive and a round-trip is identical.
+ *
+ * Order rules (docs/09 #53): a move is clamped so a point never crosses its neighbour (left x < right x,
+ * vertical group order), keeping a gap. Loading never clamps: an old record stays exactly as saved until the
+ * user moves a point. The backend checks the same rules with a strict "<" (apps/garments/landmark_checks.py).
  */
 
 export type Side = 'left' | 'right' | 'center'
@@ -49,6 +53,17 @@ export interface Bounds {
 }
 
 type Json = Record<string, unknown>
+
+/** Gap the editor keeps between ordered points (image px). The backend only needs a strict "<". */
+export const MIN_GAP = 4
+
+/** xs[b] - xs[a] >= gap (point ids). */
+export interface XRule { a: string; b: string; gap: number }
+/** ys[b] - ys[a] >= gap (group ids; b is lower on the image). */
+export interface YRule { a: string; b: string; gap: number }
+export interface Rules { x: XRule[]; y: YRule[] }
+
+export const NO_RULES: Rules = { x: [], y: [] }
 
 export function getPath(obj: unknown, path: string): number | undefined {
   let cur: unknown = obj
@@ -121,40 +136,115 @@ export function toLandmarks(original: unknown, state: EditorState, groups: Group
   return out
 }
 
+interface Range { lo: number; hi: number }
+
+/** Allowed x for `id` from the rules, ignoring rules that involve `skip` (its mirror, handled separately). */
+function xRange(xs: Record<string, number>, id: string, rules: Rules, b: Bounds, skip?: string): Range {
+  let lo = 0, hi = b.w
+  for (const r of rules.x) {
+    if (r.a === skip || r.b === skip) continue
+    if (r.b === id) lo = Math.max(lo, xs[r.a] + r.gap)
+    if (r.a === id) hi = Math.min(hi, xs[r.b] - r.gap)
+  }
+  return { lo: Math.ceil(lo), hi: Math.floor(hi) }
+}
+
+function yRange(ys: Record<string, number>, groupId: string, rules: Rules, b: Bounds): Range {
+  let lo = 0, hi = b.h
+  for (const r of rules.y) {
+    if (r.b === groupId) lo = Math.max(lo, ys[r.a] + r.gap)
+    if (r.a === groupId) hi = Math.min(hi, ys[r.b] - r.gap)
+  }
+  return { lo: Math.ceil(lo), hi: Math.floor(hi) }
+}
+
+/**
+ * Allowed x for a point that moves together with its mirror (mirror x = w - x): its own range,
+ * the mirror's range mapped through w - x, and the rules between the two.
+ */
+function mirroredRange(xs: Record<string, number>, id: string, mirror: string, rules: Rules, b: Bounds): Range {
+  const own = xRange(xs, id, rules, b, mirror)
+  const m = xRange(xs, mirror, rules, b, id)
+  let lo = Math.max(own.lo, b.w - m.hi)
+  let hi = Math.min(own.hi, b.w - m.lo)
+  for (const r of rules.x) {
+    if (r.a === id && r.b === mirror) hi = Math.min(hi, Math.floor((b.w - r.gap) / 2)) // (w - x) - x >= gap
+    if (r.a === mirror && r.b === id) lo = Math.max(lo, Math.ceil((b.w + r.gap) / 2)) // x - (w - x) >= gap
+  }
+  return { lo, hi }
+}
+
+/** Clamp v into the range; if the range is empty (no valid place), stay at `current`. */
+const into = (v: number, r: Range, current: number) => (r.lo > r.hi ? current : clamp(v, r.lo, r.hi))
+
 /**
  * Move one point to (x, y). The y applies to the whole group. With symmetry on, a center point
  * snaps to the axis and a paired point moves its mirror to w - x.
+ * With rules, the move stops at the neighbours (keeping the gap) instead of crossing them; a
+ * symmetric pair is clamped together so it stays symmetric. If there is no valid place, the point
+ * (and its mirror) stay where they are; a center point whose axis is outside its range stays too.
  */
 export function movePoint(
   state: EditorState, groups: GroupDef[], pointId: string,
-  x: number, y: number, b: Bounds, symmetry: boolean,
+  x: number, y: number, b: Bounds, symmetry: boolean, rules: Rules = NO_RULES,
 ): EditorState {
   const hit = findPoint(groups, pointId)
   if (!hit) return state
   const { group, point } = hit
   const xs = { ...state.xs }
-  let nx = clampX(x, b)
-  if (symmetry && point.side === 'center') nx = clampX(axisX(b), b)
-  xs[point.id] = nx
-  if (symmetry && point.mirror) xs[point.mirror] = mirrorX(nx, b)
-  return { ys: { ...state.ys, [group.id]: clampY(y, b) }, xs }
+  const cur = state.xs[point.id]
+  if (symmetry && point.side === 'center') {
+    const axis = clampX(axisX(b), b)
+    const r = xRange(state.xs, point.id, rules, b)
+    if (axis >= r.lo && axis <= r.hi) xs[point.id] = axis
+  } else if (symmetry && point.mirror) {
+    const r = mirroredRange(state.xs, point.id, point.mirror, rules, b)
+    if (r.lo <= r.hi) {
+      const nx = clamp(clampX(x, b), r.lo, r.hi)
+      xs[point.id] = nx
+      xs[point.mirror] = mirrorX(nx, b)
+    }
+  } else {
+    xs[point.id] = into(clampX(x, b), xRange(state.xs, point.id, rules, b), cur)
+  }
+  const ys = { ...state.ys, [group.id]: into(clampY(y, b), yRange(state.ys, group.id, rules, b), state.ys[group.id]) }
+  return { ys, xs }
 }
 
 /** Arrow-key / button nudge by (dx, dy) image pixels. */
 export function nudgePoint(
   state: EditorState, groups: GroupDef[], pointId: string,
-  dx: number, dy: number, b: Bounds, symmetry: boolean,
+  dx: number, dy: number, b: Bounds, symmetry: boolean, rules: Rules = NO_RULES,
 ): EditorState {
   const hit = findPoint(groups, pointId)
   if (!hit) return state
   return movePoint(
-    state, groups, pointId, state.xs[pointId] + dx, state.ys[hit.group.id] + dy, b, symmetry,
+    state, groups, pointId, state.xs[pointId] + dx, state.ys[hit.group.id] + dy, b, symmetry, rules,
   )
 }
 
-/** Turning symmetry on snaps every center point to the axis right away (pairs mirror on the next move). */
-export function snapCenters(state: EditorState, groups: GroupDef[], b: Bounds): EditorState {
+/**
+ * Turning symmetry on snaps every center point to the axis right away (pairs mirror on the next move).
+ * A center point whose axis falls outside its allowed range stays where it is.
+ */
+export function snapCenters(state: EditorState, groups: GroupDef[], b: Bounds, rules: Rules = NO_RULES): EditorState {
   const xs = { ...state.xs }
-  for (const g of groups) for (const p of g.points) if (p.side === 'center') xs[p.id] = clampX(axisX(b), b)
+  const axis = clampX(axisX(b), b)
+  for (const g of groups) {
+    for (const p of g.points) {
+      if (p.side !== 'center') continue
+      const r = xRange(xs, p.id, rules, b)
+      if (axis >= r.lo && axis <= r.hi) xs[p.id] = axis
+    }
+  }
   return { ...state, xs }
+}
+
+/** Save is allowed only when every point has been placed (loaded from the record or moved by the user). */
+export function saveState(placed: number, total: number): { canSave: boolean; hint: string } {
+  const canSave = total > 0 && placed >= total
+  return {
+    canSave,
+    hint: canSave ? '' : `Saqlash uchun barcha nuqtalarni qoʻying (${placed} / ${total}).`,
+  }
 }

@@ -156,3 +156,16 @@ _(none blocking P0)_
     `AI_GARMENT_DAILY_LIMIT` (garment checks, default 5), counted by `Job.kind`, so garment uploads never use up the body check.
     Both are passed to the containers by docker-compose. `.env.example` sets `AI_GARMENT_DAILY_LIMIT=30` as the dev value.
     `AI_UNAVAILABLE` stays free for the user.
+
+## Decided 2026-11-09: garment landmark validation, approved by owner
+53. **Server-side garment landmark checks** (`apps/garments/landmark_checks.py`, pure function, rules in docs/03): required
+    keys per type (what warp.py reads), finite numbers inside the cleaned PNG, left < right, legs do not overlap, pants waist
+    center inside the waist and 5 px inside the hip, vertical order. Strict `<`, so old records with a 1-3 px gap still save.
+    Failure: 400 `{code: "LANDMARKS_INVALID", detail}` with a fixed Uzbek message naming the group (never an exception text).
+    `GARMENT_NOT_READY` (409) is checked first. Extra keys are stored unchanged.
+54. **Editor clamps moves** with the same rules plus a 4 px gap (`MIN_GAP`): a drag or nudge stops at the neighbour. With
+    symmetry, a pair is clamped together (it stays symmetric); a center point snaps to the axis only if the axis is in its
+    range, otherwise it stays. If no valid place exists the point stays. **Loading never clamps** (an old record is unchanged
+    until the user moves a point). Save is disabled until every point is placed, with the hint "Saqlash uchun barcha
+    nuqtalarni qoʻying (n / total)."; a failed save shows the backend's `LANDMARKS_INVALID` message.
+

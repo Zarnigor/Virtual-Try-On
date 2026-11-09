@@ -1,5 +1,5 @@
 import type { GarmentType } from '../../api/types'
-import type { GroupDef, PointDef } from './geometry'
+import { MIN_GAP, type GroupDef, type PointDef, type Rules, type XRule, type YRule } from './geometry'
 
 /**
  * Landmark groups per garment type (names fixed by docs/03). Point ids are their x paths.
@@ -73,3 +73,36 @@ export const PANTS_GROUPS: GroupDef[] = [
 ]
 
 export const groupsFor = (type: GarmentType): GroupDef[] => (type === 'pants' ? PANTS_GROUPS : TSHIRT_GROUPS)
+
+// ---------- order rules (same as backend apps/garments/landmark_checks.py, plus the editor's MIN_GAP) ----------
+
+const lr = (base: string): XRule => ({ a: `${base}.left_x`, b: `${base}.right_x`, gap: MIN_GAP })
+/** Top-to-bottom chain of group ids. */
+const chain = (...ids: string[]): YRule[] => ids.slice(1).map((b, i) => ({ a: ids[i], b, gap: MIN_GAP }))
+/** Left-to-right chain across both legs: Sol-Sol < Sol-Oʻng < Oʻng-Sol < Oʻng-Oʻng. */
+const legChain = (base: string): XRule[] => {
+  const ids = [`${base}.left_leg.left_x`, `${base}.left_leg.right_x`, `${base}.right_leg.left_x`, `${base}.right_leg.right_x`]
+  return ids.slice(1).map((b, i) => ({ a: ids[i], b, gap: MIN_GAP }))
+}
+/** warp.py uses waist.center_x - 5 / + 5 as the inner crotch edges, so it must stay 5 px inside the hip. */
+export const CENTER_HIP_MARGIN = 5
+
+export const TSHIRT_RULES: Rules = {
+  x: [lr('shoulder'), lr('chest'), lr('waist'), lr('hem'), { a: 'sleeve_end.left.x', b: 'sleeve_end.right.x', gap: MIN_GAP }],
+  y: [...chain('shoulder', 'chest', 'waist', 'hem'), { a: 'shoulder', b: 'sleeve_end', gap: MIN_GAP }],
+}
+
+export const PANTS_RULES: Rules = {
+  x: [
+    lr('waist'), lr('hip'),
+    { a: 'waist.left_x', b: 'waist.center_x', gap: MIN_GAP },
+    { a: 'waist.center_x', b: 'waist.right_x', gap: MIN_GAP },
+    { a: 'hip.left_x', b: 'waist.center_x', gap: CENTER_HIP_MARGIN + MIN_GAP },
+    { a: 'waist.center_x', b: 'hip.right_x', gap: CENTER_HIP_MARGIN + MIN_GAP },
+    ...legChain('knee'), ...legChain('hem'),
+  ],
+  y: chain('waist', 'hip', 'crotch', 'knee', 'hem'),
+}
+
+export const rulesFor = (type: GarmentType): Rules => (type === 'pants' ? PANTS_RULES : TSHIRT_RULES)
+

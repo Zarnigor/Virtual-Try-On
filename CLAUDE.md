@@ -128,12 +128,14 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       **Partly done (2026-11-09, branch `landmark-editor-variant-c`):** garment editor rebuilt from design artboard VariantC in
       `frontend/src/components/landmark-editor/` (pure `geometry.ts` + `garmentGroups.ts` + component), used by
       `pages/LandmarkEditor.tsx`; rules in docs/09 #37-41; 13 vitest tests (`npm test`). Not yet checked by hand in the browser.
-      Still to do: body groups + BodyConfirm wiring, sanity checks (client + server). No ESLint config exists yet (`npm run lint` fails).
+      **Garment sanity checks done (2026-11-09, docs/09 #53-54):** server `apps/garments/landmark_checks.py` (400
+      `LANDMARKS_INVALID`), editor clamps moves to the order rules (4 px gap), Save needs every point placed. 35 vitest tests.
+      Still to do: body groups + body sanity checks + BodyConfirm wiring. No ESLint config exists yet (`npm run lint` fails).
       Body confirm page must send the edited landmarks to `POST body/confirm/` (BodyConfirm.tsx has a TODO).
 - [ ] 6. Garment pipeline: prompts 01 + 04, quality check, Save/Cancel preview (screen 8), delete original, visibility (screen 9).
       **Prompt 01 done (2026-11-09, docs/09 #45-51, uncommitted):** garment AI check in `run_garment_cleaning` (httpx client
       `apps/jobs/gemini.py`, cache `ai_cache.py`, race-safe daily slot `limits.py`, `WRONG_GARMENT_TYPE`, `Garment.ai_skipped`
-      + frontend dev warning). 77 backend tests pass. **Real-API check NOT done:** every call to the .env model timed out
+      + frontend dev warning). Committed (17644c8..5727582); separate daily limits per kind (#52). **Real-API check NOT done:** every call to the .env model timed out
       (60 s) or got 503, then the free-tier quota (20 requests/day) ran out. Rerun the throwaway smoke script when the quota
       resets. Owner to review the defaults in #47-49. Still to do: prompt 04, quality check, Save/Cancel, delete original.
 - [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.

@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from .landmark_checks import LandmarksInvalid, validate_garment_landmarks
 from .models import Garment
 from .serializers import GarmentSerializer, GarmentUploadSerializer
 from apps.images import ImageRejected, validate_image_upload
@@ -102,7 +103,11 @@ def update_landmarks(request, pk):
     landmarks = request.data.get("landmarks")
     if not isinstance(landmarks, dict) or not landmarks:
         return Response({"code": "LANDMARKS_REQUIRED", "detail": "Chiziqlarni belgilang."}, status=400)
-    g.landmarks = landmarks
+    try:
+        validate_garment_landmarks(g.type, landmarks, g.image.width, g.image.height)
+    except LandmarksInvalid as e:  # detail is our own fixed Uzbek message, never an exception text
+        return Response({"code": "LANDMARKS_INVALID", "detail": e.detail}, status=400)
+    g.landmarks = landmarks  # stored exactly as sent (extra keys kept)
     g.save(update_fields=["landmarks"])
     return Response(GarmentSerializer(g, context={"request": request}).data)
 

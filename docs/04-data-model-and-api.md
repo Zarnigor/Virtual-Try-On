@@ -46,7 +46,7 @@ General rules
 | POST | garments/ | multipart `photo`, `type`, `name?` | 201 `{garment, job_id}` |
 | GET | garments/{id}/ | | `Garment` (owner, or public+approved) |
 | DELETE | garments/{id}/ | | 204 (owner only) |
-| PATCH | garments/{id}/landmarks/ | `{landmarks}` | `Garment` (409 `GARMENT_NOT_READY` until cleaned) |
+| PATCH | garments/{id}/landmarks/ | `{landmarks}` | `Garment` (409 `GARMENT_NOT_READY` until cleaned; 400 `LANDMARKS_INVALID` `{code, detail}` with a short Uzbek message naming the group, rules in docs/03) |
 | PATCH | garments/{id}/visibility/ | `{visibility: private\|public}` | `Garment` |
 | GET | jobs/{id}/ | | `Job {id, kind, status, result, error_code, error_message, ...}` |
 | POST | tryon/ | `{base: body\|avatar, avatar_id?, garment_ids[]}` | 202 `{job_id, outfit_id}` |

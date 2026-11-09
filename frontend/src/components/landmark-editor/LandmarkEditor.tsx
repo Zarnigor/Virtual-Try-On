@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import {
-  axisX, findPoint, fromLandmarks, movePoint, nudgePoint, snapCenters, toLandmarks,
-  type Bounds, type EditorState, type GroupDef,
+  NO_RULES, axisX, findPoint, fromLandmarks, movePoint, nudgePoint, saveState, snapCenters, toLandmarks,
+  type Bounds, type EditorState, type GroupDef, type Rules,
 } from './geometry'
 import './landmarkEditor.css'
 
@@ -16,6 +16,8 @@ interface Props {
   imageAlt: string
   bounds: Bounds
   groups: GroupDef[]
+  /** Order rules: a move stops at the neighbour instead of crossing it. Loading never clamps. */
+  rules?: Rules
   /** Landmarks as loaded from the API (any shape the groups describe; empty object for new records). */
   landmarks: unknown
   heading: string
@@ -38,7 +40,7 @@ function hexA(hex: string, a: number) {
 }
 
 export default function LandmarkEditor({
-  imageUrl, imageAlt, bounds, groups, landmarks, heading, subheading, saving, onSave,
+  imageUrl, imageAlt, bounds, groups, rules = NO_RULES, landmarks, heading, subheading, saving, onSave,
 }: Props) {
   const { w, h } = bounds
   const initial = useMemo(() => fromLandmarks(landmarks, groups, { w, h }), [landmarks, groups, w, h])
@@ -78,6 +80,7 @@ export default function LandmarkEditor({
 
   const b = { w, h }
   const total = groups.reduce((n, g) => n + g.points.length, 0)
+  const save = saveState(placed.size, total)
   const active = findPoint(groups, activeId) ?? { group: groups[0], point: groups[0].points[0] }
   const ax = state.xs[active.point.id]
   const ay = state.ys[active.group.id]
@@ -92,7 +95,7 @@ export default function LandmarkEditor({
   }
 
   const nudge = (dx: number, dy: number) => {
-    setState((s) => nudgePoint(s, groups, active.point.id, dx, dy, b, symmetry))
+    setState((s) => nudgePoint(s, groups, active.point.id, dx, dy, b, symmetry, rules))
     markPlaced(active.point.id)
   }
 
@@ -119,7 +122,7 @@ export default function LandmarkEditor({
     if (!d || d.pointerId !== e.pointerId) return
     const p = toImage(e)
     if (!p) return
-    setState((s) => movePoint(s, groups, d.id, p.x + d.offX, p.y + d.offY, b, symmetry))
+    setState((s) => movePoint(s, groups, d.id, p.x + d.offX, p.y + d.offY, b, symmetry, rules))
     markPlaced(d.id)
   }
 
@@ -141,7 +144,7 @@ export default function LandmarkEditor({
     const on = !symmetry
     setSymmetry(on)
     if (on) {
-      setState((s) => snapCenters(s, groups, b))
+      setState((s) => snapCenters(s, groups, b, rules))
       setPlaced((prev) => {
         const next = new Set(prev)
         groups.forEach((g) => g.points.forEach((p) => p.side === 'center' && next.add(p.id)))
@@ -341,6 +344,7 @@ export default function LandmarkEditor({
             </button>
           </div>
           <p className="le-hint">Klaviatura: strelkalar 1 px, Shift bilan 5 px.</p>
+          {!save.canSave && <p className="le-hint" role="status">{save.hint}</p>}
 
           <div className="le-actions">
             <button type="button" className="btn btn-secondary" onClick={reset} disabled={saving}>
@@ -349,7 +353,8 @@ export default function LandmarkEditor({
             <button
               type="button"
               className="btn btn-primary"
-              disabled={saving}
+              disabled={saving || !save.canSave}
+              title={save.hint || undefined}
               onClick={() => onSave(toLandmarks(landmarks, state, groups))}
             >
               {saving ? 'Saqlanmoqda…' : 'Saqlash'}
