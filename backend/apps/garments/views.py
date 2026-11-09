@@ -1,4 +1,3 @@
-import os
 from django.conf import settings
 from django.db.models import Q
 from rest_framework.decorators import api_view, permission_classes
@@ -76,13 +75,7 @@ def garment_detail(request, pk):
             g = Garment.objects.get(pk=pk, owner=request.user)
         except Garment.DoesNotExist:
             return Response(status=404)
-        for field in (g.image, g.original_image):
-            if field:
-                try:
-                    os.remove(field.path)
-                except OSError:
-                    pass
-        g.delete()
+        g.delete()  # files removed by post_delete signal
         return Response(status=204)
 
     try:

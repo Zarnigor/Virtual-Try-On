@@ -20,6 +20,7 @@ services:
     volumes:
       - ./backend:/app
       - media:/app/media
+      - u2net:/root/.u2net   # rembg model cache (176 MB), survives container rebuilds
     ports:
       - "8000:8000"
     environment:
@@ -30,6 +31,7 @@ services:
       - ALLOWED_HOSTS=localhost,127.0.0.1,backend
       - MEDIA_URL=/media/
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AI_DEV_BYPASS=${AI_DEV_BYPASS:-1}  # local dev only, see settings/base.py
     depends_on:
       - db
       - redis
@@ -41,12 +43,14 @@ services:
     volumes:
       - ./backend:/app
       - media:/app/media
+      - u2net:/root/.u2net   # rembg model cache (176 MB), survives container rebuilds
     environment:
       - DATABASE_URL=postgres://tryon:tryon_dev@db:5432/tryon
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=dev-secret-key-change-in-production
       - DEBUG=1
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - AI_DEV_BYPASS=${AI_DEV_BYPASS:-1}  # local dev only, see settings/base.py
     depends_on:
       - db
       - redis
@@ -65,3 +69,4 @@ services:
 volumes:
   pgdata:
   media:
+  u2net:

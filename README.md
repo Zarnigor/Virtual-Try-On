@@ -26,13 +26,19 @@ seed/avatars.reference.json     landmark JSON schema example (not final data)
 Scaffold exists (backend/, frontend/, docker-compose.yml). The API contract is fixed: `docs/04` + `frontend/src/api/types.ts`.
 No flow works end to end yet. Current progress and the next step are tracked in `CLAUDE.md` ("Status and next step").
 
-## Commands (not verified yet: no Docker/Node/Python on the dev Mac at the time of writing)
+## Environment and commands (verified 2026-11-09 on macOS arm64 + OrbStack)
+Docker runs in **OrbStack** (`~/.orbstack/bin` must be on PATH). OrbStack needs macOS permission for the Desktop folder
+(System Settings -> Privacy & Security -> Files & Folders), otherwise containers fail with "Operation not permitted".
+The first garment job downloads the rembg model (about 176 MB) into the `u2net` volume (kept across rebuilds).
 ```
-cp .env.example .env                                   # then fill GEMINI_API_KEY
-docker compose up --build                              # db, redis, backend :8000, worker, frontend :5173
-docker compose exec backend python manage.py migrate
-docker compose exec backend python manage.py seed_avatars   # placeholder avatars until real photos exist
-docker compose exec backend python manage.py test           # no tests yet
-docker compose exec frontend npx tsc --noEmit                # type check
-python3 tools/warp_experiment/run.py                         # day-1 warp experiment -> tools/warp_experiment/out/
+docker compose up -d --build                              # db, redis, backend :8000, worker, frontend :5173
+                                                          # backend entrypoint runs migrate + seed_avatars automatically
+docker compose exec -T backend python manage.py check
+docker compose exec -T backend python manage.py makemigrations --check --dry-run
+docker compose exec -T backend python manage.py test apps   # 34 tests (step 3)
+docker compose exec -T frontend npx tsc --noEmit          # type check
+docker compose exec -T frontend npm test                  # vitest (landmark-editor geometry)
+docker compose logs -f backend worker
+docker compose down                                       # stop (add -v to wipe db + media)
 ```
+Optional: `cp .env.example .env` and set GEMINI_API_KEY (AI steps are stubs until steps 4 and 6).

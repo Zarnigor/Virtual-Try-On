@@ -12,8 +12,8 @@ class Garment(models.Model):
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        null=True, blank=True,
-        on_delete=models.SET_NULL,
+        null=True, blank=True,  # null = admin catalog garment
+        on_delete=models.CASCADE,  # account deletion deletes the user's garments (docs/07)
         related_name="garments",
     )
     name = models.CharField(max_length=100, default="")

@@ -11,7 +11,7 @@ class Outfit(models.Model):
     body = models.ForeignKey(
         "bodies.Body",
         null=True, blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,  # body deletion deletes its outfits (docs/02 rule 3)
         related_name="outfits",
     )
     avatar = models.ForeignKey(

@@ -1,8 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.conf import settings
-from django.conf.urls.static import static
 
+# No open /media/ route: images are only served through signed URLs (/api/media/signed/..., docs/02 rule 10).
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.users.urls")),
@@ -13,4 +12,4 @@ urlpatterns = [
     path("api/", include("apps.outfits.urls")),
     path("api/", include("apps.jobs.urls")),
     path("api/media/", include("apps.users.media_urls")),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]

@@ -27,7 +27,7 @@ silhouettes and flat T-shirt/pants shapes only as placeholders. In the app:
 | 6 | Model tanlash | /model | GET /avatars/nearest?... | nearest avatar image |
 | 7 | Kiyimlar | /garments | GET /garments?scope=mine\|catalog&type= | garment thumbnails; DELETE /garments/{id} |
 | 8 | Kiyim yuklash va tozalash | /garments/new | POST /garments (file, type), GET /jobs/{id}, then Save/Cancel | uploaded original (temporary preview) and cleaned result |
-| 9 | Kiyimni belgilash | /garments/{id}/landmarks | PATCH landmarks, PATCH visibility | cleaned garment image |
+| 9 | Kiyimni belgilash | /garments/{id}/landmarks | PATCH landmarks, PATCH visibility | cleaned garment image (editor: design artboard VariantC, `components/landmark-editor/`) |
 | 10 | Kiyib koʻrish | /try-on | GET /garments, POST /tryon, POST /tryon/{id}/realistic, POST /outfits | body or avatar image, garment thumbs, result image, realistic image |
 | 11 | Mening obrazlarim | /outfits | GET /outfits, DELETE /outfits/{id} | result and realistic images |
 | 12 | Profil va maxfiylik | /profile | GET /body, PATCH /body/measurements, DELETE /body, DELETE /me | none |

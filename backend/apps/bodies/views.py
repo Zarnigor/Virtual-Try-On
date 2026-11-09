@@ -1,4 +1,3 @@
-import os
 from django.conf import settings
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
@@ -30,10 +29,8 @@ def _err(code, status, **extra):
 
 
 def _own_body(request):
-    try:
-        return request.user.body
-    except Body.DoesNotExist:
-        return None
+    # Query every time: request.user.body can be a stale cached object.
+    return Body.objects.filter(user=request.user).first()
 
 
 @api_view(["GET", "POST", "DELETE"])
@@ -48,12 +45,7 @@ def body_root(request):
         return _err("BODY_NOT_FOUND", 404)
 
     if request.method == "DELETE":
-        if body.image:
-            try:
-                os.remove(body.image.path)
-            except OSError:
-                pass
-        body.delete()
+        body.delete()  # cascades to its outfits; files removed by post_delete signals
         return Response(status=204)
 
     return Response(BodySerializer(body, context={"request": request}).data)

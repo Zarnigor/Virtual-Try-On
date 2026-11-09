@@ -7,7 +7,7 @@ class Avatar(models.Model):
 
     sex = models.CharField(max_length=10, choices=SEX_CHOICES)
     build = models.CharField(max_length=10, choices=BUILD_CHOICES)
-    image = models.ImageField(upload_to="avatars/")
+    image = models.ImageField(upload_to="avatars/", blank=True, null=True)  # set right after creation by seed_avatars
     landmarks = models.JSONField(default=dict)
     measurements = models.JSONField(default=dict)  # reference measurements in cm (circumference)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -54,7 +54,7 @@ Deformation pairs garment and body landmarks by identical names.
 ## Detection algorithm (prototype)
 See `tools/landmark-editor-prototype/body-landmarks.html`: background colour from image borders ->
 mask -> largest connected component -> row scans. Auto-detect, then the user drags lines
-(ticks snap to the silhouette edge) and confirms. Arrow keys nudge by 1 px (Shift: 10 px).
+(ticks snap to the silhouette edge) and confirms. Arrow keys nudge by 1 px (Shift: 5 px). All points of a group share one Y; symmetry mirrors X around w / 2 (docs/09 #37-39).
 In production: do segmentation on the backend (rembg), return the mask/landmarks, editor only adjusts.
 
 ## Reference data

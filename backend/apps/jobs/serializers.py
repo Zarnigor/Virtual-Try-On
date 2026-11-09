@@ -22,6 +22,12 @@ ERROR_MESSAGES = {
     "FILE_TOO_LARGE": "Fayl hajmi juda katta. 20 MB dan kichik rasm yuklang.",
     "BAD_FILE_TYPE": "Faqat JPG yoki PNG formatidagi rasmlar qabul qilinadi.",
     "AI_FAILED": "Tekshiruv vaqtida xatolik yuz berdi. Qayta urinib ko'ring.",
+    "AI_UNAVAILABLE": "Tekshiruv xizmati hozircha ishlamayapti. Keyinroq qayta urinib koʻring.",
+    "INVALID_AI_RESPONSE": "Rasmni tekshirib boʻlmadi. Boshqa rasm yuklab koʻring.",
+    "CLEAN_FAILED": "Kiyimni tozalab boʻlmadi. Boshqa rasm yuklab koʻring.",
+    "WARP_FAILED": "Kiyimni tanaga moslashtirib boʻlmadi. Qayta urinib koʻring.",
+    "BODY_NOT_FOUND": "Tana topilmadi.",
+    "GARMENT_NOT_FOUND": "Kiyim topilmadi.",
 }
 
 

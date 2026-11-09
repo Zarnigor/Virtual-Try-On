@@ -26,7 +26,8 @@ but the frontend must fully work too (React is required). The owner works and re
 
 ## Hard rules (do not break)
 - **One body per user, photo/landmarks immutable after confirmation.** Enforce in the backend (unique `user_id`, no PUT/PATCH for
-  photo/landmarks, second upload fails). A hidden frontend button is not enough.
+  photo/landmarks, upload while a **confirmed** body exists fails with 409). A hidden frontend button is not enough.
+  An upload while an **unconfirmed** body exists replaces it (docs/09 #33).
   Measurements may change **once per 365 days**. The user **may delete** their body (cascades to its outfits) and create a new one.
 - **Garment images are immutable**, only deletable. Landmarks and visibility are data and may be edited.
 - Body, photo and measurements are **private to the owner**: every query filtered by `user_id`; other users get 404.
@@ -37,8 +38,12 @@ but the frontend must fully work too (React is required). The owner works and re
   **Never build features that remove or redraw the user's clothes/body.**
 - Adults only for body photos (AI suspected-minor rejection + "I am 18+" confirmation).
 - **Code checks first, AI checks second** (cost). Geometry (arms touch, legs gap, framing) is checked by code, not AI.
-- **AI fails closed**: invalid/empty AI JSON means rejected. AI returns codes; the backend maps codes to Uzbek messages.
-- Daily limit on AI-reaching upload attempts per user (default 5). Code-check rejections do not count.
+- **AI fails closed, both ways**: invalid/empty AI JSON means rejected, and `ok: true` with contradicting fields is rejected
+  with codes derived from those fields. AI returns codes; the backend maps codes to Uzbek messages.
+  "AI could not answer" (`AI_UNAVAILABLE`, `AI_RESPONSE_INVALID`) shows "try again later", never "photo rejected".
+- Daily limit on AI-reaching upload attempts per user (default 5), race-safe (`select_for_update`, slot reserved before the
+  request). Counts responses incl. `AI_RESPONSE_INVALID`; does not count `AI_UNAVAILABLE`, code-check rejections or bypassed jobs.
+- Gemini is called over plain `httpx` (no Google SDK). Tests never make real HTTP calls (`httpx.MockTransport` + guard).
 - Canvas for body/avatars/results: **600 x 1200 px**, `axis_x = 300`, figure from y = 50 to about 1150.
   Garments: tight-cropped transparent PNG (not forced to 600x1200).
 - Gemini image aspect ratios have no 1:2. Cleaning uses 3:4; realistic render pads to 9:16 and crops back (see prompts/README.md).
@@ -100,15 +105,30 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       (anchor shoulder->about 40% of the arm, not down to the hand), per-leg pants on real separated legs.
       Then log the scanline-vs-mesh decision (docs/09 item 19, docs/06). **Blocked on the owner: real avatar photos.**
 - [x] 2. Frontend and backend agree: API contract in docs/04 + `frontend/src/api/types.ts`; paths/fields fixed.
-      Not run or type-checked yet (no tooling on the Mac). **Git init + first commit still pending** (needs git:
-      `xcode-select --install`). Do the commit first thing once git exists.
-- [ ] 3. Hard-rule bugs + tests: body delete must delete its outfits + files (Outfit.body is SET_NULL today);
-      account delete must delete the user's garments + files (Garment.owner is SET_NULL); drop the open `/media/`
-      static route in `tryon_studio/urls.py`; AI fails closed (`run_body_validation` approves everything today).
-      (Already fixed in step 2: try-on rejects others' unapproved public garments; first measurements don't start the lock.)
-- [ ] 4. Own-body pipeline: code checks -> rembg -> normalize 600x1200 -> delete original -> strip EXIF -> prompt 02
-      (`google-genai` SDK, Pydantic) -> daily AI limit -> auto landmark detection returned in `GET body/`.
+      Committed (e54f802). Environment runs (2026-11-09): Docker via OrbStack, all 5 services up, `manage.py check`,
+      migrations and `tsc --noEmit` clean; a 30-check API smoke test passed (register -> body -> garment clean ->
+      landmarks -> try-on 600x1200 -> deletes, plus 404/409 permission cases). How to run: README "Environment and commands".
+- [x] 3. Hard-rule bugs + tests (done 2026-11-09, 34 tests pass: `docker compose exec -T backend python manage.py test apps`).
+      Body delete cascades to outfits; account delete cascades to garments; files removed by post_delete signals
+      (`apps/files.py`); open `/media/` route removed; AI fails closed (`apps/jobs/ai_schemas.py` Pydantic parser,
+      `apps/jobs/tasks.py`), a rejected upload is deleted so the user can retry. `AI_DEV_BYPASS=1` (DEBUG only, set in
+      docker-compose) skips the not-yet-wired AI calls for local testing and marks `result.ai_skipped`.
+- [ ] 3b. NOW: owner tests with real clothes (garment upload -> rembg -> landmark dots -> try-on on a placeholder avatar).
+      The owner sends the findings separately: log them in docs/09 before starting step 4.
+- [ ] 4. Own-body pipeline. **Plan approved 2026-11-09, full spec in docs/09 items 22-34. Do NOT start coding until the 3b
+      findings have arrived.** (Items 35-36 add: finalized job = no-op on start; `Body.current_job` + `SUPERSEDED`
+      check before finalizing, with a two-quick-uploads test.) Summary: EXIF strip -> rembg -> code checks -> normalize 600x1200 -> auto landmarks in
+      `GET body/` -> race-safe AI slot -> prompt 02 on the ~1024 px original via `gemini-3.6-flash` over httpx -> fail-closed
+      parse (both ways) -> delete original in `finally`. Plus: `AI_UNAVAILABLE` vs `AI_RESPONSE_INVALID` (metric endpoint),
+      `acks_late` + poison-pill guard, Celery beat (orphaned originals > 1 h, stuck jobs > 15 min via conditional UPDATE),
+      re-upload replaces an unconfirmed body, `AI_DEV_BYPASS=1` always skips. Remove `google-generativeai` from requirements.
+      Tests: MockTransport + real-HTTP guard, PostgreSQL `TransactionTestCase` race for the last slot; one manual real-API check
+      of the generated `responseJsonSchema` (ask the owner before sending it).
 - [ ] 5. One `LandmarkEditor` (port of `tools/landmark-editor-prototype`) for body + garments; sanity checks client + server.
+      **Partly done (2026-11-09, branch `landmark-editor-variant-c`):** garment editor rebuilt from design artboard VariantC in
+      `frontend/src/components/landmark-editor/` (pure `geometry.ts` + `garmentGroups.ts` + component), used by
+      `pages/LandmarkEditor.tsx`; rules in docs/09 #37-41; 13 vitest tests (`npm test`). Not yet checked by hand in the browser.
+      Still to do: body groups + BodyConfirm wiring, sanity checks (client + server). No ESLint config exists yet (`npm run lint` fails).
       Body confirm page must send the edited landmarks to `POST body/confirm/` (BodyConfirm.tsx has a TODO).
 - [ ] 6. Garment pipeline: prompts 01 + 04, quality check, Save/Cancel preview (screen 8), delete original, visibility (screen 9).
 - [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.
@@ -117,8 +137,9 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
 - [ ] 10. P1 if time: realistic render (prompt 05).
 
 Open questions for the owner (ask once, then log the answers in docs/09):
-which build day we are on; whether real avatar photos exist; scanline instead of mesh warp OK;
-where the stack runs (this Mac has no Docker/Node/Python/git).
+which build day we are on; whether real avatar photos exist; scanline instead of mesh warp OK.
+Environment: everything runs in Docker (OrbStack). The Mac has git but no host Python/Node: run Python and npm inside the
+containers (`docker compose exec -T backend ...`, `docker compose exec -T frontend ...`). Add `~/.orbstack/bin` to PATH.
 
 Known gaps that are not bugs in the contract: frontend pages do not follow the design yet (nav names, missing screens
 3, 5, 6, 8, 9, 12, emojis, no locale file). Seeded avatars are drawn placeholders from `seed/avatars.reference.json`.
