@@ -5,6 +5,7 @@ import { startTryon } from '../api/tryon'
 import { getOutfit } from '../api/outfits'
 import { usePoll } from '../components/usePoll'
 import Spinner from '../components/Spinner'
+import DevAiWarning from '../components/DevAiWarning'
 import StatusChip from '../components/StatusChip'
 
 export default function TryOn() {
@@ -212,6 +213,7 @@ export default function TryOn() {
                         />
                       )}
                       <div style={{ flex: 1 }}>
+                        {g.ai_skipped && <DevAiWarning compact />}
                         <StatusChip status={g.type} />
                         {!hasLandmarks && (
                           <span style={{ fontSize: 11, color: 'var(--warning)', marginLeft: 6 }}>

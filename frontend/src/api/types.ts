@@ -208,6 +208,8 @@ export interface Garment {
   visibility: Visibility
   status: GarmentStatus
   owned_by_me: boolean
+  /** True = the AI check was skipped (AI_DEV_BYPASS, local dev only): NOT validated. Show a dev warning. */
+  ai_skipped: boolean
   created_at: string
 }
 

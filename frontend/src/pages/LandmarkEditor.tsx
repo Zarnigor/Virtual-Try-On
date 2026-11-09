@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getGarment, updateLandmarks, type Garment } from '../api/garments'
 import type { GarmentLandmarks } from '../api/types'
+import DevAiWarning from '../components/DevAiWarning'
 import Spinner from '../components/Spinner'
 import LandmarkEditor from '../components/landmark-editor/LandmarkEditor'
 import { groupsFor } from '../components/landmark-editor/garmentGroups'
@@ -85,6 +86,7 @@ export default function GarmentLandmarksPage() {
         </button>
       </div>
 
+      {garment?.ai_skipped && <DevAiWarning />}
       {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
       {success && (
         <p role="status" style={{ color: 'var(--accent)', fontSize: 13, marginBottom: 12 }}>
