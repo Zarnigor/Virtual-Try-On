@@ -15,7 +15,8 @@ behind signed URLs (assumption; S3-compatible later).
   No image update. The original upload is deleted after cleaning. No garment real-size field.
 - **Outfit**: owner, body (FK) or avatar (FK), garments (M2M), result_image, realistic_image (nullable), created_at
 - **Report**: garment, reporter, reason; unique (garment, reporter)
-- **Job**: user, kind (body_validation | garment_clean | moderation | realistic), status (queued|running|done|failed), result/error code, created_at
+- **Job**: user, kind (body_validation | garment_clean | moderation | realistic), status (queued|running|done|failed), result/error code, ai_called, ai_called_at, ai_outcome (""|responded|invalid|unavailable;
+  daily limit, docs/09 #29), created_at. `garment_clean` result: `{cleaned, ai_skipped, ai_cached}`
 
 ## API contract (implemented, 2026-11-09)
 This section is the contract. The frontend mirror is `frontend/src/api/types.ts`; the Django views and
@@ -57,7 +58,8 @@ Notes
 - There is **no** endpoint to edit body photo/landmarks or a garment image. Body landmarks are sent once, in `body/confirm/`.
 - `measurements` = circumferences in cm: `{shoulder?, chest?, waist?, hip?}` (decision 13). Values given at confirm do not start the yearly lock; each `PATCH body/measurements/` does.
 - Body fields: `id, image_url, landmarks, height_cm, measurements, confirmed_at, measurements_unlock_at, can_change_measurements, created_at`.
-- Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, visibility, status, owned_by_me, created_at`.
+- Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, visibility, status, owned_by_me, ai_skipped, created_at`.
+  `ai_skipped` (read-only) = the AI check was skipped by `AI_DEV_BYPASS` (local dev only): the frontend shows a dev warning.
 - Outfit fields: `id, body, avatar, garments[], result_url, realistic_url, created_at`.
 
 Not built yet (add here and in types.ts when built): `POST tryon/{id}/realistic/`, `POST outfits/` (explicit save; today every

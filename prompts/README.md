@@ -11,7 +11,9 @@ Do not paraphrase or "improve" them without testing (see testing notes below).
 | 04-garment-cleaning.txt | image model | garment photo + `GARMENT_TYPE`, `BACKGROUND_HEX` | image (or text `NO_GARMENT`) | `aspectRatio: "3:4"`, `imageSize: "1K"` |
 | 05-realistic-render.txt | image model | Image 1 (try-on composite), Image 2 (clean garment) | image (or text `NO_EDIT`) | `aspectRatio: "9:16"`, `imageSize: "1K"` |
 
-MVP garment types: `tshirt` (short sleeve or sleeveless) and `pants`. Anything else is rejected as WRONG_TYPE.
+MVP garment types: `tshirt` (short sleeve or sleeveless) and `pants`. Prompt 01 gets `top` for `tshirt` (its own word).
+The backend checks the type in code: `detected_type` must equal the declared type and, for `tshirt`, `sleeve_length` must be
+`none` or `short`. Any mismatch (and the AI's own `WRONG_TYPE` issue) is reported as **`WRONG_GARMENT_TYPE`**.
 
 Image model: **Nano Banana 2 (standard)**, chosen by the owner (not Lite, not Pro). Verify the current model ID in the Gemini docs.
 
@@ -54,10 +56,12 @@ Image model: **Nano Banana 2 (standard)**, chosen by the owner (not Lite, not Pr
 | APPARENT_MINOR / ESTIMATE_UNCLEAR | Bu rasmni qabul qila olmaymiz. Boshqa rasm yuklab koʻring. (Sababni batafsil yozmang.) |
 | NO_GARMENT / NOT_A_CLOTHING_PHOTO | Rasmda kiyim topilmadi. |
 | MULTIPLE_GARMENTS | Rasmda bitta kiyim boʻlsin. |
-| WRONG_TYPE | Tanlangan tur rasmdagi kiyimga mos emas. Hozircha faqat futbolka va shim qabul qilinadi. |
+| WRONG_GARMENT_TYPE (AI's WRONG_TYPE maps here) | Rasmdagi kiyim tanlangan turga mos emas. Futbolka yoki shim turini toʻgʻri tanlang. |
 | NOT_FRONT_VIEW | Kiyimning old tomonini yuklang. |
 | GARMENT_CUT_OFF | Kiyim toʻliq koʻrinsin, chetlari kesilmasin. |
 | LOW_QUALITY | Rasm xira yoki kichik. Aniqroq rasm yuklang. |
+| AI_UNAVAILABLE / AI_RESPONSE_INVALID | Tekshiruv xizmati hozircha ishlamayapti. Keyinroq qayta urinib koʻring. (Never "photo rejected".) |
+| AI_LIMIT | Bugungi tekshiruvlar limiti tugadi. Ertaga qayta urinib koʻring. |
 
 Code-side (non-AI) checks have their own codes: ARMS_TOUCH_BODY, LEGS_TOUCH, IMAGE_TOO_SMALL,
 HEAD_OR_FEET_CUT, FILE_TOO_LARGE, BAD_FILE_TYPE, CORRUPT_FILE, IMAGE_TOO_LARGE. Map them to similar Uzbek messages.

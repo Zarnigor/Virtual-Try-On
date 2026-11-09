@@ -12,7 +12,11 @@ Image model: **Nano Banana 2 (standard)** via the official Gemini API.
 
 ## Garment upload pipeline (AI cleaning is in P0)
 1. Code checks: file type/size, min size.
-2. AI check: `01-garment-validation.txt` (JSON). Types: tshirt, pants.
+2. AI check: `01-garment-validation.txt` (JSON). Types: tshirt, pants. **The detected type must match the chosen type**
+   (checked in code; a T-shirt also needs short or no sleeves), otherwise `WRONG_GARMENT_TYPE`. Every rule is re-checked in
+   code (`ok: true` alone is never trusted); invalid/empty JSON -> `AI_RESPONSE_INVALID`. Verdicts are cached by image hash
+   (+ declared type, prompt hash, model): a cache hit makes no AI call and uses no daily slot. Code: `apps/jobs/ai_schemas.py`,
+   `apps/jobs/tasks.py` (`_check_garment_with_ai`), `apps/jobs/gemini.py`, `apps/jobs/ai_cache.py`, `apps/jobs/limits.py`.
 3. AI cleaning: `04-garment-cleaning.txt` (image model, 3:4, 1K). Background colour from garment brightness
    (white garments: #808080, otherwise #EDEDED).
 4. rembg (or flat-colour keying) -> transparent PNG -> crop to the alpha bounding box.

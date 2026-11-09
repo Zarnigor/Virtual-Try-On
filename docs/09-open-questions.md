@@ -131,3 +131,28 @@ _(none blocking P0)_
     `original_image`. `PATCH garments/{id}/landmarks/` returns 409 `GARMENT_NOT_READY` before that, so landmarks are always pixels
     of the cleaned crop. The wardrobe shows "Tayyorlanmoqda" / "Belgilangan" / "Belgilanmagan", shows the moderation status only
     for public garments (private ones always say "pending"), and polls until every garment has its image.
+
+## Decided 2026-11-09: garment AI check (prompt 01, part of step 6), approved by owner
+45. **Garment AI check is wired** in `run_garment_cleaning`, before cleaning: cache -> poison-pill guard -> daily slot -> Gemini
+    (httpx, model from `GEMINI_VALIDATION_MODEL` in .env, never hardcoded) -> strict Pydantic parse. Timeout at least 60 s
+    (`GEMINI_TIMEOUT_S`), one retry on 429/5xx and network errors, no retry on timeout. `google-generativeai` removed.
+46. **The schema follows prompt 01** (`top|pants`, `sleeve_length`, `visible_fraction >= 0.6`). The backend sends `top` for
+    `tshirt`. Type mismatch, a non-short-sleeved top declared as `tshirt`, or the AI's `WRONG_TYPE` -> **`WRONG_GARMENT_TYPE`**
+    ("Rasmdagi kiyim tanlangan turga mos emas. Futbolka yoki shim turini toʻgʻri tanlang.", confirmed by owner).
+    `ok: false` with no failing field and no known issue -> `AI_RESPONSE_INVALID`.
+47. (Default, confirmed by owner 2026-11-09: `AI_UNAVAILABLE` stays free) **AI photo rejections still count** toward the daily limit (unchanged #20, #28: the reply was
+    billed). Only `AI_UNAVAILABLE`, code-check rejections, bypassed jobs and cache hits are free. The race-safe slot from #29
+    is built now (`apps/jobs/limits.py`, PostgreSQL race test). Over the limit the job fails with `AI_LIMIT` (worker only; the
+    upload endpoint contract is unchanged, so there is no 429 pre-check yet).
+48. (Default, owner to review) **`Garment.ai_skipped`** (read-only API field) marks garments whose AI check was bypassed. The
+    frontend shows a yellow "DEV: tekshirilmagan" chip (wardrobe, try-on) and a banner (landmark editor).
+49. (Default, owner to review) **Cache by image hash:** Django cache on Redis, 30 days, key = sha256(image hash, declared type,
+    prompt hash, model). Stores the parsed fields only; rules are re-run in code on every hit. Only valid, self-consistent
+    replies are cached. A cache error is a miss.
+50. **Code renamed** `INVALID_AI_RESPONSE` -> `AI_RESPONSE_INVALID` (approved spelling, #34). It shows "try again later".
+51. **Tests:** `apps/jobs/tests_garment_ai.py` (MockTransport, hand-written fixtures from the prompt schema). The test runner
+    (`tryon_studio/test_runner.py`) blocks every real httpx call and uses an in-memory cache.
+52. **Separate daily limits per job kind** (owner, 2026-11-09): `AI_DAILY_LIMIT` (body checks, default 5) and
+    `AI_GARMENT_DAILY_LIMIT` (garment checks, default 5), counted by `Job.kind`, so garment uploads never use up the body check.
+    Both are passed to the containers by docker-compose. `.env.example` sets `AI_GARMENT_DAILY_LIMIT=30` as the dev value.
+    `AI_UNAVAILABLE` stays free for the user.

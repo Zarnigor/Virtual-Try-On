@@ -35,10 +35,12 @@ docker compose up -d --build                              # db, redis, backend :
                                                           # backend entrypoint runs migrate + seed_avatars automatically
 docker compose exec -T backend python manage.py check
 docker compose exec -T backend python manage.py makemigrations --check --dry-run
-docker compose exec -T backend python manage.py test apps   # 34 tests (step 3)
+docker compose exec -T backend python manage.py test apps   # 77 tests (real HTTP is blocked in tests)
 docker compose exec -T frontend npx tsc --noEmit          # type check
 docker compose exec -T frontend npm test                  # vitest (landmark-editor geometry)
 docker compose logs -f backend worker
 docker compose down                                       # stop (add -v to wipe db + media)
 ```
-Optional: `cp .env.example .env` and set GEMINI_API_KEY (AI steps are stubs until steps 4 and 6).
+Optional: `cp .env.example .env` and set `GEMINI_API_KEY` and `GEMINI_VALIDATION_MODEL` (the garment check, prompt 01, is
+wired; the body check is a stub until step 4). `AI_DEV_BYPASS=1` (the docker default) skips the AI; set `AI_DEV_BYPASS=0`
+in .env to call Gemini. Optional `GEMINI_TIMEOUT_S` (minimum 60).
