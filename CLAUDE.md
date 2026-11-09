@@ -135,9 +135,9 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
 - [ ] 6. Garment pipeline: prompts 01 + 04, quality check, Save/Cancel preview (screen 8), delete original, visibility (screen 9).
       **Prompt 01 done (2026-11-09, docs/09 #45-51, uncommitted):** garment AI check in `run_garment_cleaning` (httpx client
       `apps/jobs/gemini.py`, cache `ai_cache.py`, race-safe daily slot `limits.py`, `WRONG_GARMENT_TYPE`, `Garment.ai_skipped`
-      + frontend dev warning). Committed (17644c8..5727582); separate daily limits per kind (#52). **Real-API check NOT done:** every call to the .env model timed out
-      (60 s) or got 503, then the free-tier quota (20 requests/day) ran out. Rerun the throwaway smoke script when the quota
-      resets. Owner to review the defaults in #47-49. Still to do: prompt 04, quality check, Save/Cancel, delete original.
+      + frontend dev warning). Committed (17644c8..5727582); separate daily limits per kind (#52). **Real-API check done 2026-11-09 on `gemini-3.5-flash-lite`:**
+      8/8 verdicts as expected (6 photos + 2 wrong-type runs), responseJsonSchema accepted, 1.5-18 s per call. The earlier
+      model (`gemini-3.8-flash`, still in .env) timed out / 503'd. Owner to choose the .env model. Owner to review the defaults in #47-49. Still to do: prompt 04, quality check, Save/Cancel, delete original.
 - [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.
 - [ ] 8. Try-on: hands/forearms above the garment, `quality_warnings[]`, explicit `POST outfits/` save, screens 10-12 per design.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
