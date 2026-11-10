@@ -4,6 +4,11 @@ import numpy as np
 from django.test import SimpleTestCase
 
 from apps.tryon_engine import warp
+from apps.tryon_engine.flags import render_flags
+
+
+def flags_render_source(source):
+    return render_flags(source)["source"]
 
 H, W = 1200, 600
 SKIN = (90, 120, 200, 255)  # BGRA
@@ -836,7 +841,7 @@ class TshirtCompositingTests(SimpleTestCase):
         cv2.fillPoly(base, [tank], grey)
         cv2.fillPoly(base, [np.array([(280, 255), (320, 255), (320, 270), (280, 270)], np.int32)], SKIN)
         g, glm = NeckFixTests().crew_tshirt()
-        (rgb, _, dbg), _ = self.render(g=g, glm=glm, base=base, lm=lm)
+        (rgb, _, dbg), _ = self.render(g=g, glm=glm, base=base, lm=lm, source="avatar")
         is_grey = (np.abs(rgb.astype(int) - np.array(grey[:3])).max(axis=2) <= 12)
         n = lm["neck"]
         self.assertEqual(int(is_grey[150:lm["shoulder"]["y"] + 5, n["left_x"] - 10:n["right_x"] + 11].sum()), 0)
@@ -845,9 +850,25 @@ class TshirtCompositingTests(SimpleTestCase):
         op = dbg["neck_opening"]
         y = int(op["y0"] + op["depth"]) + 4
         np.testing.assert_allclose(rgb[y, int(op["cx"])], SHIRT[:3], atol=3)
-        off, _ = self.render(g=g, glm=glm, base=base, lm=lm, neck_gap_fill=False)
+        off, _ = self.render(g=g, glm=glm, base=base, lm=lm, neck_gap_fill=False, source="avatar")
         self.assertGreater(int((np.abs(off[0].astype(int) - np.array(grey[:3])).max(axis=2) <= 12)
                                [150:lm["shoulder"]["y"] + 5, n["left_x"] - 10:n["right_x"] + 11].sum()), 0)
+
+    def test_neck_gap_fill_runs_for_avatars_only_never_for_an_own_body(self):
+        base, lm = avatar()
+        cv2.fillPoly(base, [np.array([(250, 238), (350, 238), (420, 270), (180, 270)], np.int32)], (128, 128, 128, 255))
+        g, glm = NeckFixTests().crew_tshirt()
+        (rgb_av, _, dbg_av), _ = self.render(g=g, glm=glm, base=base, lm=lm, source="avatar")
+        self.assertTrue((dbg_av["neck_gap"] > 0.5).any())  # avatar: the fill may run
+        no_fill, _ = self.render(g=g, glm=glm, base=base, lm=lm, neck_gap_fill=False, source="avatar")
+        for kw in ({"source": "body"}, {"source": "body", "neck_gap_fill": True}, {}):  # {}: default = own body
+            (rgb, _, dbg), _ = self.render(g=g, glm=glm, base=base, lm=lm, **kw)
+            self.assertNotIn("neck_gap", dbg, kw)  # own body: never, whatever the flag
+            np.testing.assert_array_equal(rgb, no_fill[0])
+        self.assertEqual(flags_render_source("body"), "body")
+        self.assertEqual(flags_render_source("avatar"), "avatar")
+        with self.assertRaises(ValueError):
+            flags_render_source("user")
 
     def test_neck_mask_lower_edge_is_curved_without_steps(self):
         base, lm = avatar()

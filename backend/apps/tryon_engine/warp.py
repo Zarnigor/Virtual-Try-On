@@ -1361,7 +1361,8 @@ LAYER_ORDER = ("avatar", "pants", "tshirt_torso", "tshirt_sleeves", "shoulder_ca
 def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600,
                  shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
-                 halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True):
+                 halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True,
+                 source: str = "body"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1372,6 +1373,9 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     TRYON_NECK_FIX / TRYON_NECK_GAP_FILL, see flags.render_flags). neck_fix: in the neck zone the T-shirt's inner
     back collar is made transparent (the avatar's neck shows), the head/neck edge is one smooth curve feathered
     about 3 px that keeps the front collar band visible, and the shoulder-edge alpha is smoothed.
+    source: "avatar" (admin avatar photo) or "body" (the user's own photo, the default: fail closed). The neck-gap
+    fill paints over the avatar's own clothes, so it runs for avatars only, never for an own body whatever the flag
+    (docs/02 rule 12, docs/09 #89).
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -1420,7 +1424,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
             dark = contact_shadow(warped[:, :, 3], mask, _crotch_x(body_lm))
             canvas[:, :, :3] = (canvas[:, :, :3].astype(np.float32) * (1 - dark[:, :, None])).astype(np.uint8)
         canvas = _alpha_composite(canvas, warped)
-    if neck_gap_fill and "tshirt_layer" in info:
+    if neck_gap_fill and source == "avatar" and "tshirt_layer" in info:
         canvas, info["neck_gap"] = neck_gap_fill_fn(canvas, base, mask, body_lm, head,
                                                     info["tshirt_layer"][:, :, 3], opening)
     info["head_overlay"] = head

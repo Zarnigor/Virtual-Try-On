@@ -4,8 +4,12 @@ TRYON_NECK_FIX, TRYON_NECK_GAP_FILL."""
 from django.conf import settings
 
 
-def render_flags() -> dict:
-    return {"shading": settings.TRYON_SHADING, "contact_shadows": settings.TRYON_CONTACT_SHADOW,
+def render_flags(source: str = "body") -> dict:
+    """source: "avatar" or "body" (own photo). Passed through to render_tryon, which never runs the neck-gap fill
+    for an own body."""
+    if source not in ("avatar", "body"):
+        raise ValueError(f"unknown body source: {source!r}")
+    return {"source": source, "shading": settings.TRYON_SHADING, "contact_shadows": settings.TRYON_CONTACT_SHADOW,
             "edge_feather": settings.TRYON_EDGE_FEATHER, "shoulder_cap": settings.TRYON_SHOULDER_CAP,
             "hem_snap": settings.TRYON_HEM_SNAP, "halo_removal": settings.TRYON_HALO_REMOVAL,
             "neck_fix": settings.TRYON_NECK_FIX, "neck_gap_fill": settings.TRYON_NECK_GAP_FILL}

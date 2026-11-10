@@ -257,6 +257,8 @@ head/neck edge and (neck-gap fill) a thin strip of the avatar's own tank collar 
   at the edge is smeared into the ring.
 - **The avatar's grey top beside the torso** where the arm still touches the body (1-4 px strips below the armpit,
   female slim/average): those rows are not widened (the mask run includes the arm). Same as before this round.
+- **Neck-gap fill is for admin avatars only** (docs/09 #89, docs/02 rule 12): `render_tryon(source=...)` runs it only for
+  `source="avatar"`; an own body (`"body"`, also the default) never gets it, whatever `TRYON_NECK_GAP_FILL` says.
 - **Too long T-shirts** are cut flat at crotch + 35 % (the hem trim is lost: #17 on male plus).
 - **Demo results** precomputed before this change are stale until `build_demo` is run again.
 - **Neck fix on V necks and blouses**: a garment with a dark inside that passes the crew-neck size test (blouse #17) gets

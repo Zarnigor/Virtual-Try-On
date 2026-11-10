@@ -304,4 +304,4 @@ _(none blocking P0)_
     shadow under the chin for "not skin" and painted a flat brown bib on the black T-shirt; replaced before commit.
     Remaining (docs/06 "Known limits"): dropped-shoulder corner on #36, prints split at the shoulder join, the
     avatar's top beside the torso where the arm touches (pre-existing). No flag had to be set to 0.
-
+89. (decided 2026-11-10) Neck-gap fill (TRYON_NECK_GAP_FILL) is allowed for admin avatars only; it must be 0 for the own-body path (docs/02 rule 12).

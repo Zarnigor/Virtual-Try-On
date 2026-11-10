@@ -49,7 +49,7 @@ def _do_warp(outfit):
             raise ValueError(f"Cannot read garment image {garment.pk}")
         garments.append((garment.type, g_img, garment.landmarks))
 
-    final_bgr, warns, _ = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W, **render_flags())
+    final_bgr, warns, _ = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W, **render_flags("body" if outfit.body else "avatar"))
     if warns:
         logger.warning("Warp warnings for outfit %d: %s", outfit.pk, warns)
 

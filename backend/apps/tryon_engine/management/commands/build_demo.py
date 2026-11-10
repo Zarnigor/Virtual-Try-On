@@ -99,7 +99,7 @@ class Command(BaseCommand):
                 ids = [garments[s][0].pk for s in combo]
                 items = [(garments[s][0].type, garments[s][1], garments[s][0].landmarks) for s in combo]
                 rgb, warns, _ = render_tryon(base, av.landmarks, items, settings.CANVAS_H, settings.CANVAS_W,
-                                             **render_flags())
+                                             **render_flags("avatar"))
                 rel = f"{DEMO_DIR}/avatar{av.pk}_{'_'.join(str(i) for i in sorted(ids))}.png"
                 cv2.imwrite(str(Path(settings.MEDIA_ROOT) / rel), rgb)
                 results[pair_key(av.pk, ids)] = rel

@@ -98,7 +98,7 @@ def run():
         for av in avatars:
             try:
                 rgb, warns, _ = warp.render_tryon(bases[av.pk], av.landmarks, [(g[1], g[2], g[3]) for g in gset],
-                                                  H, W, **render_flags())
+                                                  H, W, **render_flags("avatar"))
             except Exception as e:  # a failed cell is shown, not hidden
                 rgb, warns = np.full((H, W, 3), (200, 200, 255), np.uint8), [f"ERROR {e!r}"]
                 print(f"FAIL {name} avatar {av.pk}: {e!r}")
