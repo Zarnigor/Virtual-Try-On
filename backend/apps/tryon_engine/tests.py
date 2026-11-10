@@ -402,9 +402,48 @@ class TshirtFitTests(SimpleTestCase):
         g[0:30, 110:190] = SHIRT  # ghost-mannequin back collar above the shoulder line
         rgb, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
         np.testing.assert_allclose(rgb[228, 300], SKIN[:3], atol=2)  # neck shows, not the collar
-        np.testing.assert_allclose(rgb[250, 300], SHIRT[:3], atol=2)  # below the neck row: the garment
+        np.testing.assert_allclose(rgb[262, 300], SHIRT[:3], atol=2)  # below the collar arc: the garment
         np.testing.assert_allclose(rgb[228, 344], SHIRT[:3], atol=2)  # outside neck width + margin: collar
         w = warp.head_neck_overlay(warp.figure_mask(base), lm)
-        self.assertLess(w[245, 300], 0.01)
+        self.assertLess(w[262, 300], 0.01)
         self.assertGreater(w[100, 300], 0.99)
-        self.assertTrue(0 < w[239, 300] < 1)  # feathered edge
+        self.assertTrue(0 < w[254, 300] < 1)  # feathered edge
+
+    def test_neck_overlay_lower_edge_is_a_curve(self):
+        base, lm = avatar()
+        w = warp.head_neck_overlay(warp.figure_mask(base), lm)
+        n = lm["neck"]
+        bottoms = {x: int(np.nonzero(w[:, x] > 0.5)[0].max()) for x in range(n["left_x"], n["right_x"] + 1, 5)}
+        centre, side = bottoms[300], bottoms[n["left_x"]]
+        self.assertGreater(len(set(bottoms.values())), 3)  # not a straight horizontal edge
+        self.assertGreater(centre - side, 0.15 * (n["right_x"] - n["left_x"]))  # dips at the centre
+
+    def test_no_skin_in_the_shoulder_band(self):
+        base, lm = avatar()
+        trap = np.array([(272, 205), (328, 205), (398, 258), (202, 258)], np.int32)  # sloping trapezius
+        cv2.fillPoly(base, [trap], SKIN)
+        g, glm = tshirt()
+        rgb, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        head = warp.head_neck_overlay(warp.figure_mask(base), lm)
+        n = lm["neck"]
+        band = np.zeros((H, W), bool)
+        band[n["y"]:lm["shoulder"]["y"] + 30] = True
+        band[:, n["left_x"] - warp.NECK_MARGIN - 2:n["right_x"] + warp.NECK_MARGIN + 3] = False
+        band &= warp.figure_mask(base) & (head < 0.01) & ~dbg["arm_mask"]
+        skin = (np.abs(rgb.astype(int) - np.array(SKIN[:3])).max(axis=2) < 25) & band
+        self.assertEqual(int(skin.sum()), 0)
+
+    def test_crop_top_hem_overlaps_the_pants_waistband(self):
+        base, lm = avatar()
+        g, glm = tshirt(hem_y=150)  # hem lands ~60 px above the body waist
+        p, plm = pants()
+        rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)])
+        hem_y, l, r = dbg["tshirt_hem"]
+        for x in range(int(l) + 10, int(r) - 10, 7):
+            col = rgb[int(hem_y) - 10:int(lm["waist"]["y"]) + 30, x].astype(int)
+            skin = (np.abs(col - np.array(SKIN[:3])).max(axis=1) < 25)
+            white = (col > 245).all(axis=1)
+            self.assertFalse((skin | white).any(), f"gap at x={x}")
+        alone, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        y = int(hem_y) + 20
+        np.testing.assert_allclose(alone[y, 300], base[y, 300, :3], atol=1)  # without pants: avatar shows

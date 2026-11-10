@@ -119,6 +119,12 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
 - Collar above the shoulder line: same uniform scale, centred, not fitted.
 - Sleeves: rigid (s + rotation onto the upper-arm edge line), shortened with a warning past half the arm; the armhole
   edge reaches past the torso edge by the measured gap + 4 px and the cap 4 px up (garment fabric, sampled rigidly).
-- Head and neck: figure pixels above the `neck` row within neck width + 6 px are drawn over all garments
-  (feathered 1.5 px), so ghost-mannequin back collars never cover the neck. Hands/forearms below the sleeve hem as before.
+- Head and neck: figure pixels within neck width + 6 px and above a downward arc (the `neck` row, 0.25 x neck width
+  deeper at the centre, like a crew collar) are drawn over all garments, feathered ~3 px; ghost-mannequin back
+  collars never cover the neck. Hands/forearms below the sleeve hem as before.
+- Shoulder cap (docs/09 #65): bare figure pixels between the neck column and the shoulder edges, below the neck
+  row, on the shoulder side of the sleeve hems and above the T-shirt hem, are filled UNDER the garment with the
+  nearest colour of the garment's shoulder row (feathered ~2 px), so no skin sliver shows at the shoulders.
+- With pants: pants first, then the T-shirt; where the hem covers, the pants top is extended (repeating the pants
+  column) up to 6 px above the hem, so no gap shows between hem and waistband. T-shirt alone: unchanged.
 - Warning: a row's width vs garment * s beyond 1.3x (e.g. a fitted blouse widened over broad hips).

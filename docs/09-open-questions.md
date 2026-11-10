@@ -209,3 +209,5 @@ _(none blocking P0)_
 64. **T-shirt keeps its own silhouette** (2026-11-10, docs/06 "T-shirt fit"): uniform scale from the shoulder line
     (+4 % ease), rows max(garment, body + 4 %) capped 1.8x, per-garment looseness, rigid overlapping sleeves, head/neck
     drawn above the garment. Scale from shoulder width, not torso length: length would force every hem to one row.
+65. **T-shirt round 3** (2026-11-10): curved, feathered head/neck overlay edge; shoulder band filled under the
+    garment with the shoulder-row colour; the pants reach 6 px under the T-shirt hem (crop tops with pants included).
