@@ -487,3 +487,39 @@ class SolidColourTests(SimpleTestCase):
                 inner &= ~(layers[1][:, :, 3] > 0)
             self.assertTrue(inner.sum() > 1000)
             self.assertTrue((rgb[inner] == np.array(colour[:3])).all(), colour)
+
+
+class PantsSilhouetteTests(SimpleTestCase):
+    def balloon_pants(self):
+        """Legs 80 px wide down to the knee, +25 % balloon below it (100), cuff 40 % narrower than the balloon (60)."""
+        img = np.zeros((600, 280, 4), np.uint8)
+        cv2.fillPoly(img, [np.array([(60, 10), (220, 10), (230, 100), (230, 180), (50, 180), (50, 100)], np.int32)],
+                     PANTS)
+        half = [(40, 180), (40, 385), (50, 470), (50, 520), (30, 585)]
+        for x0 in (60, 220):
+            pts = [(x0 - dx, y) for dx, y in half] + [(x0 + dx, y) for dx, y in reversed(half)]
+            cv2.fillPoly(img, [np.array(pts, np.int32)], PANTS)
+        lm = {"waist": {"y": 10, "left_x": 60, "right_x": 220, "center_x": 140},
+              "hip": {"y": 100, "left_x": 50, "right_x": 230}, "crotch": {"y": 180, "center_x": 140},
+              "knee": {"y": 385, "left_leg": {"left_x": 20, "right_x": 100}, "right_leg": {"left_x": 180, "right_x": 260}},
+              "hem": {"left_leg": {"y": 584, "left_x": 30, "right_x": 90},
+                      "right_leg": {"y": 584, "left_x": 190, "right_x": 250}}}
+        return img, lm
+
+    def test_balloon_and_cuff_are_kept(self):
+        base, lm = avatar()
+        p, plm = self.balloon_pants()
+        _, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm)])
+        s = (1040 - 480) / (584 - 10)  # uniform scale of this garment on this avatar
+        knee_y = 480 + (385 - 10) * s
+        for side in ("left", "right"):
+            rows = dbg["pants_leg_rows"][side]
+            w = {y: r - l for y, l, r in rows}
+            knee_w = w[min(w, key=lambda y: abs(y - knee_y))]
+            bulge = max(v for y, v in w.items() if y >= knee_y)
+            cuff = rows[-1][2] - rows[-1][1]
+            self.assertAlmostEqual(knee_w, 80 * s, delta=0.05 * 80 * s)  # knee: the garment's own width
+            self.assertAlmostEqual(bulge / knee_w, 100 / 80, delta=0.05 * 100 / 80)
+            self.assertAlmostEqual(cuff / bulge, 60 / 100, delta=0.05 * 60 / 100)
+            ys = [y for y, _, _ in rows]  # one uniform vertical scale below the knee: evenly spaced rows
+            self.assertLessEqual(max(np.diff(ys)), 6.01)

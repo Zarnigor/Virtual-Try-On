@@ -226,3 +226,5 @@ _(none blocking P0)_
     cleaning and by build_demo); prints are never touched. Owner-approved exception to "garment images are
     immutable": an admin maintenance step on the processed image, not a user edit. Run on #28 (the black T-shirts
     #19/#26/#27 had been deleted in the app).
+70. **Pants silhouette bug** (2026-11-10): the straight lower panel came from landmark-interpolated row spans
+    (crotch -> knee -> hem), not from the centreline rule. Rows now use the garment's own silhouette span.

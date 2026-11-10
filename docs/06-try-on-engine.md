@@ -138,3 +138,10 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
   Prints and multi-colour garments are untouched; alpha never changes.
 - With all TRYON_* flags 0 the warp only resamples: rows and sleeves are resized/warped premultiplied, so interior
   pixels keep the source colour exactly (test `SolidColourTests`).
+
+### Pants keep their own row widths (2026-11-10, docs/09 #70, `_garment_span`)
+- Each source row's span is read from the garment's silhouette (alpha), not interpolated between the crotch, knee
+  and hem landmarks: a balloon lower panel and a gathered cuff keep their shape. Legs: the leg's run split at the
+  crotch axis; waist..crotch: the extent within the landmark span +-15 %. Landmark span = fallback.
+- Final width = max(garment span * s, body + ease) (capped); only the centreline is smoothed. Below the knee the
+  rows keep the single vertical scale (full-length legs: hem snapped to the ankle, one linear map per leg).

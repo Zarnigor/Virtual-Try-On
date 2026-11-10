@@ -222,6 +222,24 @@ def find_arms(mask: np.ndarray, lm: dict) -> dict:
     return arms
 
 
+def _garment_span(alpha: np.ndarray, sy: float, fallback: tuple, side: str | None = None, axis: float = 0.0):
+    """The garment's OWN span in source row sy, from its silhouette (bulges, balloon panels and gathered cuffs
+    are kept; landmark interpolation made every leg a straight panel). side: one leg (split at the crotch axis);
+    None: the extent within the landmark span +-15 %. Falls back to the landmark span."""
+    y = min(max(int(round(sy)), 0), alpha.shape[0] - 1)
+    near = (fallback[0] + fallback[1]) / 2
+    if side is None:  # whole piece: the garment's extent within the landmark span +-15 % (a leg gap stays inside)
+        pad = 0.15 * (fallback[1] - fallback[0])
+        lo, hi = max(int(fallback[0] - pad), 0), min(int(fallback[1] + pad) + 1, alpha.shape[1])
+        xs = np.nonzero(alpha[y, lo:hi])[0]
+        run = (int(xs[0]) + lo, int(xs[-1]) + lo) if len(xs) else None
+    else:
+        run = _leg_run(alpha, y, side, axis, near)
+    if run is None or run[1] - run[0] < 0.3 * (fallback[1] - fallback[0]):
+        return fallback
+    return float(run[0]), float(run[1]) + 1.0
+
+
 def _leg_run(mask: np.ndarray, y: int, side: str, axis: float, near: float):
     """The leg's run in row y on one side of the axis (a run across the axis is split there), or None."""
     best = None
@@ -576,6 +594,7 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
     warnings: list[str] = []
     g, a = garment_lm, body_lm
     img = _bgra(garment_img)
+    g_alpha = img[:, :, 3] > 128
 
     g_wy, a_wy = _f(g["waist"]["y"]), _f(a["waist"]["y"])
     g_cr, a_cr = _f(g["crotch"]["y"]), _f(a["crotch"]["y"])
@@ -605,7 +624,7 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
     src_rows, dst_rows = [], []
     for y in _ys(a_wy, cr_dst):
         sy = g_wy + (y - a_wy) / s
-        sl, sr = _interp_span(g_rows, sy)
+        sl, sr = _garment_span(g_alpha, sy, _interp_span(g_rows, sy))
         bl, br = body_span(a, y)
         t = (y - a_wy) / max(hip_dst - a_wy, 1e-6)
         w = waist_blend_width((sr - sl) * s, br - bl, t) if t < 1 else pants_width((sr - sl) * s, br - bl)
@@ -652,7 +671,7 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
         src_rows, dst_rows = [], []
         for y in _ys(cr_dst, hem_dst):
             sy = g_cr + (y - cr_dst) * s_leg
-            sl, sr = _interp_span(leg_src, sy)
+            sl, sr = _garment_span(g_alpha, sy, _interp_span(leg_src, sy), side, g_cx)
             bl, br = _interp_span(body_rows, y)
             # tight: through the knee; loose: smooth monotonic curve; blended by the garment's looseness
             c = (1 - fit["t"]) * leg_centerline(y, *centre_pts, 1.0) + \
@@ -670,6 +689,8 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
             dst_rows.append((y, l, r))
             if k < 0.5:
                 track(f"{side}-leg", sr - sl, r - l)
+        if info is not None:
+            info.setdefault("pants_leg_rows", {})[side] = dst_rows
         strip = _scanline_strip(img, src_rows, dst_rows, H, W, [], f"{side}-leg")
         result = _alpha_composite(result, strip)
 
