@@ -9,7 +9,7 @@ import DevAiWarning from '../components/DevAiWarning'
 import StatusChip from '../components/StatusChip'
 
 export default function TryOn() {
-  const [base, setBase] = useState<'body' | 'avatar'>('body')
+  const [base, setBase] = useState<'body' | 'avatar'>('avatar')
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null)
   const [garments, setGarments] = useState<Garment[]>([])
