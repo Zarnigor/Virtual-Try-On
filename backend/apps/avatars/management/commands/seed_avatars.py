@@ -1,12 +1,13 @@
 """
 Seed the 6 avatars (male/female x slim/average/plus).
 
-    manage.py seed_avatars --from /avatars    real photos (docker-compose mounts ./avatars there)
+    manage.py seed_avatars --from /avatars    real photos (docker-compose mounts ./avatars there); any subset of the 6
     manage.py seed_avatars                    drawn placeholders from seed/avatars.reference.json
 
---from: each photo goes through apps/avatars/prep.py (rembg mask, uniform scale, pad to 600x1200 RGBA,
-figure top y=50, axis x=300, fails loudly instead of clipping) and gets INITIAL landmarks from its own
-mask (no shared defaults: poses differ). The staff landmark editor is the source of truth.
+--from: each photo goes through the shared body pipeline apps/bodies/pipeline.py (EXIF strip, rembg mask, uniform
+scale, pad to 600x1200 RGBA, figure top y=50, axis x=300, fails loudly instead of clipping) and gets INITIAL
+landmarks from its own mask (no shared defaults: poses differ). A reseeded avatar loses its confirmed landmarks
+(landmarks_confirmed_at = null). The staff landmark editor (/staff/avatars/:id) is the source of truth.
 File names map to sex/build by tokens, e.g. man_slim.jpg, woman_plus_size.jpg, female_average.png.
 """
 import json
@@ -14,7 +15,6 @@ import re
 import numpy as np
 import cv2
 from pathlib import Path
-from io import BytesIO
 from django.core.management.base import BaseCommand
 from django.core.files.base import ContentFile
 from apps.avatars.models import Avatar
@@ -96,6 +96,8 @@ def _body_polygon(lm):
     return np.array(left + right, dtype=np.int32)
 
 
+NOMINAL_HEIGHT = {"male": 178.0, "female": 165.0}  # cm, staff edit them in the editor
+
 SEX_ALIASES = {"male": "male", "man": "male", "men": "male", "female": "female", "woman": "female", "women": "female"}
 BUILD_ALIASES = {"slim": "slim", "average": "average", "plus": "plus"}  # "plus_size" -> tokens plus, size
 PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp"}
@@ -131,10 +133,10 @@ class Command(BaseCommand):
         self._placeholders(force=options["force"])
 
     def _from_photos(self, folder: Path):
-        from PIL import Image
         from rembg import new_session
         from django.core.management.base import CommandError
-        from apps.avatars.prep import NormalizeError, detect_landmarks, landmark_warnings, normalize
+        from apps.avatars.staff_upload import save_processed
+        from apps.bodies.pipeline import BodyPhotoRejected, process_body_photo
 
         if not folder.is_dir():
             raise CommandError(f"folder not found: {folder}")
@@ -148,31 +150,32 @@ class Command(BaseCommand):
                 errors.append(f"{f.name}: duplicate of {mapping[key].name} ({key[0]} {key[1]})")
             else:
                 mapping[key] = f
+        if errors:
+            raise CommandError("; ".join(errors))
+        if not mapping:
+            raise CommandError(f"no avatar photos in {folder} (names like female_slim.jpg)")
         missing = [f"{s} {b}" for s in ("male", "female") for b in ("slim", "average", "plus") if (s, b) not in mapping]
-        if errors or missing:
-            raise CommandError("; ".join(errors + ([f"missing: {', '.join(missing)}"] if missing else [])))
 
         session = new_session("u2net_human_seg")
         for (sex, build), f in sorted(mapping.items()):
             try:
-                norm = normalize(Image.open(f), session=session)
-            except NormalizeError as e:
-                raise CommandError(f"{f.name}: {e}")
-            lm = detect_landmarks(norm.mask, norm.gray)
-            buf = BytesIO()
-            norm.image.save(buf, format="PNG")
+                processed = process_body_photo(f.read_bytes(), session=session)
+            except BodyPhotoRejected as e:
+                raise CommandError(f"{f.name}: {e.code} ({e.internal})")
             avatar, created = Avatar.objects.get_or_create(sex=sex, build=build)
-            avatar.landmarks = lm
+            save_processed(avatar, processed, f"avatar_{sex}_{build}.png")
             avatar.measurements = avatar.measurements or MEASUREMENTS[f"{sex}_{build}"]  # nominal, staff edits them
-            _replace_image(avatar, f"avatar_{sex}_{build}.png", buf.getvalue())
+            avatar.height_cm = avatar.height_cm or NOMINAL_HEIGHT[sex]
             avatar.save()
-            warns = landmark_warnings(lm)
             self.stdout.write(
                 f"{f.name} -> {sex} {build} (avatar {avatar.pk}, {'created' if created else 'updated'}): "
-                f"scale {norm.scale:.3f}, figure {norm.figure_px[0]}x{norm.figure_px[1]} px"
-                + (f"; landmark warnings: {'; '.join(warns)}" if warns else "")
+                f"scale {processed.scale:.3f}"
+                + (f"; landmark warnings: {'; '.join(processed.warnings)}" if processed.warnings else "")
             )
-        self.stdout.write(self.style.SUCCESS("6 avatars seeded from photos. Check the landmarks in the editor."))
+        self.stdout.write(self.style.SUCCESS(
+            f"{len(mapping)} avatar(s) seeded from photos. Check the landmarks in the editor (/staff/avatars)."
+            + (f" Not in the folder (unchanged): {', '.join(missing)}." if missing else "")
+        ))
 
     def _placeholders(self, force=False):
         """Drawn placeholders. Runs on every backend start (entrypoint.sh), so by default it only CREATES

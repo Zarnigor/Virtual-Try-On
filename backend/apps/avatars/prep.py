@@ -23,7 +23,11 @@ SEAM_DARKER = 30  # grey levels a seam must be darker than its surroundings to b
 
 
 class NormalizeError(Exception):
-    pass
+    """Code checks on the figure (docs/09 #26). `code` is a backend error code (NO_PERSON, HEAD_OR_FEET_CUT, FIGURE_CLIPPED)."""
+
+    def __init__(self, message: str, code: str = "FIGURE_CLIPPED"):
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass
@@ -39,7 +43,7 @@ def _largest_component(alpha: np.ndarray) -> np.ndarray:
     hard = (alpha > 128).astype(np.uint8)
     n, labels, stats, _ = cv2.connectedComponentsWithStats(hard, connectivity=8)
     if n <= 1:
-        raise NormalizeError("no figure found in the mask")
+        raise NormalizeError("no figure found in the mask", "NO_PERSON")
     biggest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
     return labels == biggest
 
@@ -65,6 +69,8 @@ def normalize(src: Image.Image, session=None) -> Normalized:
 
     ys, xs = np.nonzero(keep)
     y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    if y0 == 0 or y1 == keep.shape[0]:  # the figure touches the photo's top or bottom edge
+        raise NormalizeError("head or feet cut by the photo edge", "HEAD_OR_FEET_CUT")
     fig_h, fig_w = y1 - y0, x1 - x0
     axis = _axis_x(keep)
     half = max(axis - x0, x1 - axis)

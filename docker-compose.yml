@@ -37,6 +37,7 @@ services:
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
+      - BODY_AI_CHECK_ENABLED=${BODY_AI_CHECK_ENABLED:-1}  # prompt 02 on own-body uploads; 0 honoured only with DEBUG
       - DEMO_MODE=${DEMO_MODE:-0}  # precomputed try-on results (manage.py build_demo)
       - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
       - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}
@@ -66,6 +67,7 @@ services:
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
+      - BODY_AI_CHECK_ENABLED=${BODY_AI_CHECK_ENABLED:-1}  # prompt 02 on own-body uploads; 0 honoured only with DEBUG
       - DEMO_MODE=${DEMO_MODE:-0}  # precomputed try-on results (manage.py build_demo)
       - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
       - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}

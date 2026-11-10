@@ -45,6 +45,7 @@ General rules
 | GET | avatars/nearest/ | `?sex&height&shoulder&chest&waist&hip` | `Avatar` |
 | GET | staff/avatars/ | (staff only, others 404) | `StaffAvatar[]` (`Avatar` + `height_cm, landmarks_confirmed_at, status: confirmed\|auto`) |
 | GET | staff/avatars/{id}/ | (staff only) | `StaffAvatar`; landmarks not yet confirmed get edge points from the mask (GET never writes) |
+| POST | staff/avatars/ | multipart `sex, build, photo, height_cm, shoulder, chest, waist, hip` (staff only) | 201 `StaffAvatar + warnings[]` (200 when it replaced that sex+build; landmarks reset to auto); 400 `{code, detail}` (`NO_PERSON`, `HEAD_OR_FEET_CUT`, `FIGURE_CLIPPED`, upload codes) |
 | PATCH | staff/avatars/{id}/landmarks/ | `{landmarks, height_cm?, measurements?}` (staff only) | `StaffAvatar`, sets `landmarks_confirmed_at`; 400 `LANDMARKS_INVALID` (rules in docs/03) |
 | GET | garments/ | `?scope=mine\|catalog\|all&type=tshirt\|pants` | `Garment[]` |
 | POST | garments/ | multipart `photo`, `type`, `name?` | 201 `{garment, job_id}` |

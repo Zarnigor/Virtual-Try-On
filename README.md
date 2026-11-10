@@ -11,7 +11,7 @@ System Settings -> Privacy & Security -> Files & Folders). The Mac has no host P
 cp .env.example .env                       # then set GEMINI_API_KEY and GEMINI_VALIDATION_MODEL (garment AI check)
 docker compose up -d --build               # db, redis, backend :8000, worker, frontend :5173
                                            # backend start runs migrate + creates MISSING placeholder avatars only
-docker compose exec -T backend python manage.py seed_avatars --from /avatars    # real avatar photos (./avatars, not in git)
+docker compose exec -T backend python manage.py seed_avatars --from /avatars    # real avatar photos (./avatars, not in git; any subset of female_slim.jpg ...)
 open http://localhost:5173                 # register, upload a garment, mark landmarks, try it on an avatar
 ```
 `.env` flags (defaults in `.env.example`): `AI_DEV_BYPASS=0` (1 = skip AI checks locally, DEBUG only, garments get a

@@ -177,3 +177,7 @@ GARMENT_MIN_SIDE_PX = 300  # shorter side of a garment photo
 # AI-gated job fails. AI_DEV_BYPASS=1 lets LOCAL testing skip the AI step; it is ignored unless DEBUG is on,
 # and the job result is marked {"ai_skipped": true}. Never set it in production.
 AI_DEV_BYPASS = DEBUG and os.environ.get("AI_DEV_BYPASS", "0") == "1"
+# Body AI check (prompt 02) for OWN-body uploads. Default on. Off (0) skips prompt 02 and marks the job
+# {"ai_skipped": true}; honoured only with DEBUG (adults-only is a hard rule), so production always runs it.
+# Staff avatar uploads never call the AI (apps/bodies/pipeline.py).
+BODY_AI_CHECK_ENABLED = os.environ.get("BODY_AI_CHECK_ENABLED", "1") == "1" or not DEBUG

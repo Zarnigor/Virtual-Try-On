@@ -161,3 +161,70 @@ class StaffAvatarApiTests(MediaTestCase):
             tasks._do_warp(Outfit.objects.get(pk=outfit.pk))  # as the worker loads it
         self.assertEqual(seen["lm"]["waist"]["left_x"], 230)
         self.assertEqual(seen["lm"]["waist"]["width"], 150)
+
+
+class StaffAvatarUploadTests(MediaTestCase):
+    def setUp(self):
+        super().setUp()
+        self.staff = self.make_user("staff@test.uz")
+        self.staff.is_staff = True
+        self.staff.save()
+
+    def post(self, **over):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.bodies.tests_pipeline import body_photo
+        data, mask = body_photo()
+        form = {"sex": "female", "build": "slim", "height_cm": 165, "shoulder": 96, "chest": 82, "waist": 64,
+                "hip": 90, "photo": SimpleUploadedFile("f.jpg", data, content_type="image/jpeg"), **over}
+        with mock.patch("rembg.remove", return_value=mask), mock.patch("rembg.new_session"):
+            return self.client.post("/api/staff/avatars/", form, format="multipart")
+
+    def test_non_staff_cannot_upload(self):
+        self.login(self.make_user("user@test.uz"))
+        self.assertEqual(self.post().status_code, 404)
+        self.assertFalse(Avatar.objects.exists())
+
+    def test_upload_creates_an_auto_avatar_and_replaces_on_reupload(self):
+        self.login(self.staff)
+        r = self.post()
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["status"], "auto")
+        a = Avatar.objects.get()
+        self.assertEqual((a.height_cm, a.measurements["waist"]), (165, 64))
+        self.assertIn("left_x", a.landmarks["head_top"])
+        import os
+        folder = os.path.dirname(a.image.path)
+        a.landmarks_confirmed_at = "2026-11-10T00:00:00Z"
+        a.save()
+        r = self.post(waist=66)
+        self.assertEqual(r.status_code, 200)
+        a.refresh_from_db()
+        self.assertIsNone(a.landmarks_confirmed_at)  # a new photo needs new landmarks
+        self.assertEqual(os.listdir(folder), [os.path.basename(a.image.name)])  # the old file was removed
+
+    def test_missing_measurements_or_bad_photo(self):
+        self.login(self.staff)
+        r = self.post(hip="")
+        self.assertEqual(r.status_code, 400)
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        r = self.post(photo=SimpleUploadedFile("x.jpg", b"nope", content_type="image/jpeg"))
+        self.assertEqual(r.status_code, 400)
+        self.assertFalse(Avatar.objects.exists())
+
+
+class SeedSubsetTests(MediaTestCase):
+    def test_any_subset_of_photos_is_seeded(self):
+        import tempfile
+        from pathlib import Path
+        from django.core.management import call_command
+        from apps.bodies.tests_pipeline import body_photo
+
+        folder = Path(tempfile.mkdtemp())
+        data, mask = body_photo()
+        (folder / "female_slim.jpg").write_bytes(data)
+        (folder / "man_plus_size.jpg").write_bytes(data)
+        out = open("/dev/null", "w")
+        with mock.patch("rembg.remove", return_value=mask), mock.patch("rembg.new_session"):
+            call_command("seed_avatars", src=str(folder), stdout=out)
+        self.assertEqual(sorted(Avatar.objects.values_list("sex", "build")), [("female", "slim"), ("male", "plus")])
+        self.assertTrue(all(a.landmarks_confirmed_at is None for a in Avatar.objects.all()))

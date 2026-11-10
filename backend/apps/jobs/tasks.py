@@ -154,7 +154,10 @@ def run_body_validation(job_pk: int):
         _fail(job, "BODY_NOT_FOUND")
         return
     try:
-        # TODO step 4: code checks (geometry) and normalization run before the AI call.
+        # TODO step 4: run apps/bodies/pipeline.process_body_photo (code checks, normalization) before the AI call.
+        if not settings.BODY_AI_CHECK_ENABLED:  # DEBUG only (settings): prompt 02 skipped, marked for the UI
+            _done(job, {"approved": True, "ai_skipped": True})
+            return
         ai_checked = _ai_verdict(_ask_body_validation(body), BodyValidation, BODY_ISSUES)
         _done(job, {"approved": True, "ai_skipped": not ai_checked})
     except JobRejected as e:

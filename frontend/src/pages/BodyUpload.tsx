@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadBody } from '../api/bodies'
-import Dropzone from '../components/Dropzone'
+import PhotoPicker from '../components/PhotoPicker'
 
 export default function BodyUpload() {
   const navigate = useNavigate()
@@ -53,34 +53,12 @@ export default function BodyUpload() {
         </ul>
       </div>
 
-      {preview ? (
-        <div style={{ marginBottom: 20 }}>
-          <img
-            src={preview}
-            alt="Tanlangan rasm"
-            style={{
-              width: '100%',
-              maxHeight: 400,
-              objectFit: 'contain',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--inset)',
-              marginBottom: 12,
-            }}
-          />
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => { setFile(null); setPreview(null) }}
-          >
-            Boshqa rasm tanlash
-          </button>
-        </div>
-      ) : (
-        <Dropzone
-          onFile={handleFile}
-          label="Tana rasmini tanlang yoki bu yerga tashlang"
-          hint="JPG, PNG — max 10 MB"
-        />
-      )}
+      <PhotoPicker
+        file={file}
+        preview={preview}
+        onFile={handleFile}
+        onClear={() => { setFile(null); setPreview(null) }}
+      />
 
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, cursor: 'pointer' }}>
         <input

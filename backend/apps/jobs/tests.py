@@ -62,6 +62,24 @@ class BodyJobTests(MediaTestCase):
         self.assertEqual((self.job.status, self.job.error_code), ("failed", "AI_UNAVAILABLE"))
         self.assertFalse(Body.objects.exists())
 
+    @override_settings(AI_DEV_BYPASS=False, BODY_AI_CHECK_ENABLED=False)
+    def test_body_ai_check_off_skips_prompt_02_and_marks_it(self):
+        with mock.patch.object(tasks, "_ask_body_validation") as ask:
+            tasks.run_body_validation(self.job.pk)
+        ask.assert_not_called()
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, "done")
+        self.assertTrue(self.job.result["ai_skipped"])
+
+    def test_body_ai_check_cannot_be_turned_off_without_debug(self):
+        import importlib
+        import os
+        from tryon_studio.settings import base
+        with mock.patch.dict(os.environ, {"BODY_AI_CHECK_ENABLED": "0", "DEBUG": "0"}):
+            mod = importlib.reload(base)
+            self.assertTrue(mod.BODY_AI_CHECK_ENABLED or mod.DEBUG)
+        importlib.reload(base)
+
     @override_settings(AI_DEV_BYPASS=True)
     def test_dev_bypass_is_marked(self):
         tasks.run_body_validation(self.job.pk)
