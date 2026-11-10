@@ -353,3 +353,58 @@ class OpaqueGarmentTests(SimpleTestCase):
         self.assertTrue((rgb[far] == base[:, :, :3][far]).all())  # no contact shadow on the avatar
         shaded, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)], shading=True, contact_shadows=True)
         self.assertFalse((shaded[solid] == np.array(PANTS[:3])).all())
+
+
+class TshirtFitTests(SimpleTestCase):
+    def layer(self, g, glm, lm=None):
+        base, lm0 = avatar()
+        lm = lm or lm0
+        mask = warp.figure_mask(base)
+        info = {}
+        out, warns = warp.warp_tshirt(lm, glm, g, H, W, arms=warp.find_arms(mask, lm), info=info, mask=mask)
+        return out, info, lm, warns
+
+    def test_rows_never_narrower_than_body_plus_ease(self):
+        for narrow in (False, True):
+            g, glm = tshirt()
+            if narrow:  # a slim-fit body: torso much narrower than the shoulders
+                for k in ("chest", "waist", "hem"):
+                    glm[k]["left_x"], glm[k]["right_x"] = 105, 195
+            _, info, lm, _ = self.layer(g, glm)
+            for y, l, r in info["tshirt_rows"]:
+                bl, br = warp.body_span(lm, y)
+                self.assertGreaterEqual(r - l, (br - bl) * (1 + warp.TSHIRT_EASE) - 1, (narrow, y))
+                self.assertLessEqual(r - l, (br - bl) * warp.PANTS_MAX_BODY + 1)
+
+    def test_symmetric_garment_gives_symmetric_result(self):
+        g, glm = tshirt()
+        out, _, _, _ = self.layer(g, glm)
+        m = out[:, :, 3] > 128
+        best = max((m & np.roll(m[:, ::-1], k, axis=1)).sum() / (m | np.roll(m[:, ::-1], k, axis=1)).sum()
+                   for k in (0, 1, 2))
+        self.assertGreater(best, 0.97)
+
+    def test_sleeve_overlaps_the_torso_without_a_gap(self):
+        g, glm = tshirt()
+        out, _, lm, _ = self.layer(g, glm)
+        s = (lm["shoulder"]["right_x"] - lm["shoulder"]["left_x"]) * (1 + warp.TSHIRT_EASE) / 160
+        y1 = int(lm["shoulder"]["y"] + (glm["chest"]["y"] - glm["shoulder"]["y"]) * s) - 4
+        a = out[:, :, 3] > 128
+        for y in range(int(lm["shoulder"]["y"]) + 2, y1):
+            xs = np.nonzero(a[y])[0]
+            self.assertTrue(a[y, xs.min():300].all(), f"gap left at y={y}")
+            self.assertTrue(a[y, 300:xs.max() + 1].all(), f"gap right at y={y}")
+
+    def test_head_and_neck_stay_above_a_high_collar(self):
+        base, lm = avatar()
+        lm["neck"]["y"] = 240  # the collar (dst y ~221..260) reaches above it
+        g, glm = tshirt()
+        g[0:30, 110:190] = SHIRT  # ghost-mannequin back collar above the shoulder line
+        rgb, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        np.testing.assert_allclose(rgb[228, 300], SKIN[:3], atol=2)  # neck shows, not the collar
+        np.testing.assert_allclose(rgb[250, 300], SHIRT[:3], atol=2)  # below the neck row: the garment
+        np.testing.assert_allclose(rgb[228, 344], SHIRT[:3], atol=2)  # outside neck width + margin: collar
+        w = warp.head_neck_overlay(warp.figure_mask(base), lm)
+        self.assertLess(w[245, 300], 0.01)
+        self.assertGreater(w[100, 300], 0.99)
+        self.assertTrue(0 < w[239, 300] < 1)  # feathered edge

@@ -206,3 +206,6 @@ _(none blocking P0)_
     rembg and after warping (background-coloured openings kept); compositing fixed to straight-alpha "over".
     Shading, contact shadow and edge feather are behind `TRYON_SHADING`, `TRYON_CONTACT_SHADOW`, `TRYON_EDGE_FEATHER`
     (default 0). The T-shirt still uses "widths follow the body" (no ease model, no neck/sleeve layering yet).
+64. **T-shirt keeps its own silhouette** (2026-11-10, docs/06 "T-shirt fit"): uniform scale from the shoulder line
+    (+4 % ease), rows max(garment, body + 4 %) capped 1.8x, per-garment looseness, rigid overlapping sleeves, head/neck
+    drawn above the garment. Scale from shoulder width, not torso length: length would force every hem to one row.

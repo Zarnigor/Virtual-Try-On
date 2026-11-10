@@ -107,3 +107,18 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
   outside the garment, distance <= 40): e.g. a real neck hole. Openings are warped with the garment and stay open.
 - Compositing is straight-alpha "over" and rows are resized premultiplied, so empty (black) pixels never darken
   edges or strip overlaps; newly opaque and soft-edge pixels take the colour of the nearest opaque garment pixel.
+
+### T-shirt fit (2026-11-10, docs/09 #64, `warp_tshirt`, `head_neck_overlay`)
+- One uniform scale `s` for both axes, set by the shoulder line: garment shoulder width * s = body shoulder + 4 %.
+  (A length-based scale would put every hem at the same body row and stretch crop tops; the hem is the garment's own
+  scaled length, cut, never squeezed, below crotch + 35 % of crotch->knee.)
+- Rows: `tshirt_row_width` = body + 4 % at the shoulder line, smoothstep to max(garment * s, body + 4 %) by the
+  garment's chest row, capped at 1.8x body. Below the arm separation the torso run in the mask is covered (+2 px).
+- Looseness once per garment (mean chest/waist ratio, smoothstep 1.05x..1.15x): the row centre goes from the torso
+  centre (tight) to the shoulder centre straight down (loose); both sides alike.
+- Collar above the shoulder line: same uniform scale, centred, not fitted.
+- Sleeves: rigid (s + rotation onto the upper-arm edge line), shortened with a warning past half the arm; the armhole
+  edge reaches past the torso edge by the measured gap + 4 px and the cap 4 px up (garment fabric, sampled rigidly).
+- Head and neck: figure pixels above the `neck` row within neck width + 6 px are drawn over all garments
+  (feathered 1.5 px), so ghost-mannequin back collars never cover the neck. Hands/forearms below the sleeve hem as before.
+- Warning: a row's width vs garment * s beyond 1.3x (e.g. a fitted blouse widened over broad hips).
