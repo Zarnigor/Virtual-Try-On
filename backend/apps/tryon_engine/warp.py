@@ -33,18 +33,24 @@ LOOSE_KNEE_PULL = 0.25  # loose legs: the knee moves the smooth centreline by at
 HANG_LOOSE = 0.5  # loose leg: centreline weight of the body leg (rest: straight drop from the hip)
 LOOSE_FROM, LOOSE_FULL = 1.05, 1.15  # garment/body knee width (mean of both legs): smoothstep tight -> loose
 WAISTBAND_CURVE = 0.04  # waistband top edge dips by this fraction of the waist width at the centre
+OPENING_COLOR_DIST = 40  # a hole whose colour is this close to the photo background is a real opening (kept)
 WHITE_THRESHOLD = 235  # base images without transparency: figure = pixels darker than this in any channel
 
 
 # ---------- helpers ----------
 
+def _over(base: np.ndarray, top: np.ndarray) -> np.ndarray:
+    """Straight-alpha 'over' of BGRA float arrays (any leading shape). The colour under alpha 0 never leaks in
+    (the old 'rgb*(1-a) + top*a, alpha added' mixed the black of empty pixels into soft edges and overlaps)."""
+    ta, ba = top[..., 3:4] / 255.0, base[..., 3:4] / 255.0
+    oa = ta + ba * (1 - ta)
+    rgb = (top[..., :3] * ta + base[..., :3] * ba * (1 - ta)) / np.maximum(oa, 1e-6)
+    return np.concatenate([np.where(oa > 0, rgb, 0), oa * 255], axis=-1)
+
+
 def _alpha_composite(base: np.ndarray, overlay: np.ndarray) -> np.ndarray:
-    out = base.copy().astype(np.float32)
-    ov = overlay.astype(np.float32)
-    alpha = ov[:, :, 3:4] / 255.0
-    out[:, :, :3] = out[:, :, :3] * (1 - alpha) + ov[:, :, :3] * alpha
-    out[:, :, 3] = np.clip(out[:, :, 3] + ov[:, :, 3], 0, 255)
-    return out.astype(np.uint8)
+    out = _over(base.astype(np.float32), overlay.astype(np.float32))
+    return np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
 
 def _bgra(img: np.ndarray) -> np.ndarray:
@@ -135,7 +141,12 @@ def _scanline_strip(src: np.ndarray, src_rows: list, dst_rows: list, H: int, W: 
             sl, sr = max(0, int(src_lx)), min(src.shape[1], int(src_rx) + 1)
             if sr <= sl:
                 continue
-            row = cv2.resize(src[src_y, sl:sr].reshape(1, -1, 4), (dst_width, 1), interpolation=cv2.INTER_LINEAR)[0]
+            # resize premultiplied: the colour under transparent neighbours must not darken edge pixels
+            srow = src[src_y, sl:sr].astype(np.float32)
+            srow[:, :3] *= srow[:, 3:4] / 255.0
+            row = cv2.resize(srow.reshape(1, -1, 4), (dst_width, 1), interpolation=cv2.INTER_LINEAR)[0]
+            ra = row[:, 3:4] / 255.0
+            row[:, :3] = np.where(ra > 0, row[:, :3] / np.maximum(ra, 1e-6), 0)
             x0, x1 = max(dst_lx, 0), min(dst_rx, W)
             if x1 <= x0:
                 continue
@@ -145,11 +156,8 @@ def _scanline_strip(src: np.ndarray, src_rows: list, dst_rows: list, H: int, W: 
             if r1 <= r0:
                 continue
             piece = row[r0:r1].astype(np.float32)
-            a = piece[:, 3:4] / 255.0
-            base = result[dst_y, x0:x1].astype(np.float32)
-            base[:, :3] = base[:, :3] * (1 - a) + piece[:, :3] * a
-            base[:, 3] = np.clip(base[:, 3] + piece[:, 3], 0, 255)
-            result[dst_y, x0:x1] = base.astype(np.uint8)
+            out = _over(result[dst_y, x0:x1].astype(np.float32), piece)
+            result[dst_y, x0:x1] = np.clip(np.rint(out), 0, 255).astype(np.uint8)
     return result
 
 
@@ -519,7 +527,94 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
     return result, warnings
 
 
-# ---------- realism (shading, edges, contact shadow) ----------
+# ---------- opaque silhouette ----------
+
+def _largest_silhouette(alpha: np.ndarray) -> np.ndarray:
+    """Bool mask of the largest outer contour of alpha >= 128, filled (holes included)."""
+    cnts, _ = cv2.findContours((alpha >= 128).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    filled = np.zeros(alpha.shape, np.uint8)
+    if cnts:
+        cv2.drawContours(filled, [max(cnts, key=cv2.contourArea)], -1, 1, -1)
+    return filled.astype(bool)
+
+
+def background_color(img: np.ndarray):
+    """Median colour of the transparent pixels outside the garment (rembg keeps the photo's own background colour
+    there), or None if there are too few."""
+    a = img[:, :, 3]
+    out = (a == 0) & ~_largest_silhouette(a)
+    if out.sum() < 20:
+        return None
+    return np.median(img[:, :, :3][out].astype(np.float32), axis=0)
+
+
+def opening_mask(img: np.ndarray, bg) -> np.ndarray:
+    """Holes inside the silhouette whose colour matches the background: real openings (e.g. a neck hole)."""
+    a = img[:, :, 3]
+    holes = _largest_silhouette(a) & (a < 128)
+    keep = np.zeros(a.shape, bool)
+    if bg is None or not holes.any():
+        return keep
+    n, lab = cv2.connectedComponents(holes.astype(np.uint8), connectivity=8)
+    rgb = img[:, :, :3].astype(np.float32)
+    for i in range(1, n):
+        m = lab == i
+        if np.linalg.norm(np.median(rgb[m], axis=0) - np.asarray(bg, np.float32)) <= OPENING_COLOR_DIST:
+            keep |= m
+    return keep
+
+
+def fill_alpha_holes(img: np.ndarray, keep: np.ndarray | None = None, inpaint: bool = False) -> np.ndarray:
+    """Alpha 255 for every pixel inside the largest outer contour, except its outer 1 px edge and `keep` (real
+    openings, whose 1 px edge also stays soft). inpaint: colour the newly opaque and soft-edge pixels from the
+    nearest opaque pixel (warped layers store black under alpha 0; a cleaned photo keeps its true colours)."""
+    a = img[:, :, 3]
+    k3 = np.ones((3, 3), np.uint8)
+    interior = cv2.erode(_largest_silhouette(a).astype(np.uint8), k3) > 0
+    if keep is not None and keep.any():
+        interior &= ~(cv2.dilate(keep.astype(np.uint8), k3) > 0)
+    todo = interior & (a < 255)
+    if not todo.any():
+        return img
+    out = img.copy()
+    if inpaint:
+        _colour_from_nearest_opaque(out, (interior & (a < 250)) | ((a > 0) & (a < 250)))
+    out[:, :, 3][todo] = 255
+    return out
+
+
+def _colour_from_nearest_opaque(img: np.ndarray, where: np.ndarray) -> None:
+    """In place: RGB of `where` pixels from the nearest fully opaque pixel. Warped layers keep black under alpha 0,
+    so up-scaled soft edges and holes are darkened; this removes that dark ring/spot."""
+    ok = img[:, :, 3] >= 250
+    if not where.any() or not ok.any():
+        return
+    _, labels = cv2.distanceTransformWithLabels((~ok).astype(np.uint8), cv2.DIST_L2, 3,
+                                                labelType=cv2.DIST_LABEL_PIXEL)
+    oy, ox = np.nonzero(ok)  # DIST_LABEL_PIXEL numbers the zero (= ok) pixels 1.. in raster order
+    idx = labels[where] - 1
+    img[:, :, :3][where] = img[oy[idx], ox[idx], :3]
+
+
+def garment_layer(gtype: str, gimg: np.ndarray, glm: dict, body_lm: dict, H: int, W: int,
+                  arms: dict, info: dict, mask: np.ndarray) -> tuple[np.ndarray, list]:
+    """Warped BGRA layer of one garment, opaque inside its silhouette: holes are filled before warping (cleaned
+    image) and again after (warp seams); background-coloured openings are warped along and kept open."""
+    fn = {"tshirt": warp_tshirt, "pants": warp_pants}[gtype]
+    src = _bgra(gimg)
+    openings = opening_mask(src, background_color(src))
+    src = fill_alpha_holes(src, openings)
+    warped, warns = fn(body_lm, glm, src, H, W, arms=arms, info=info, mask=mask)
+    keep = None
+    if openings.any():
+        aux = np.zeros_like(src)
+        aux[openings] = 255
+        aux_w, _ = fn(body_lm, glm, aux, H, W, arms=arms, info={}, mask=mask)
+        keep = aux_w[:, :, 3] > 128
+    return fill_alpha_holes(warped, keep, inpaint=True), warns
+
+
+# ---------- realism (optional: shading, edges, contact shadow) ----------
 
 def shading_map(base: np.ndarray, region: np.ndarray, sigma: float = SHADING_SIGMA,
                 lo: float = SHADING_RANGE[0], hi: float = SHADING_RANGE[1]) -> np.ndarray:
@@ -605,8 +700,11 @@ def arm_overlay_mask(mask: np.ndarray, arms: dict, sleeve_hems: dict | None) -> 
 
 
 def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600,
+                 shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Pants are drawn under the T-shirt.
+    The realism effects are off by default (TRYON_SHADING / TRYON_CONTACT_SHADOW / TRYON_EDGE_FEATHER, see
+    flags.render_flags): with all off the result is the warped, opaque garment over the avatar.
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -617,16 +715,17 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     warnings, info = [], {}
     order = {"pants": 0, "tshirt": 1}
     for gtype, gimg, glm in sorted(garments, key=lambda t: order.get(t[0], 9)):
-        fn = {"tshirt": warp_tshirt, "pants": warp_pants}.get(gtype)
-        if fn is None:
+        if gtype not in ("tshirt", "pants"):
             continue
-        warped, warns = fn(body_lm, glm, gimg, H, W, arms=arms, info=info, mask=mask)
+        warped, warns = garment_layer(gtype, gimg, glm, body_lm, H, W, arms, info, mask)
         warnings += [f"{gtype}: {w}" for w in warns]
-        warped = soften_edges(warped)
-        shade = shading_map(base, mask & (warped[:, :, 3] > 0))
-        warped = apply_shading(warped, shade, shading_strength)
-        dark = contact_shadow(warped[:, :, 3], mask, _crotch_x(body_lm))
-        canvas[:, :, :3] = (canvas[:, :, :3].astype(np.float32) * (1 - dark[:, :, None])).astype(np.uint8)
+        if edge_feather:
+            warped = soften_edges(warped)
+        if shading:
+            warped = apply_shading(warped, shading_map(base, mask & (warped[:, :, 3] > 0)), shading_strength)
+        if contact_shadows:
+            dark = contact_shadow(warped[:, :, 3], mask, _crotch_x(body_lm))
+            canvas[:, :, :3] = (canvas[:, :, :3].astype(np.float32) * (1 - dark[:, :, None])).astype(np.uint8)
         canvas = _alpha_composite(canvas, warped)
 
     keep = arm_overlay_mask(mask, arms, info.get("sleeve_hems"))

@@ -22,6 +22,7 @@ from apps.avatars.models import Avatar
 from apps.garments.landmark_checks import LandmarksInvalid, validate_garment_landmarks
 from apps.garments.models import Garment
 from apps.tryon_engine.demo import DEMO_DIR, load_manifest, manifest_path, pair_key
+from apps.tryon_engine.flags import render_flags
 from apps.tryon_engine.warp import render_tryon
 
 
@@ -88,7 +89,8 @@ class Command(BaseCommand):
             for combo in combos:
                 ids = [garments[s][0].pk for s in combo]
                 items = [(garments[s][0].type, garments[s][1], garments[s][0].landmarks) for s in combo]
-                rgb, warns, _ = render_tryon(base, av.landmarks, items, settings.CANVAS_H, settings.CANVAS_W)
+                rgb, warns, _ = render_tryon(base, av.landmarks, items, settings.CANVAS_H, settings.CANVAS_W,
+                                             **render_flags())
                 rel = f"{DEMO_DIR}/avatar{av.pk}_{'_'.join(str(i) for i in sorted(ids))}.png"
                 cv2.imwrite(str(Path(settings.MEDIA_ROOT) / rel), rgb)
                 results[pair_key(av.pk, ids)] = rel

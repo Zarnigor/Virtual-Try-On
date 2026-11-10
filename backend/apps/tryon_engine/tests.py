@@ -305,3 +305,51 @@ class PantsCenterlineTests(SimpleTestCase):
         self.assertAlmostEqual(legs["right"]["ratio"], 1.16, delta=0.01)
         self.assertEqual(legs["left"]["knee_pull"], legs["right"]["knee_pull"])
         self.assertEqual(legs["left"]["hang"], legs["right"]["hang"])
+
+
+def interior_holes(layer):
+    """Pixels inside the largest silhouette (minus its 1 px edge) that are not fully opaque."""
+    sil = warp._largest_silhouette(layer[:, :, 3])
+    inner = cv2.erode(sil.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    return inner & (layer[:, :, 3] < 255)
+
+
+class OpaqueGarmentTests(SimpleTestCase):
+    def holed_pants(self):
+        p, plm = pants()
+        for x, y in ((140, 60), (90, 300), (190, 450)):  # rembg-like holes: alpha 0, garment colour kept
+            p[y - 6:y + 6, x - 6:x + 6, 3] = 0
+        return p, plm
+
+    def test_holes_are_filled_in_the_source_and_after_warping(self):
+        p, _ = self.holed_pants()
+        self.assertTrue(interior_holes(p).any())
+        filled = warp.fill_alpha_holes(p, warp.opening_mask(p, warp.background_color(p)))
+        self.assertFalse(interior_holes(filled).any())
+        base, lm = avatar()
+        mask = warp.figure_mask(base)
+        p, plm = self.holed_pants()
+        layer, _ = warp.garment_layer("pants", p, plm, lm, H, W, warp.find_arms(mask, lm), {}, mask)
+        self.assertFalse(interior_holes(layer).any())
+
+    def test_background_coloured_hole_stays_open(self):
+        g, _ = tshirt()
+        g[60:80, 140:160] = (0, 0, 0, 0)  # same colour as the transparent background around the garment
+        keep = warp.opening_mask(g, warp.background_color(g))
+        self.assertTrue(keep[70, 150])
+        self.assertEqual(warp.fill_alpha_holes(g, keep)[70, 150, 3], 0)
+
+    def test_all_flags_off_leaves_rgb_untouched(self):
+        base, lm = avatar()
+        rng = np.random.default_rng(1)
+        base[:, :, :3] = np.clip(base[:, :, :3].astype(int) + rng.integers(-60, 60, base[:, :, :3].shape), 0, 255)
+        p, plm = pants()
+        rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm)])
+        mask = warp.figure_mask(base)
+        layer, _ = warp.garment_layer("pants", p, plm, lm, H, W, warp.find_arms(mask, lm), {}, mask)
+        solid = (layer[:, :, 3] == 255) & ~dbg["arm_mask"]
+        self.assertTrue((rgb[solid] == np.array(PANTS[:3])).all())  # no shading
+        far = mask & ~(cv2.dilate((layer[:, :, 3] > 0).astype(np.uint8), np.ones((15, 15), np.uint8)) > 0)
+        self.assertTrue((rgb[far] == base[:, :, :3][far]).all())  # no contact shadow on the avatar
+        shaded, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)], shading=True, contact_shadows=True)
+        self.assertFalse((shaded[solid] == np.array(PANTS[:3])).all())

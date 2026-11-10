@@ -235,6 +235,11 @@ def _rembg_clean(garment):
     if not bbox:
         raise JobRejected("NO_GARMENT", "rembg left nothing")
     img = img.crop(bbox)
+    # Opaque inside the silhouette: rembg holes are filled, background-coloured openings stay (docs/09 #63).
+    import numpy as np
+    from apps.tryon_engine.warp import background_color, fill_alpha_holes, opening_mask
+    arr = np.array(img)
+    img = Image.fromarray(fill_alpha_holes(arr, opening_mask(arr, background_color(arr))), "RGBA")
     buf = BytesIO()
     img.save(buf, format="PNG")
 

@@ -38,6 +38,9 @@ services:
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
       - DEMO_MODE=${DEMO_MODE:-0}  # precomputed try-on results (manage.py build_demo)
+      - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
+      - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}
+      - TRYON_EDGE_FEATHER=${TRYON_EDGE_FEATHER:-0}
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:
@@ -63,6 +66,9 @@ services:
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
       - DEMO_MODE=${DEMO_MODE:-0}  # precomputed try-on results (manage.py build_demo)
+      - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
+      - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}
+      - TRYON_EDGE_FEATHER=${TRYON_EDGE_FEATHER:-0}
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:

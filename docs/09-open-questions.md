@@ -202,3 +202,7 @@ _(none blocking P0)_
     and the hang weight are decided per leg, not per row.
 62. **Looseness per garment, smooth** (2026-11-10, replaces the per-leg cut of #61): mean knee ratio of both legs,
     smoothstep 1.05x .. 1.15x drives the knee pull (1 -> 0.25) and the hang weight (1 -> 0.5); both legs share them.
+63. **Garments are opaque, realism is optional** (2026-11-10): holes inside the garment silhouette are filled after
+    rembg and after warping (background-coloured openings kept); compositing fixed to straight-alpha "over".
+    Shading, contact shadow and edge feather are behind `TRYON_SHADING`, `TRYON_CONTACT_SHADOW`, `TRYON_EDGE_FEATHER`
+    (default 0). The T-shirt still uses "widths follow the body" (no ease model, no neck/sleeve layering yet).

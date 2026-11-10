@@ -145,6 +145,10 @@ AI_CLEANING_ENABLED = os.environ.get("AI_CLEANING_ENABLED", "0") == "1"
 # Demo mode (apps/tryon_engine/demo.py): precomputed try-on results from `manage.py build_demo` are served at once
 # for the (avatar, garments) pairs they cover; no Celery, no Gemini for those. Off: nothing changes.
 DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
+# Try-on realism effects (docs/06 "Realism pass"), all off by default: the plain warped, opaque garment.
+TRYON_SHADING = os.environ.get("TRYON_SHADING", "0") == "1"
+TRYON_CONTACT_SHADOW = os.environ.get("TRYON_CONTACT_SHADOW", "0") == "1"
+TRYON_EDGE_FEATHER = os.environ.get("TRYON_EDGE_FEATHER", "0") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
 PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", BASE_DIR.parent / "prompts"))  # docker: ./prompts -> /prompts
 

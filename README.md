@@ -16,6 +16,7 @@ open http://localhost:5173                 # register, upload a garment, mark la
 ```
 `.env` flags (defaults in `.env.example`): `AI_DEV_BYPASS=0` (1 = skip AI checks locally, DEBUG only, garments get a
 "DEV: tekshirilmagan" chip), `AI_CLEANING_ENABLED=0` (prompt 04 not built, docs/09 #55), `DEMO_MODE=0`,
+`TRYON_SHADING` / `TRYON_CONTACT_SHADOW` / `TRYON_EDGE_FEATHER` (realism effects, all `0` = plain opaque garment),
 `AI_DAILY_LIMIT` / `AI_GARMENT_DAILY_LIMIT`, optional `GEMINI_TIMEOUT_S` (min 60). The first rembg run downloads its
 model (~176 MB, `u2net` volume, kept across rebuilds).
 

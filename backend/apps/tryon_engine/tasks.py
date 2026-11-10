@@ -33,6 +33,7 @@ def _do_warp(outfit):
     import cv2
     from django.core.files.base import ContentFile
     from django.conf import settings
+    from apps.tryon_engine.flags import render_flags
     from apps.tryon_engine.warp import render_tryon
 
     base_path = outfit.body.image.path if outfit.body else outfit.avatar.image.path
@@ -48,7 +49,7 @@ def _do_warp(outfit):
             raise ValueError(f"Cannot read garment image {garment.pk}")
         garments.append((garment.type, g_img, garment.landmarks))
 
-    final_bgr, warns, _ = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W)
+    final_bgr, warns, _ = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W, **render_flags())
     if warns:
         logger.warning("Warp warnings for outfit %d: %s", outfit.pk, warns)
 

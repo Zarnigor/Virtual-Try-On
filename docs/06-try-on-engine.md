@@ -82,6 +82,8 @@ Scanline strips (torso, pants) + rigid affine sleeves. Diagnosed on the 6 real a
 - Warning: a row's horizontal scale vs `s` beyond 1.3x (e.g. narrow pants widened over a plus-size body).
 
 ### Realism pass (2026-11-10, docs/09 #60, `render_tryon`)
+All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONTACT_SHADOW`, `TRYON_EDGE_FEATHER`
+(env, read by `flags.render_flags()`). With all off the result is the warped, opaque garment over the avatar.
 - Shading: `shading_map` = avatar luminance / its blur (sigma 25, normalised to the garment area), clipped 0.75..1.2,
   smoothed; garment RGB *= shade ** 0.7 (`shading_strength`, 0 = off). Alpha is never changed.
 - Edges: the 1 px rim is dropped (photo background fringe) and the alpha feathered by ~1 px (colour grown from inside).
@@ -98,3 +100,10 @@ Scanline strips (torso, pants) + rigid affine sleeves. Diagnosed on the 6 real a
 - Loose: a quadratic Bezier from the crotch-row centre to the ankle centre; the knee pulls it by at most 25 % of its
   offset from the straight line, and the control point is clamped between the ends, so the edges are monotonic (no kink
   or bulge at inward knees, e.g. male_plus).
+
+### Opaque garments (2026-11-10, docs/09 #63, `garment_layer`, `fill_alpha_holes`)
+- After rembg (`_rembg_clean`) and again after warping: alpha = 255 inside the largest outer contour, except its outer
+  1 px edge. A hole is kept open only if its colour matches the photo background (median of the transparent pixels
+  outside the garment, distance <= 40): e.g. a real neck hole. Openings are warped with the garment and stay open.
+- Compositing is straight-alpha "over" and rows are resized premultiplied, so empty (black) pixels never darken
+  edges or strip overlaps; newly opaque and soft-edge pixels take the colour of the nearest opaque garment pixel.
