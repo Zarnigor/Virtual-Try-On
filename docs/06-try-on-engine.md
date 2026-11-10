@@ -125,6 +125,7 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
 - Shoulder cap (docs/09 #65): bare figure pixels between the neck column and the shoulder edges, below the neck
   row, on the shoulder side of the sleeve hems and above the T-shirt hem, are filled UNDER the garment with the
   nearest colour of the garment's shoulder row (feathered ~2 px), so no skin sliver shows at the shoulders.
-- With pants: pants first, then the T-shirt; where the hem covers, the pants top is extended (repeating the pants
-  column) up to 6 px above the hem, so no gap shows between hem and waistband. T-shirt alone: unchanged.
+- With pants (docs/09 #66): pants first, then the T-shirt. Pants are cropped above their own waist row (wide pants
+  left maroon lines beside the shirt). A hem 0..12 px above the pants waist is extended down by repeating its last
+  opaque row (alpha 255) to 6 px past the pants top in each column; a crop top further up stays as is.
 - Warning: a row's width vs garment * s beyond 1.3x (e.g. a fitted blouse widened over broad hips).

@@ -433,17 +433,35 @@ class TshirtFitTests(SimpleTestCase):
         skin = (np.abs(rgb.astype(int) - np.array(SKIN[:3])).max(axis=2) < 25) & band
         self.assertEqual(int(skin.sum()), 0)
 
-    def test_crop_top_hem_overlaps_the_pants_waistband(self):
+    def test_wide_pants_never_reach_above_their_waist(self):
         base, lm = avatar()
-        g, glm = tshirt(hem_y=150)  # hem lands ~60 px above the body waist
+        p, plm = pants()
+        p = cv2.resize(p, (int(p.shape[1] * 1.7), p.shape[0]), interpolation=cv2.INTER_NEAREST)
+        plm = scale_x(plm, 1.7)
+        rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm)])
+        is_pants = (np.abs(rgb.astype(int) - np.array(PANTS[:3])).max(axis=2) < 40)
+        self.assertFalse(is_pants[:int(np.ceil(dbg["pants_waist_y"]))].any())
+        self.assertTrue(is_pants[int(dbg["pants_waist_y"]) + 20].any())
+
+    def test_hem_just_above_the_waist_is_extended_over_the_waistband(self):
+        base, lm = avatar()
+        g, glm = tshirt(hem_y=193)  # hem lands ~8 px above the body (= pants) waist
         p, plm = pants()
         rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)])
         hem_y, l, r = dbg["tshirt_hem"]
-        for x in range(int(l) + 10, int(r) - 10, 7):
-            col = rgb[int(hem_y) - 10:int(lm["waist"]["y"]) + 30, x].astype(int)
+        self.assertTrue(0 < dbg["pants_waist_y"] - hem_y <= warp.HEM_GAP_MAX)
+        for x in range(int(l) + 10, int(r) - 10, 5):
+            col = rgb[int(hem_y) - 5:int(dbg["pants_waist_y"]) + 25, x].astype(int)
             skin = (np.abs(col - np.array(SKIN[:3])).max(axis=1) < 25)
             white = (col > 245).all(axis=1)
             self.assertFalse((skin | white).any(), f"gap at x={x}")
+
+    def test_crop_top_with_pants_is_unchanged(self):
+        base, lm = avatar()
+        g, glm = tshirt(hem_y=150)  # hem ~60 px above the waist: the midriff shows
+        p, plm = pants()
+        rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)])
         alone, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
-        y = int(hem_y) + 20
-        np.testing.assert_allclose(alone[y, 300], base[y, 300, :3], atol=1)  # without pants: avatar shows
+        y0, y1 = int(dbg["tshirt_hem"][0]) + 3, int(dbg["pants_waist_y"]) - 3
+        np.testing.assert_array_equal(rgb[y0:y1], alone[y0:y1])
+        np.testing.assert_allclose(rgb[y0 + 5, 300], base[y0 + 5, 300, :3], atol=1)

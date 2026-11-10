@@ -211,3 +211,6 @@ _(none blocking P0)_
     drawn above the garment. Scale from shoulder width, not torso length: length would force every hem to one row.
 65. **T-shirt round 3** (2026-11-10): curved, feathered head/neck overlay edge; shoulder band filled under the
     garment with the shoulder-row colour; the pants reach 6 px under the T-shirt hem (crop tops with pants included).
+66. **Hem over waistband, revised** (2026-11-10, replaces the pants extension of #65, which left maroon lines beside
+    the T-shirt): pants are cropped above their waist row; a T-shirt hem within 12 px above the pants waist is extended
+    down to 6 px past the pants top; crop tops further up are unchanged.

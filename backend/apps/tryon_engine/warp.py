@@ -232,7 +232,8 @@ NECK_MARGIN = 6  # px each side of the neck landmark width that the head/neck ov
 NECK_FEATHER = 1.5  # px sigma of the head/neck overlay edge (~3 px ramp)
 NECK_ARC = 0.25  # the overlay's lower edge dips by this x neck width at the centre (crew collar arc)
 CAP_FEATHER = 1.0  # px sigma of the shoulder-cap fill edge (~2 px)
-HEM_OVER_WAISTBAND = 6  # px the T-shirt hem overlaps the pants waistband
+HEM_OVER_WAISTBAND = 6  # px the T-shirt hem is extended past the pants waistband top
+HEM_GAP_MAX = 12  # only a hem at most this far above the pants waist is extended (crop tops stay as they are)
 
 
 def tshirt_looseness(ratios) -> float:
@@ -421,6 +422,28 @@ def head_neck_overlay(base_mask: np.ndarray, lm: dict) -> np.ndarray:
     return out * base_mask
 
 
+def extend_hem_over_waistband(tshirt: np.ndarray, pants: np.ndarray, hem_y: float, waist_y: float) -> np.ndarray:
+    """T-shirt layer whose hem is extended down to HEM_OVER_WAISTBAND px past the pants top, by repeating its last
+    fully opaque row (same RGB, alpha 255, full width). Only when the hem is 0..HEM_GAP_MAX px above the pants
+    waist; a crop top far above it, or a hem already below it, is left as is."""
+    if not 0 <= waist_y - hem_y <= HEM_GAP_MAX:
+        return tshirt
+    H, W = tshirt.shape[:2]
+    opaque = tshirt[:, :, 3] >= 250
+    rows = [y for y in range(min(int(hem_y), H - 1), max(int(hem_y) - 8, 0), -1) if opaque[y].any()]
+    if not rows:
+        return tshirt
+    last = rows[0]
+    out = tshirt.copy()
+    pants_on = pants[:, :, 3] >= 128
+    for x in np.nonzero(opaque[last])[0]:
+        col = np.nonzero(pants_on[:, x])[0]
+        target = int(np.ceil((col[0] if len(col) else waist_y) + HEM_OVER_WAISTBAND))
+        out[last + 1:min(target + 1, H), x] = tshirt[last, x]
+        out[last + 1:min(target + 1, H), x, 3] = 255
+    return out
+
+
 def shoulder_cap_fill(layer: np.ndarray, figure: np.ndarray, lm: dict, hems: dict | None, head: np.ndarray,
                       hem_y: float) -> np.ndarray:
     """T-shirt layer with the band between the neck and the shoulder edges covered: figure pixels below the neck
@@ -457,29 +480,6 @@ def shoulder_cap_fill(layer: np.ndarray, figure: np.ndarray, lm: dict, hems: dic
     a = cv2.GaussianBlur(region.astype(np.float32), (0, 0), CAP_FEATHER)
     fill[:, :, 3] = np.clip(np.maximum(a, region) * 255 * figure, 0, 255).astype(np.uint8)
     return _alpha_composite(fill, layer)
-
-
-def extend_pants_under_hem(pants: np.ndarray, tshirt: np.ndarray, hem: tuple) -> np.ndarray:
-    """Pants layer whose top reaches HEM_OVER_WAISTBAND px above the T-shirt hem in every column the hem covers,
-    so no gap line shows between hem and waistband. The added pixels repeat the pants column just inside its top."""
-    hem_y, l, r = hem
-    H, W = pants.shape[:2]
-    out = pants.copy()
-    opaque = pants[:, :, 3] >= 250
-    shirt = tshirt[:, :, 3] >= 128
-    for x in range(max(int(l), 0), min(int(r) + 1, W)):
-        col = np.nonzero(opaque[:, x])[0]
-        shirt_col = np.nonzero(shirt[:, x])[0]
-        if not len(col) or not len(shirt_col):
-            continue
-        bottom = int(shirt_col.max())  # the hem in this column
-        target = bottom - HEM_OVER_WAISTBAND
-        top = int(col[0])
-        if top > target >= 0:
-            src_y = min(top + 3, H - 1)
-            out[target:top, x] = pants[src_y, x] if opaque[src_y, x] else pants[top, x]
-            out[target:top, x, 3] = 255
-    return out
 
 
 PANTS_EASE = 0.04  # pants cover the body with ~4% ease (no skin/underwear showing)
@@ -665,6 +665,9 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
     for label, r in worst.items():
         if r > PANTS_DISTORT_LIMIT or r < 1 / PANTS_DISTORT_LIMIT:
             warnings.append(f"{label}: distorted {max(r, 1 / r):.2f}x ({'wider' if r > 1 else 'narrower'})")
+    result[:max(int(np.ceil(a_wy)), 0)] = 0  # pants exist only from their own waist row down
+    if info is not None:
+        info["pants_waist_y"] = a_wy
     return result, warnings
 
 
@@ -867,9 +870,9 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         layers.append((gtype, warped))
     types = [t for t, _ in layers]
     if "pants" in types and "tshirt" in types:  # hem overlaps the waistband: no gap line between them
-        i = types.index("pants")
-        layers[i] = ("pants", extend_pants_under_hem(layers[i][1], layers[types.index("tshirt")][1],
-                                                     info["tshirt_hem"]))
+        i = types.index("tshirt")
+        layers[i] = ("tshirt", extend_hem_over_waistband(layers[i][1], layers[types.index("pants")][1],
+                                                         info["tshirt_hem"][0], info["pants_waist_y"]))
     for gtype, warped in layers:  # pants first, then the T-shirt
         if edge_feather:
             warped = soften_edges(warped)
