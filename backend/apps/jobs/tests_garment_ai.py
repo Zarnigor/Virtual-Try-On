@@ -425,6 +425,21 @@ class GarmentAIJobTests(MediaTestCase):
         self.assertFalse(second.ai_called)
         self.assertFalse(Garment.objects.filter(pk=g2.pk).exists())
 
+    @override_settings(AI_GARMENT_DAILY_LIMIT=1, AI_DAILY_LIMIT=0)
+    def test_staff_skip_the_garment_limit_but_the_ai_still_runs(self):
+        self.user.is_staff = True
+        self.user.save()
+        for i in range(3):
+            _, job = self.upload("tshirt", image_bytes((i, i, i)))
+            with FakeGemini(gemini_reply(TSHIRT)) as fake:
+                job = self.run_job(job)
+            self.assertEqual((job.status, len(fake.requests)), ("done", 1))  # a real AI check every time
+            self.assertTrue(job.ai_called)
+            self.assertFalse(job.result["ai_skipped"])
+        self.assertEqual(limits.counted_today(self.user.pk, KIND), 3)  # still recorded
+        body_job = Job.objects.create(user=self.user, kind="body_validation")
+        self.assertFalse(limits.reserve_ai_slot(body_job))  # the body limit applies to staff too
+
     @override_settings(AI_GARMENT_DAILY_LIMIT=1)
     def test_unavailable_does_not_use_the_slot(self):
         _, first = self.upload("tshirt", image_bytes((1, 1, 1)))

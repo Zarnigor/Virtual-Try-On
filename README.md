@@ -14,10 +14,14 @@ docker compose up -d --build               # db, redis, backend :8000, worker, f
 docker compose exec -T backend python manage.py seed_avatars --from /avatars    # real avatar photos (./avatars, not in git; any subset of female_slim.jpg ...)
 open http://localhost:5173                 # register, upload a garment, mark landmarks, try it on an avatar
 ```
+Staff pages (staff users only, see `create_staff_user` below): `/staff/avatars` (list, landmark status),
+`/staff/avatars/new` (upload a new avatar photo + nominal height and circumferences), `/staff/avatars/:id` (body landmark
+editor with live cm widths and circumference estimates; Save confirms the landmarks the try-on engine uses).
 `.env` flags (defaults in `.env.example`): `AI_DEV_BYPASS=0` (1 = skip AI checks locally, DEBUG only, garments get a
 "DEV: tekshirilmagan" chip), `AI_CLEANING_ENABLED=0` (prompt 04 not built, docs/09 #55), `DEMO_MODE=0`,
 `TRYON_SHADING` / `TRYON_CONTACT_SHADOW` / `TRYON_EDGE_FEATHER` (realism effects, all `0` = plain opaque garment),
-`AI_DAILY_LIMIT` / `AI_GARMENT_DAILY_LIMIT`, optional `GEMINI_TIMEOUT_S` (min 60). The first rembg run downloads its
+`BODY_AI_CHECK_ENABLED=1` (prompt 02 on own-body uploads; 0 honoured only with DEBUG),
+`AI_DAILY_LIMIT` / `AI_GARMENT_DAILY_LIMIT` (staff are exempt from the garment limit, the AI check still runs), optional `GEMINI_TIMEOUT_S` (min 60). The first rembg run downloads its
 model (~176 MB, `u2net` volume, kept across rebuilds).
 
 ## Demo mode (no Gemini, no Celery for the covered pairs)
@@ -66,11 +70,15 @@ Rebuild after reseeding avatars. Currently built: 1 T-shirt + 1 pants x 6 avatar
 
 ## Commands
 ```
-docker compose exec -T backend python manage.py test apps     # 123 tests
+docker compose exec -T backend python manage.py test apps     # 186 tests
 docker compose exec -T frontend npx tsc --noEmit              # type check
-docker compose exec -T frontend npm test                      # vitest: 35 tests (landmark editor)
+docker compose exec -T frontend npm test                      # vitest: 44 tests (landmark editor, body cm)
 docker compose exec -T backend python manage.py migrate
 docker compose exec -T backend python manage.py seed_avatars [--from /avatars | --force]
+docker compose exec backend python manage.py create_staff_user --email you@example.com   # asks the password
+                                                              # (or -e STAFF_PASSWORD=...; never commit it)
+docker compose exec -T backend python manage.py promote_garments --list                    # ids, type, status
+docker compose exec -T backend python manage.py promote_garments --ids 28 33 --catalog     # public + approved
 docker compose exec -T backend python manage.py reflatten_garments --all-solid --dry-run   # flatten lighting once
 docker compose exec -T -e ENGINE=new backend python manage.py shell < tools/tryon_check/run.py   # try-on check
 docker compose logs -f backend worker
