@@ -33,7 +33,7 @@ services:
       - MEDIA_URL=/media/
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
-      - AI_DEV_BYPASS=${AI_DEV_BYPASS:-1}  # local dev only, see settings/base.py
+      - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:
@@ -56,7 +56,7 @@ services:
       - DEBUG=1
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
-      - AI_DEV_BYPASS=${AI_DEV_BYPASS:-1}  # local dev only, see settings/base.py
+      - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:
