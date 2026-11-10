@@ -591,13 +591,21 @@ class SleeveOnceTests(SimpleTestCase):
     def test_each_marker_line_appears_exactly_once_per_sleeve(self):
         base, lm = avatar()
         g, glm = self.marked_tshirt()
-        rgb, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
-        red = ((rgb[:, :, 2] > 150) & (rgb[:, :, 1] < 90) & (rgb[:, :, 0] < 90)).astype(np.uint8)
-        n, _, stats, _ = cv2.connectedComponentsWithStats(red, connectivity=8)
-        lines = [stats[i] for i in range(1, n) if stats[i][cv2.CC_STAT_AREA] >= 8]
+        # halo off: its edge ring takes the nearest interior colour, which smears a stitch lying at the edge
+        rgb, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)], halo_removal=False)
+        red = (rgb[:, :, 2] > 150) & (rgb[:, :, 1] < 90) & (rgb[:, :, 0] < 90)
+        src_red = (g[:, :, 2] == 255) & (g[:, :, 1] == 0)
+        glm_n, _ = warp.normalize_tshirt_landmarks(glm, g[:, :, 3] > 128)
+        s2 = warp.tshirt_scale(glm_n, lm) ** 2
+        split_dst, split_src = 320, 110  # between the upper-sleeve stitch and the cuff stitch
         for half in ("left", "right"):
-            mine = [st for st in lines if (st[cv2.CC_STAT_LEFT] < 300) == (half == "left")]
-            self.assertEqual(len(mine), 2, (half, [tuple(st) for st in mine]))  # one cuff + one upper stitch
+            cols, src_cols = (slice(0, 300), slice(0, 170)) if half == "left" else (slice(300, W), slice(170, 340))
+            for rows, src_rows in ((slice(0, split_dst), slice(0, split_src)), (slice(split_dst, H), slice(split_src, None))):
+                area, once = int(red[rows, cols].sum()), float(src_red[src_rows, src_cols].sum()) * s2
+                # drawn once: about the scaled source area (a line drawn twice would be ~2x); a line crossing the
+                # shoulder join may lose a few px to the outer edge fix, the cuff may be shortened
+                self.assertLess(area, 1.3 * once, (half, rows, area, once))
+                self.assertGreater(area, 0.35 * once, (half, rows, area, once))
 
 
 class RowWarpTests(SimpleTestCase):
@@ -724,8 +732,136 @@ class TshirtLayerTests(SimpleTestCase):
         self.assertLess(fixed["shoulder"]["y"], glm["chest"]["y"])
 
     def test_layer_order_is_explicit(self):
-        self.assertEqual(warp.LAYER_ORDER, ("avatar", "pants", "shoulder_cap", "tshirt_torso", "tshirt_sleeves",
-                                            "head_neck", "hands_forearms"))
+        self.assertEqual(warp.LAYER_ORDER, ("avatar", "pants", "tshirt_torso", "tshirt_sleeves", "shoulder_cap",
+                                            "neck_gap_fill", "head_neck", "hands_forearms"))
+
+
+class TshirtCompositingTests(SimpleTestCase):
+    """One test per defect of the T-shirt compositing round (docs/09, docs/06 "Layer order")."""
+
+    def render(self, shirt=SHIRT, skin=SKIN, g=None, glm=None, base=None, lm=None, **kw):
+        if base is None:
+            base, lm = avatar()
+            base[base[:, :, 3] > 0] = skin
+        if g is None:
+            g, glm = tshirt()
+            g[g[:, :, 3] > 0] = shirt
+        return warp.render_tryon(base, lm, [("tshirt", g, glm)], **kw), lm
+
+    def test_sleeve_top_never_above_the_shoulder_line(self):
+        g, glm = tshirt()
+        g[g[:, :, 3] > 0] = SHIRT
+        # a sleeve whose top corner rises above the armhole top: the rigid rotation lifts it further
+        cv2.fillPoly(g, [np.array([(70, 30), (40, 18), (8, 110), (75, 100)], np.int32)], SHIRT)
+        cv2.fillPoly(g, [np.array([(230, 30), (260, 18), (292, 110), (225, 100)], np.int32)], SHIRT)
+        (_, _, dbg), _ = self.render(g=g, glm=glm)
+        for side in ("left", "right"):
+            m, c = dbg["shoulder_lines"][side]
+            a = dbg["tshirt_parts"][f"sleeve_{side}"][:, :, 3]
+            ys, xs = np.nonzero(a > 0)
+            self.assertGreater(len(ys), 500)
+            above = (ys + 0.5) - (m * (xs + 0.5) + c)  # < 0: above the line
+            self.assertGreaterEqual(float(above.min()), -1.0, side)
+            # and the line is the torso's own slope (not a flat cut at some other height)
+            t = dbg["tshirt_parts"]["torso"][:, :, 3] >= 128
+            x = int(dbg["tshirt_shoulders"][0 if side == "left" else 1] + (25 if side == "left" else -25))
+            self.assertLessEqual(abs(int(np.argmax(t[:, x])) - (m * (x + 0.5) + c)), 2.5)
+
+    def seam_profile(self, shirt, skin):
+        (rgb, _, dbg), lm = self.render(shirt=shirt, skin=skin)
+        # internal pixels only: at least 4 px inside the union's outer contour (the contour itself is soft)
+        filled = (dbg["tshirt_layer"][:, :, 3] > 0).astype(np.uint8)
+        inside = cv2.distanceTransform(filled, cv2.DIST_L2, 3) >= 4
+        bad = []
+        for side, (p0, p1) in dbg["armhole_lines"].items():
+            y0, y1 = sorted((float(p0[1]), float(p1[1])))
+            for y in range(int(y0) + 2, int(y1) - 2):
+                t = (y - p0[1]) / (p1[1] - p0[1])
+                x = int(round(p0[0] + t * (p1[0] - p0[0])))
+                band = rgb[y, x - 6:x + 7].astype(int)[inside[y, x - 6:x + 7]]
+                if len(band):
+                    bad.append(int(np.abs(band - np.array(shirt[:3])).max()))
+        return bad
+
+    def test_no_seam_lightness_dip_dark_on_dark(self):
+        bad = self.seam_profile((30, 30, 30, 255), (70, 70, 70, 255))
+        self.assertGreater(len(bad), 40)
+        self.assertLessEqual(max(bad), 2)
+
+    def test_no_seam_lightness_dip_light_on_light(self):
+        bad = self.seam_profile((235, 235, 235, 255), (200, 200, 200, 255))
+        self.assertGreater(len(bad), 40)
+        self.assertLessEqual(max(bad), 2)
+
+    def test_sleeve_outer_contour_is_drawn_once(self):
+        (_, _, dbg), _ = self.render()
+        parts = dbg["tshirt_parts"]
+        torso = parts["torso"][:, :, 3] > 0
+        for side in ("left", "right"):
+            sleeve = parts[f"sleeve_{side}"][:, :, 3]
+            self.assertFalse((torso & (sleeve >= 250)).any(), side)  # under an opaque sleeve pixel: no torso
+            # outward of the join (8 px past the armhole line) only the sleeve exists: its contour is drawn once
+            p0, p1 = dbg["armhole_lines"][side]
+            for y in range(int(p0[1]) + 2, int(p1[1])):
+                x = p0[0] + (y - p0[1]) / (p1[1] - p0[1]) * (p1[0] - p0[0])
+                out = torso[y, :max(int(x) - 8, 0)] if side == "left" else torso[y, int(x) + 9:]
+                self.assertFalse(out.any(), (side, y))
+        # one edge ramp across the outer sleeve edge: alpha never rises again after it starts falling
+        layer = dbg["tshirt_layer"][:, :, 3].astype(int)
+        y = int(dbg["armhole_lines"]["left"][1][1]) - 10
+        row = layer[y, :300]
+        first = int(np.nonzero(row > 0)[0][0])
+        ramp = row[first:first + 8]
+        self.assertTrue((np.diff(ramp) >= 0).all(), ramp)
+
+    def test_cap_fill_colour_equals_the_neighbouring_garment_colour(self):
+        base, lm = avatar()
+        cv2.fillPoly(base, [np.array([(272, 205), (328, 205), (398, 258), (202, 258)], np.int32)], SKIN)
+        g, glm = TshirtFitTests().collared_tshirt()
+        top_colour = (200, 90, 150, 255)
+        g[:45][g[:45, :, 3] > 0] = top_colour  # the shoulder rows differ from the body of the garment
+        (rgb, _, dbg), _ = self.render(g=g, glm=glm, base=base, lm=lm)
+        cap = dbg["shoulder_cap"]
+        drawn = (cap[:, :, 3] > 0) & (dbg["tshirt_layer"][:, :, 3] > 0)
+        self.assertGreater(int(drawn.sum()), 20)
+        diff = np.abs(cap[:, :, :3][cap[:, :, 3] > 0].astype(int) - np.array(top_colour[:3])).max()
+        self.assertLessEqual(int(diff), 3)  # the adjacent shoulder row, never skin or black
+        visible = (cap[:, :, 3] == 255) & (dbg["tshirt_layer"][:, :, 3] == 255) & ~(dbg["head_overlay"] > 0.01)
+        self.assertLessEqual(int(np.abs(rgb[visible].astype(int) - np.array(top_colour[:3])).max()), 3)
+
+    def test_no_grey_tank_collar_between_neck_and_collar_band(self):
+        base, lm = avatar()
+        grey = (128, 128, 128, 255)
+        tank = np.array([(250, 238), (350, 238), (420, 270), (180, 270)], np.int32)  # sits above the collar
+        cv2.fillPoly(base, [tank], grey)
+        cv2.fillPoly(base, [np.array([(280, 255), (320, 255), (320, 270), (280, 270)], np.int32)], SKIN)
+        g, glm = NeckFixTests().crew_tshirt()
+        (rgb, _, dbg), _ = self.render(g=g, glm=glm, base=base, lm=lm)
+        is_grey = (np.abs(rgb.astype(int) - np.array(grey[:3])).max(axis=2) <= 12)
+        n = lm["neck"]
+        self.assertEqual(int(is_grey[150:lm["shoulder"]["y"] + 5, n["left_x"] - 10:n["right_x"] + 11].sum()), 0)
+        self.assertTrue((dbg["neck_gap"] > 0.5).any())  # it was the fill, not the garment, that hid it
+        # the collar band (garment pixels under the opening) stays visible
+        op = dbg["neck_opening"]
+        y = int(op["y0"] + op["depth"]) + 4
+        np.testing.assert_allclose(rgb[y, int(op["cx"])], SHIRT[:3], atol=3)
+        off, _ = self.render(g=g, glm=glm, base=base, lm=lm, neck_gap_fill=False)
+        self.assertGreater(int((np.abs(off[0].astype(int) - np.array(grey[:3])).max(axis=2) <= 12)
+                               [150:lm["shoulder"]["y"] + 5, n["left_x"] - 10:n["right_x"] + 11].sum()), 0)
+
+    def test_neck_mask_lower_edge_is_curved_without_steps(self):
+        base, lm = avatar()
+        w = warp.head_neck_overlay(warp.figure_mask(base), lm, warp.NECK_FEATHER_FIX)
+        n = lm["neck"]
+        cols = range(n["left_x"] - warp.NECK_MARGIN - 15, n["right_x"] + warp.NECK_MARGIN + 16)
+        bottom = np.array([int(np.nonzero(w[:400, x] > 0.5)[0].max()) for x in cols])
+        self.assertGreater(len(set(bottom.tolist())), 10)  # a curve, not a flat edge
+        inner = bottom[warp.NECK_MARGIN + 15 + 5:-(warp.NECK_MARGIN + 15 + 5)]  # inside the neck: a smooth arc
+        self.assertLessEqual(int(np.abs(np.diff(inner)).max()), 3)
+        self.assertGreater(int(bottom.max()) - int(bottom[0]), 0.3 * (n["right_x"] - n["left_x"]))
+        # no vertical wall: at the neck sides the edge keeps rising outward, it never drops straight to the top
+        self.assertTrue((np.diff(bottom[:len(bottom) // 2]) >= 0).all())
+        self.assertTrue((np.diff(bottom[len(bottom) // 2:]) <= 0).all())
 
 
 INNER = (20, 20, 20, 255)  # the inner back collar of the synthetic crew-neck T-shirt
@@ -795,15 +931,12 @@ class NeckFixTests(SimpleTestCase):
         _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)])
         self.assertNotIn("neck_opening", dbg)
 
-    def test_edge_ramp_is_1_to_2_px(self):
+    def test_edge_ramp_is_about_3_px(self):
         base, lm = avatar()
         mask = warp.figure_mask(base)
-        soft = lambda f: int(((lambda w: (w > 0.02) & (w < 0.98))(warp.head_neck_overlay(mask, lm, f))).sum())  # noqa: E731
-        self.assertLess(soft(warp.NECK_FEATHER_FIX), 0.6 * soft(warp.NECK_FEATHER))
-        # the ramp across the neck's side edge is at most 2 px wide
-        w = warp.head_neck_overlay(mask, lm, warp.NECK_FEATHER_FIX)[150, :]
-        edge = np.nonzero((w > 0.02) & (w < 0.98))[0]
-        self.assertLessEqual(len(edge), 4)  # two edges, 1-2 px each
+        w = warp.head_neck_overlay(mask, lm, warp.NECK_FEATHER_FIX)[:, 300]  # down the neck centre
+        ramp = int(((w > 0.1) & (w < 0.9)).sum())  # 10-90 % width of the lower edge
+        self.assertTrue(2 <= ramp <= 4, ramp)
 
     def test_shoulder_alpha_is_smoothed_and_the_interior_untouched(self):
         _, lm = avatar()
@@ -828,3 +961,13 @@ class NeckFixTests(SimpleTestCase):
         vis = (out[:, :, 3] > 0) & (layer[:, :, 3] == 0)
         self.assertTrue(vis.any())
         self.assertTrue((out[vis][:, :3] == np.array(SHIRT[:3])).all())
+
+
+class HaloOuterOnlyTests(SimpleTestCase):
+    def test_outer_contour_eroded_hole_left_alone(self):
+        img = np.zeros((60, 60, 4), np.uint8)
+        img[10:50, 10:50] = (40, 30, 200, 255)
+        img[25:35, 25:35, 3] = 0  # a real opening inside
+        out = warp.remove_halo(img, outer_only=True)
+        self.assertFalse(out[10:12, :, 3].any() or out[:, 10:12, 3].any())  # outer contour: 2 px gone
+        np.testing.assert_array_equal(out[23:37, 23:37, 3], img[23:37, 23:37, 3])  # the hole's edge untouched

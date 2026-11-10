@@ -286,3 +286,22 @@ _(none blocking P0)_
     T-shirt: the check uses #28, the blouse #17 and `white28` (#28 recoloured to white in memory, never saved). Re-run
     `neck.py` with real ones when uploaded (`NECK_IDS`). Demo results need `build_demo` again.
 
+## Decided 2026-11-10: T-shirt compositing round 4 (owner asked, built autonomously)
+86. **Sleeve/torso ownership** (docs/06 "Layer order" step 4): the sleeve is sampled from the whole garment image
+    inside its territory (own garment pixels + 3 px past the armhole, rigid transform, threshold 0.5); outward of the
+    armhole line only the sleeve exists, inward the sleeve is drawn over the torso. Removes the seam lines along the
+    join (two clipped soft edges over each other let the avatar through) and the doubled outer sleeve edge.
+    The sleeve is clipped below the torso's shoulder slope line within one armhole length of the shoulder point:
+    no shoulder "pad". The T-shirt halo fix runs once, after compositing, on the outer contour only (2 px erode +
+    2 px ring), no longer on the source; holes and joins are untouched.
+87. **Shoulder cap** is drawn under the finished T-shirt layer; colour = median of the garment's solid pixels 3..15
+    rows under its top edge, median-filtered along the shoulder (was: one pixel per column plus a black/skin feather:
+    the tan/brown streaks).
+88. **Neck**: one smooth head/neck edge without vertical walls, feather ~3 px, kept above the front collar band. New
+    flag `TRYON_NECK_GAP_FILL` (default 1): the avatar's grey tank collar left between the neck and the collar is
+    painted in the neck's skin colour (chroma/hue test, ~2 px feather; 0-90 px per render). It touches the avatar's
+    own clothes in a thin strip at the neckline; the owner may turn it off. A first version (Lab distance) took the
+    shadow under the chin for "not skin" and painted a flat brown bib on the black T-shirt; replaced before commit.
+    Remaining (docs/06 "Known limits"): dropped-shoulder corner on #36, prints split at the shoulder join, the
+    avatar's top beside the torso where the arm touches (pre-existing). No flag had to be set to 0.
+

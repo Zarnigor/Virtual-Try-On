@@ -151,6 +151,9 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       order (pants -> shoulder cap -> torso -> rigid sleeves -> head/neck -> hands), row warp by `cv2.remap`, flags
       `TRYON_SHOULDER_CAP` / `TRYON_HEM_SNAP` / `TRYON_HALO_REMOVAL` (default 1). Contact sheets:
       `tools/tryon_check/matrix.py`. Demo results are stale until `build_demo` is run again. Owner to confirm #82.
+      **2026-11-10 round 4 (docs/09 #86-88):** T-shirt sleeves own their pixels (no seams/doubled edge), clipped below the
+      shoulder slope line; halo fix once on the outer contour; cap colour from the shoulder rows; smooth neck edge;
+      `TRYON_NECK_GAP_FILL` (default 1). Demo rebuilt. 212 backend tests pass.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.
