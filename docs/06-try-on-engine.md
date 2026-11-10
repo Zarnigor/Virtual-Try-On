@@ -117,17 +117,12 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
 - Looseness once per garment (mean chest/waist ratio, smoothstep 1.05x..1.15x): the row centre goes from the torso
   centre (tight) to the shoulder centre straight down (loose); both sides alike.
 - Collar above the shoulder line: same uniform scale, centred, not fitted.
-- Sleeves: rigid (s + rotation onto the upper-arm edge line), shortened with a warning past half the arm; the armhole
-  edge reaches past the torso edge by the measured gap + 4 px and the cap 4 px up (garment fabric, sampled rigidly).
-- Head and neck: figure pixels within neck width + 6 px and above a downward arc (the `neck` row, 0.25 x neck width
-  deeper at the centre, like a crew collar) are drawn over all garments, feathered ~3 px; ghost-mannequin back
-  collars never cover the neck. Hands/forearms below the sleeve hem as before.
-- Shoulder cap (docs/09 #65): bare figure pixels between the neck column and the shoulder edges, below the neck
-  row, on the shoulder side of the sleeve hems and above the T-shirt hem, are filled UNDER the garment with the
-  nearest colour of the garment's shoulder row (feathered ~2 px), so no skin sliver shows at the shoulders.
-- With pants (docs/09 #66): pants first, then the T-shirt. Pants are cropped above their own waist row (wide pants
-  left maroon lines beside the shirt). A hem 0..12 px above the pants waist is extended down by repeating its last
-  opaque row (alpha 255) to 6 px past the pants top in each column; a crop top further up stays as is.
+- Sleeves: rigid (s + rotation), see "Layer order" below (replaces the armhole reach-in and the 4 px cap).
+- Head and neck: figure pixels within neck width + 6 px and above a U-shaped edge (half ellipse: 0.25 x neck width
+  below the `neck` row at the centre, 0.3 x neck width above it at the sides, like a collar that wraps the neck) are
+  drawn over all garments, feathered ~3 px; ghost-mannequin back collars never cover the neck.
+- Shoulder cap: see "Layer order" (replaces the #65 band fill, which painted everything below the neck row).
+- With pants: see "Layer order" (the hem is snapped by stretching; the #66 row repetition is gone).
 - Warning: a row's width vs garment * s beyond 1.3x (e.g. a fitted blouse widened over broad hips).
 
 ### Solid colours (2026-11-10, docs/09 #67)
@@ -146,9 +141,68 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
 - Final width = max(garment span * s, body + ease) (capped); only the centreline is smoothed. Below the knee the
   rows keep the single vertical scale (full-length legs: hem snapped to the ankle, one linear map per leg).
 
-### Sleeves drawn once (2026-11-10, docs/09 #71)
-- Garment pixels are split once in the source: SLEEVE = the rigid sleeve quad (shoulder, sleeve_end x 1.15,
-  armpit) plus everything outward of the shoulder->armpit line above the armpit; TORSO = the rest. The torso rows
-  warp only torso pixels, each rigid sleeve only its own (+1 px dilation for anti-aliasing). No inward reach-in.
-- The torso rows widen to the rigid sleeve's inner edge where it lies outside them, so no skin wedge shows.
-- Torso row spans come from the torso silhouette (runs overlapping the landmark span), like the pants.
+### Layer order (2026-11-10, docs/09 #79-#84, `render_tryon`, `LAYER_ORDER`)
+One compositing order, bottom to top; every layer is clipped to its own region and has its own unit tests
+(`RowWarpTests`, `HaloTests`, `TshirtLayerTests`, `TshirtFitTests`). The stacked patches (armpit fill, shoulder band
+fill, hem row repetition, sleeve reach-in) were removed, not extended.
+
+1. **Avatar.**
+2. **Pants**: only from their own waist row down (`result[:waist] = 0`). Waist block + two legs, each leg warped from
+   its own half of the garment.
+3. **Shoulder cap** (`shoulder_cap_layer`, flag `TRYON_SHOULDER_CAP`, default 1): figure pixels above the T-shirt's own
+   top edge, between each collar top point (the garment's highest pixel on that side) and the shoulder point, at most
+   3 % of the figure height deep, never above the collar top, never inside the neckline. Colour: the garment pixel just
+   below in the same column. It only fills what the T-shirt leaves bare, so it sits under the T-shirt's soft edge.
+4. **T-shirt torso** (`warp_tshirt`, part `torso`): the garment without its sleeve regions, row warp.
+5. **Rigid sleeves** (parts `sleeve_left`, `sleeve_right`): each drawn exactly once. Region in the garment
+   (`sleeve_regions`): everything outward of the armhole line (shoulder point -> armpit point) down to the armpit row;
+   below it, what lies outside the torso's own run. Rows where the sleeve is still joined to the torso (no background
+   gap, e.g. sleeves hanging along the body: #17, #28) are split along a straight line from the armpit point to the
+   torso edge of the first free row; "joined" = the run reaches more than 6 % of the chest span past the torso's median
+   edge (waist..hem). Placement: uniform scale s, rotated so shoulder -> sleeve_end follows the figure's outer edge
+   line, pivot at the shoulder point, then shifted sideways so the sleeve's hem half is centred on the arm (arm centre =
+   outer edge - half the arm width): a sleeve wider than the arm spreads evenly to both sides. It overlaps the torso by
+   3 px past the armhole line; the torso rows widen to the sleeve's armhole edge where that lies outside them.
+   The hem line (for the hands layer) is across the arm, just past the last sleeve pixel.
+6. **Head and neck** of the avatar (U-shaped, feathered lower edge).
+7. **Hands and forearms** of the avatar beyond the sleeve hem line.
+
+Shared steps, each done once per garment in `garment_layer`: fill holes -> area-resample to about the final size when
+the uniform scale is below 0.8 (`_prescale`; a 1500 px photo squeezed by the bilinear warp alone aliases) -> halo
+removal (`remove_halo`, flag `TRYON_HALO_REMOVAL`, default 1: alpha eroded 2 px, the next 4 px ring recoloured from the
+nearest interior pixel; deeper pixels untouched) -> warp -> fill warp seams.
+
+Row warp (`_warp_rows`, replaces the integer `_scanline_strip`): control rows every 3 px, (y, left edge, right edge)
+for source and destination, interpolated per pixel row and sampled with `cv2.remap` (bilinear, premultiplied):
+positions and widths are sub-pixel, edges antialiased, nothing is drawn outside the rows. Span edges are averaged over
+5 control rows (`_smooth_rows`): per-row silhouette jitter of 1 px made stair steps in every oblique line of a print.
+The last row continues to the garment's own bottom edge (`_tail_rows`), so trims below the hem landmark are kept.
+
+Width rules (unchanged, now symmetric): row width = max(garment * s, body + ease), spread evenly around the row
+centre, also when the body run in the mask forces it wider. Body under a T-shirt includes the pants: a T-shirt row
+that overlaps the pants layer is at least as wide as the pants there (no waistband beside the hem).
+
+Hem over waistband (`hem_over`, flag `TRYON_HEM_SNAP`, default 1): a hem that ends 0..(12 px + 4 % of the shoulder
+width) above the pants top is moved to 6 px past it (plus the waistband's centre dip) by stretching the rows below
+the chest row; nothing is repeated. A crop top further up is left alone.
+
+Shoulder landmarks on the sleeves (`normalize_tshirt_landmarks`): when the garment's shoulder span is more than
+1.35 x its chest span (#28: 1.55 x, the points are on the hanging sleeves' outer edge), the armhole tops are estimated
+at 12 % of the chest span outward of each armpit, on the top outline, with a warning. Otherwise the uniform scale
+shrank the whole garment (torso "distorted 1.45x wider") and the armhole line cut each sleeve in two.
+
+### Known limits (draft, 2026-11-10; contact sheets: `tools/tryon_check/matrix.py`)
+- **The avatar's own clothes show wherever the garment does not cover them** (never redrawn, hard rule): the grey
+  top under a crop top that ends more than ~20 px above the pants (female plus + #34), and its straps beside a wide
+  neckline on broad shoulders (male average / male plus + #34).
+- **A garment much wider than the body at the hip** keeps its own width (one uniform scale, set by the length): the
+  waistband is fitted to the body and the pants widen to their own hip width, which reads as a bulge on slim
+  avatars (#25 on female slim / average, male slim).
+- **Sleeves are rigid**: a puff sleeve (#17) stands off the arm like a box; folds do not follow the arm. Above the
+  arm separation row the arm is not known from the mask, so the sleeve is centred from the outer edge and the arm
+  width measured lower down.
+- **Mis-marked shoulder landmarks** are only estimated (see above); marking the armhole tops is still better.
+- **Halo removal** assumes a fringe of at most ~6 px at the warped size; details thinner than 4 px (drawstrings, lace
+  tips) lose 2 px. `TRYON_HALO_REMOVAL=0` keeps the cleaned image as is.
+- **Too long T-shirts** are cut flat at crotch + 35 % (the hem trim is lost: #17 on male plus).
+- **Demo results** precomputed before this change are stale until `build_demo` is run again.

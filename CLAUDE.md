@@ -147,6 +147,10 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       100 backend tests, tsc, 35 vitest pass. Still to do: prompt 04 (needs credits), quality check, Save/Cancel, delete original.
 - [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.
 - [ ] 8. Try-on: hands/forearms above the garment, `quality_warnings[]`, explicit `POST outfits/` save, screens 10-12 per design.
+      **2026-11-10 (docs/09 #79-84, docs/06 "Layer order" + "Known limits"):** compositing restructured into one layer
+      order (pants -> shoulder cap -> torso -> rigid sleeves -> head/neck -> hands), row warp by `cv2.remap`, flags
+      `TRYON_SHOULDER_CAP` / `TRYON_HEM_SNAP` / `TRYON_HALO_REMOVAL` (default 1). Contact sheets:
+      `tools/tryon_check/matrix.py`. Demo results are stale until `build_demo` is run again. Owner to confirm #82.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

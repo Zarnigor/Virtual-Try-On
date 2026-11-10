@@ -257,3 +257,25 @@ _(none blocking P0)_
     `--ids ... --catalog` (public + approved; refuses garments without a cleaned image or landmarks).
 78. **Demo garments checked against their type** (2026-11-10): #17 `tshirt` (short-sleeved gingham top) and #18 `pants`
     (patched wide-leg trousers) both match (a short-sleeved top is a valid `tshirt`, #46). Nothing deleted.
+
+## Decided 2026-11-10: try-on compositing restructured (owner asked: autonomous, 4 rounds, contact sheets)
+79. **One layer order** (docs/06 "Layer order", `warp.LAYER_ORDER`): avatar -> pants (from their waist row) -> shoulder
+    cap -> T-shirt torso -> rigid sleeves (once each) -> head/neck -> hands/forearms. Replaces the stacked patches of
+    #65, #66 and #71 (shoulder band fill, hem row repetition, sleeve reach-in / torso widening by quad).
+80. **Row warp by `cv2.remap`** (`_warp_rows`): sub-pixel, antialiased, span edges smoothed over 5 control rows; the
+    integer `_scanline_strip` is gone. Garments shrunk below 0.8x are area-resampled first.
+81. **Sleeve region** = outward of the armhole line; rows joined to the torso below the armpit are split along the
+    armpit -> torso-edge line (#17, #28 had the sleeve inside the torso rows: "wings", streaks beside the arms).
+    Sleeves are centred on the arm. The old quad (shoulder, sleeve_end x 1.15, armpit) took a strip of the torso side
+    with it on cap sleeves (#34): the pale panels beside the arms.
+82. **Shoulder landmarks on the sleeves** (span > 1.35 x chest span, #28) are replaced by estimated armhole tops
+    (12 % of the chest span outward of the armpits) with a warning. Proposed default: confirm or re-mark #28.
+83. **Hem snap** stretches the rows below the chest (0..12 px + 4 % of the shoulder width above the pants top ->
+    6 px over it); a T-shirt row over the pants is at least as wide as the pants. Halo: erode 2 px + 4 px ring
+    recolour, once, at the warped size.
+84. **Flags** (structural, default 1, `flags.render_flags`): `TRYON_SHOULDER_CAP`, `TRYON_HEM_SNAP`,
+    `TRYON_HALO_REMOVAL`. None had to be turned off after the 3 rounds. Remaining defects are data/rule limits, listed
+    in docs/06 "Known limits": avatar's own top under crop tops and beside wide necklines, #25 hip bulge on slim
+    avatars, rigid puff sleeves, stale demo results (run `build_demo` again).
+    Check tool: `tools/tryon_check/matrix.py` (contact sheet per garment set, `MATRIX_CROP` for zoomed sheets).
+

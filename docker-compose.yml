@@ -42,6 +42,9 @@ services:
       - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
       - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}
       - TRYON_EDGE_FEATHER=${TRYON_EDGE_FEATHER:-0}
+      - TRYON_SHOULDER_CAP=${TRYON_SHOULDER_CAP:-1}  # structural try-on steps, on by default
+      - TRYON_HEM_SNAP=${TRYON_HEM_SNAP:-1}
+      - TRYON_HALO_REMOVAL=${TRYON_HALO_REMOVAL:-1}
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
@@ -72,6 +75,9 @@ services:
       - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
       - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}
       - TRYON_EDGE_FEATHER=${TRYON_EDGE_FEATHER:-0}
+      - TRYON_SHOULDER_CAP=${TRYON_SHOULDER_CAP:-1}  # structural try-on steps, on by default
+      - TRYON_HEM_SNAP=${TRYON_HEM_SNAP:-1}
+      - TRYON_HALO_REMOVAL=${TRYON_HALO_REMOVAL:-1}
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
