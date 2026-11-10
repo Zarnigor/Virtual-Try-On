@@ -239,7 +239,11 @@ def _rembg_clean(garment):
     import numpy as np
     from apps.tryon_engine.warp import background_color, fill_alpha_holes, opening_mask
     arr = np.array(img)
-    img = Image.fromarray(fill_alpha_holes(arr, opening_mask(arr, background_color(arr))), "RGBA")
+    arr = fill_alpha_holes(arr, opening_mask(arr, background_color(arr)))
+    if settings.GARMENT_FLATTEN_LIGHTING:  # near-solid garments: flatten the photo lighting once (docs/09 #67)
+        from apps.garments.lighting import flatten_lighting
+        arr = flatten_lighting(arr)
+    img = Image.fromarray(arr, "RGBA")
     buf = BytesIO()
     img.save(buf, format="PNG")
 

@@ -214,3 +214,6 @@ _(none blocking P0)_
 66. **Hem over waistband, revised** (2026-11-10, replaces the pants extension of #65, which left maroon lines beside
     the T-shirt): pants are cropped above their waist row; a T-shirt hem within 12 px above the pants waist is extended
     down to 6 px past the pants top; crop tops further up are unchanged.
+67. **Solid-colour garments** (2026-11-10): near-solid garments get 80 % of their low-frequency photo lighting removed
+    once at cleaning (`GARMENT_FLATTEN_LIGHTING`, default 1); prints untouched. Sleeves warped premultiplied (dark
+    edges in the sleeve/torso overlap). Both current demo garments are textured (detail std ~33), so not flattened.

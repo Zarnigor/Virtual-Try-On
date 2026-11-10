@@ -51,6 +51,17 @@ def _alpha_composite(base: np.ndarray, overlay: np.ndarray) -> np.ndarray:
     return np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
 
+def _warp_affine_premultiplied(img: np.ndarray, M: np.ndarray, W: int, H: int) -> np.ndarray:
+    """Bilinear affine warp of a straight-alpha BGRA image without darkening its edges (the colour under alpha 0
+    is black; interpolating straight RGB pulled it into every edge pixel)."""
+    f = img.astype(np.float32)
+    f[:, :, :3] *= f[:, :, 3:4] / 255.0
+    w = cv2.warpAffine(f, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    a = w[:, :, 3:4] / 255.0
+    w[:, :, :3] = np.where(a > 0, w[:, :, :3] / np.maximum(a, 1e-6), 0)
+    return np.clip(np.rint(w), 0, 255).astype(np.uint8)
+
+
 def _bgra(img: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(img, cv2.COLOR_BGR2BGRA) if img.shape[2] == 3 else img
 
@@ -388,7 +399,7 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
         cap = -d * SLEEVE_OVERLAP
         poly = [quad[0] + reach_in + cap, quad[1] + cap, quad[2], quad[3] + reach_in]
         M = np.hstack([Mlin, (S_b - Mlin @ S_g).reshape(2, 1)]).astype(np.float32)
-        warped = cv2.warpAffine(img, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        warped = _warp_affine_premultiplied(img, M, W, H)
         piece = np.zeros((H, W), np.uint8)
         cv2.fillPoly(piece, [np.round(np.array(poly)).astype(np.int32)], 255)
         warped[:, :, 3] = np.where(piece > 0, warped[:, :, 3], 0)

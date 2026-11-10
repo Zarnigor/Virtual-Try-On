@@ -465,3 +465,25 @@ class TshirtFitTests(SimpleTestCase):
         y0, y1 = int(dbg["tshirt_hem"][0]) + 3, int(dbg["pants_waist_y"]) - 3
         np.testing.assert_array_equal(rgb[y0:y1], alone[y0:y1])
         np.testing.assert_allclose(rgb[y0 + 5, 300], base[y0 + 5, 300, :3], atol=1)
+
+
+class SolidColourTests(SimpleTestCase):
+    def test_flags_off_keep_solid_colours_exactly(self):
+        base, lm = avatar()
+        rng = np.random.default_rng(2)
+        base[:, :, :3] = np.clip(base[:, :, :3].astype(int) + rng.integers(-60, 60, base[:, :, :3].shape), 0, 255)
+        g, glm = tshirt(hem_y=260)
+        p, plm = pants()
+        rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)])
+        mask = warp.figure_mask(base)
+        info = {}
+        layers = [warp.garment_layer(t, i, l, lm, H, W, warp.find_arms(mask, lm), info, mask)[0]
+                  for t, i, l in (("pants", p, plm), ("tshirt", g, glm))]
+        k = np.ones((7, 7), np.uint8)
+        head = warp.head_neck_overlay(mask, lm) > 0.001
+        for layer, colour in zip(layers, (PANTS, SHIRT)):
+            inner = (cv2.erode((layer[:, :, 3] == 255).astype(np.uint8), k) > 0) & ~dbg["arm_mask"] & ~head
+            if colour is PANTS:  # under the T-shirt the pants are hidden
+                inner &= ~(layers[1][:, :, 3] > 0)
+            self.assertTrue(inner.sum() > 1000)
+            self.assertTrue((rgb[inner] == np.array(colour[:3])).all(), colour)

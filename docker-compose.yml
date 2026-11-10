@@ -41,6 +41,7 @@ services:
       - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
       - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}
       - TRYON_EDGE_FEATHER=${TRYON_EDGE_FEATHER:-0}
+      - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:
@@ -69,6 +70,7 @@ services:
       - TRYON_SHADING=${TRYON_SHADING:-0}  # try-on realism effects, off by default
       - TRYON_CONTACT_SHADOW=${TRYON_CONTACT_SHADOW:-0}
       - TRYON_EDGE_FEATHER=${TRYON_EDGE_FEATHER:-0}
+      - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:

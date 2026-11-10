@@ -21,6 +21,7 @@ from django.core.management.base import BaseCommand, CommandError
 from apps.avatars.models import Avatar
 from apps.garments.landmark_checks import LandmarksInvalid, validate_garment_landmarks
 from apps.garments.models import Garment
+from apps.garments.lighting import flatten_lighting
 from apps.tryon_engine.demo import DEMO_DIR, load_manifest, manifest_path, pair_key
 from apps.tryon_engine.flags import render_flags
 from apps.tryon_engine.warp import render_tryon
@@ -45,6 +46,10 @@ class Command(BaseCommand):
             if meta.get("type") not in ("tshirt", "pants"):
                 raise CommandError(f"{meta_path.name}: type must be tshirt or pants")
             img = cv2.imread(str(png), cv2.IMREAD_UNCHANGED)
+            if img is not None and img.ndim == 3 and img.shape[2] == 4 and settings.GARMENT_FLATTEN_LIGHTING:
+                # the same processing a cleaned upload gets (docs/09 #67); lighting.py works on RGBA
+                rgba = flatten_lighting(cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA))
+                img = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
             if img is None or img.ndim != 3 or img.shape[2] != 4:
                 raise CommandError(f"{png.name}: must be a transparent (RGBA) PNG")
             try:
@@ -73,7 +78,7 @@ class Command(BaseCommand):
                 g.image.storage.delete(g.image.name)
             g.type, g.name = meta["type"], meta.get("name", stem)[:100]
             g.landmarks, g.visibility, g.status = meta["landmarks"], "public", "approved"
-            g.image.save(f"demo_{stem}.png", ContentFile(png.read_bytes()), save=False)
+            g.image.save(f"demo_{stem}.png", ContentFile(cv2.imencode(".png", img)[1].tobytes()), save=False)
             g.save()
             garments[stem] = (g, img)
             self.stdout.write(f"garment {stem} -> catalog garment {g.pk} ({g.type})")

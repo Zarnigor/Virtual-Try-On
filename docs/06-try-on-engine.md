@@ -129,3 +129,11 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
   left maroon lines beside the shirt). A hem 0..12 px above the pants waist is extended down by repeating its last
   opaque row (alpha 255) to 6 px past the pants top in each column; a crop top further up stays as is.
 - Warning: a row's width vs garment * s beyond 1.3x (e.g. a fitted blouse widened over broad hips).
+
+### Solid colours (2026-11-10, docs/09 #67)
+- `GARMENT_FLATTEN_LIGHTING=1` (default): at cleaning (`_rembg_clean`, and `build_demo` on import) a near-solid
+  garment (`apps/garments/lighting.py`: saturation std <= 20, saturation-weighted hue std <= 12 deg unless grey,
+  std of luminance minus its blur (sigma 8 % of the width) <= 10) gets pixel - 0.8 * (lowfreq - median) per channel.
+  Prints and multi-colour garments are untouched; alpha never changes.
+- With all TRYON_* flags 0 the warp only resamples: rows and sleeves are resized/warped premultiplied, so interior
+  pixels keep the source colour exactly (test `SolidColourTests`).
