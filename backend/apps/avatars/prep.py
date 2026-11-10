@@ -163,7 +163,8 @@ def detect_landmarks(mask: np.ndarray, gray: np.ndarray) -> dict:
         q = crun(y)
         shoulder = {"y": y, "left_x": q[0], "right_x": q[1]}
 
-    chest_y = armpit + 0.025 * fh
+    # Chest = fullest torso row just below the armpit (docs/03; arms are separate runs there).
+    chest_y = arg(armpit + 0.01 * fh, armpit + 0.08 * fh, wid, True)
     # Crotch: the first row below the armpit where the legs separate on the axis. When the thighs touch, that gap
     # opens too low, so a clearly dark seam junction just above the gap wins (docs/03). The prototype's "darkest
     # point in 50-62% of height" alone picked the shorts' waistband on uniform grey shorts.
@@ -200,7 +201,7 @@ def detect_landmarks(mask: np.ndarray, gray: np.ndarray) -> dict:
     kl = kl or (cx - 2, cx - 1)
     kr = kr or (cx + 1, cx + 2)
     leg = lambda q: {"left_x": float(q[0]), "right_x": float(q[1]), "width": float(q[1] - q[0])}  # noqa: E731
-    return {
+    lm = {
         "head_top": {"y": float(top)},
         "neck": span(ny),
         "shoulder": span(shoulder["y"], (shoulder["left_x"], shoulder["right_x"])),
@@ -213,6 +214,51 @@ def detect_landmarks(mask: np.ndarray, gray: np.ndarray) -> dict:
         "ankle": {"left_leg": ankle(0), "right_leg": ankle(1)},
         "foot_bottom": {"y": float(bot)},
     }
+    return fill_missing_edges(lm, mask)
+
+
+def _extent(mask, y):
+    """(left, right) of all figure pixels on row y, or None."""
+    xs = np.nonzero(mask[int(np.clip(round(y), 0, mask.shape[0] - 1))])[0]
+    return (float(xs[0]), float(xs[-1])) if len(xs) else None
+
+
+def fill_missing_edges(lm: dict, mask: np.ndarray) -> dict:
+    """Every editor line has left/right points on the body edge (docs/03). The y-only lines get theirs here:
+    head_top / foot_bottom = extent a few rows inside the figure, armpit = torso run, crotch = outer edges
+    of both legs. Existing values are never changed."""
+    rows = np.where(mask.any(axis=1))[0]
+    if not len(rows):
+        return lm
+    cx = (lm.get("crotch") or {}).get("center_x") or _axis_x(mask)
+
+    def torso(y):
+        r = _runs(mask, y)
+        for q in r:
+            if q[0] <= cx <= q[1]:
+                return (float(q[0]), float(q[1]))
+        return _extent(mask, y)
+
+    def legs_span(y):
+        hip = lm.get("hip") or {}
+        lo, hi = hip.get("left_x", 0) - 15, hip.get("right_x", mask.shape[1]) + 15
+        r = [q for q in _runs(mask, y) if q[1] >= lo and q[0] <= hi]
+        return (float(min(q[0] for q in r)), float(max(q[1] for q in r))) if r else _extent(mask, y)
+
+    finders = {
+        "head_top": lambda y: _extent(mask, min(y + 3, rows[-1])),
+        "foot_bottom": lambda y: _extent(mask, max(y - 3, rows[0])),
+        "armpit": torso,
+        "crotch": legs_span,
+    }
+    for key, find in finders.items():
+        line = lm.get(key)
+        if not isinstance(line, dict) or "y" not in line or ("left_x" in line and "right_x" in line):
+            continue
+        q = find(line["y"])
+        if q and q[1] > q[0]:
+            line["left_x"], line["right_x"] = q
+    return lm
 
 
 ORDER = ["head_top", "neck", "shoulder", "armpit", "chest", "waist", "hip", "crotch", "knee"]

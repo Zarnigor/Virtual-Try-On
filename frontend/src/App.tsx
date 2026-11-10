@@ -14,6 +14,9 @@ import GarmentUpload from './pages/GarmentUpload'
 import LandmarkEditor from './pages/LandmarkEditor'
 import TryOn from './pages/TryOn'
 import Outfits from './pages/Outfits'
+import StaffRoute from './components/StaffRoute'
+import StaffAvatars from './pages/staff/StaffAvatars'
+import StaffAvatarEditor from './pages/staff/StaffAvatarEditor'
 
 export default function App() {
   return (
@@ -32,6 +35,8 @@ export default function App() {
           <Route path="/garments/:id/landmarks" element={<LandmarkEditor />} />
           <Route path="/tryon" element={<TryOn />} />
           <Route path="/outfits" element={<Outfits />} />
+          <Route path="/staff/avatars" element={<StaffRoute><StaffAvatars /></StaffRoute>} />
+          <Route path="/staff/avatars/:id" element={<StaffRoute><StaffAvatarEditor /></StaffRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

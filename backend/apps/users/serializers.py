@@ -23,7 +23,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("id", "email", "is_adult_confirmed", "created_at")
+        fields = ("id", "email", "is_adult_confirmed", "is_staff", "created_at")
+        read_only_fields = ("is_staff",)
 
 
 class LoginSerializer(TokenObtainPairSerializer):

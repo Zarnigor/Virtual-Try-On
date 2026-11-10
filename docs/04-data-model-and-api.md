@@ -9,7 +9,8 @@ behind signed URLs (assumption; S3-compatible later).
 - **Body**: user (OneToOne, unique), normalized image, landmarks (JSON), height_cm (nullable), measurements (JSON, optional),
   measurements_changed_at, confirmed_at (null until confirmed), created_at. Photo/landmarks immutable after confirmed_at.
   The original upload is deleted after normalization.
-- **Avatar**: sex, build (slim|average|plus), image, landmarks (JSON), seeded by command
+- **Avatar**: sex, build (slim|average|plus), image, landmarks (JSON), measurements (JSON, circumference cm), height_cm
+  (nominal, nullable), landmarks_confirmed_at (null = auto-detected; set by the staff editor). Seeded by command or uploaded by staff.
 - **Garment**: owner (FK, null for admin catalog), type (`tshirt` | `pants`), image (cleaned transparent PNG),
   landmarks (JSON), visibility (private|public), status (pending|approved|review|hidden), created_at.
   No image update. The original upload is deleted after cleaning. No garment real-size field.
@@ -42,6 +43,9 @@ General rules
 | PATCH | body/measurements/ | `{height_cm?, measurements?}` | `Body`; 403 `MEASUREMENTS_LOCKED` + `unlock_at` |
 | GET | avatars/ | | `Avatar[]` |
 | GET | avatars/nearest/ | `?sex&height&shoulder&chest&waist&hip` | `Avatar` |
+| GET | staff/avatars/ | (staff only, others 404) | `StaffAvatar[]` (`Avatar` + `height_cm, landmarks_confirmed_at, status: confirmed\|auto`) |
+| GET | staff/avatars/{id}/ | (staff only) | `StaffAvatar`; landmarks not yet confirmed get edge points from the mask (GET never writes) |
+| PATCH | staff/avatars/{id}/landmarks/ | `{landmarks, height_cm?, measurements?}` (staff only) | `StaffAvatar`, sets `landmarks_confirmed_at`; 400 `LANDMARKS_INVALID` (rules in docs/03) |
 | GET | garments/ | `?scope=mine\|catalog\|all&type=tshirt\|pants` | `Garment[]` |
 | POST | garments/ | multipart `photo`, `type`, `name?` | 201 `{garment, job_id}` |
 | GET | garments/{id}/ | | `Garment` (owner, or public+approved) |
@@ -61,6 +65,7 @@ Notes
 - Body fields: `id, image_url, landmarks, height_cm, measurements, confirmed_at, measurements_unlock_at, can_change_measurements, created_at`.
 - Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, visibility, status, owned_by_me, ai_skipped, created_at`.
   `ai_skipped` (read-only) = the AI check was skipped by `AI_DEV_BYPASS` (local dev only): the frontend shows a dev warning.
+- `User` fields: `id, email, is_adult_confirmed, is_staff, created_at` (`is_staff` read-only).
 - Outfit fields: `id, body, avatar, garments[], result_url, realistic_url, created_at`.
 - **Demo mode** (`DEMO_MODE=1`, `apps/tryon_engine/demo.py`): `POST tryon/` for an (avatar, garments) pair built by
   `manage.py build_demo` returns the same 202 shape, but the job is already `done` with `result.demo = true` (no Celery).

@@ -14,7 +14,7 @@
 | neck | span | mid-neck: just above trapezius onset, below the chin |
 | shoulder | span | acromion points on the silhouette: where the edge turns from the sloping trapezius to the near-vertical deltoid |
 | armpit | y only | first row where arms separate from the torso (>= 3 separate segments) |
-| chest | span | armpit + about 2.5% of height; torso only, arms excluded; always >= armpit |
+| chest | span | fullest torso row just below the armpit (armpit + 1..8% of height); arms excluded; always >= armpit |
 | waist | span | narrowest torso row between 35% and 70% of armpit->crotch |
 | hip | span | widest torso row between waist and crotch |
 | crotch | y only | seam junction at the body centre line (darkest point), not "first background row" (fails when thighs touch) |
@@ -24,6 +24,17 @@
 
 "span" = `{y, left_x, right_x, width, center_x}`. Knee: `{y, left_leg:{left_x,right_x,width}, right_leg:{...}}`.
 Never store the "both legs together" width: it measures the gap, not the leg.
+
+**Edge points on every line** (staff editor, auto-detection since 2026-11-10): `head_top`, `armpit`, `crotch` and
+`foot_bottom` also store `left_x` / `right_x` on the body edge (head_top / foot_bottom: extent 3 px inside the figure;
+armpit: torso run; crotch: outer edges of both legs). `crotch.center_x` stays the leg split. The engine ignores the extras.
+
+### Body landmark checks (backend `apps/bodies/landmark_checks.py`, editor `bodyGroups.ts`)
+Used by `PATCH staff/avatars/{id}/landmarks/`. Required: every line above with `y`, `left_x`, `right_x`; `crotch.center_x`;
+`knee {y, left_leg|right_leg {left_x, right_x}}`; `ankle.left_leg|right_leg {y, left_x, right_x}`. Finite numbers inside
+600x1200; `left_x < right_x`; `crotch.left_x < center_x < right_x`; knee and ankle: four x's strictly left to right (legs never
+overlap); vertical order head_top < neck < shoulder < armpit <= chest < waist < hip < crotch < knee < each ankle < foot_bottom.
+On save `width` / `center_x` (spans) and leg `width` / knee leg `y` are recomputed from the points. Failure: 400 `LANDMARKS_INVALID`.
 
 Optional later: `bust` (fullest chest, armpit + 5-8%) separate from `chest` (underarm). Not in MVP.
 

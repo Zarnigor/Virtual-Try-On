@@ -7,13 +7,13 @@ import { MIN_GAP, type GroupDef, type PointDef, type Rules, type XRule, type YRu
  * Colors follow design artboard "VariantC" (light = chip dot, deep = line and point).
  */
 
-const pair = (name: string, base: string, l: number, r: number): PointDef[] => [
+export const pair = (name: string, base: string, l: number, r: number): PointDef[] => [
   { id: `${base}.left_x`, label: `${name}-Sol`, side: 'left', xPath: `${base}.left_x`, mirror: `${base}.right_x`, defX: l },
   { id: `${base}.right_x`, label: `${name}-Oʻng`, side: 'right', xPath: `${base}.right_x`, mirror: `${base}.left_x`, defX: r },
 ]
 
 /** Four points across two legs: outer edges mirror each other, inner edges mirror each other. */
-const legs = (name: string, base: string, d: [number, number, number, number]): PointDef[] => {
+export const legs = (name: string, base: string, d: [number, number, number, number]): PointDef[] => {
   const L = `${base}.left_leg`, R = `${base}.right_leg`
   return [
     { id: `${L}.left_x`, label: `${name}-Sol-Sol`, side: 'left', xPath: `${L}.left_x`, mirror: `${R}.right_x`, defX: d[0] },
@@ -23,7 +23,7 @@ const legs = (name: string, base: string, d: [number, number, number, number]): 
   ]
 }
 
-const C = {
+export const C = {
   orange: { light: '#F4A24A', deep: '#D9730D' },
   purple: { light: '#B07CF5', deep: '#8B4FE0' },
   pink: { light: '#EE5F7A', deep: '#D63A5A' },
@@ -76,11 +76,11 @@ export const groupsFor = (type: GarmentType): GroupDef[] => (type === 'pants' ? 
 
 // ---------- order rules (same as backend apps/garments/landmark_checks.py, plus the editor's MIN_GAP) ----------
 
-const lr = (base: string): XRule => ({ a: `${base}.left_x`, b: `${base}.right_x`, gap: MIN_GAP })
+export const lr = (base: string): XRule => ({ a: `${base}.left_x`, b: `${base}.right_x`, gap: MIN_GAP })
 /** Top-to-bottom chain of group ids. */
-const chain = (...ids: string[]): YRule[] => ids.slice(1).map((b, i) => ({ a: ids[i], b, gap: MIN_GAP }))
+export const chain = (...ids: string[]): YRule[] => ids.slice(1).map((b, i) => ({ a: ids[i], b, gap: MIN_GAP }))
 /** Left-to-right chain across both legs: Sol-Sol < Sol-Oʻng < Oʻng-Sol < Oʻng-Oʻng. */
-const legChain = (base: string): XRule[] => {
+export const legChain = (base: string): XRule[] => {
   const ids = [`${base}.left_leg.left_x`, `${base}.left_leg.right_x`, `${base}.right_leg.left_x`, `${base}.right_leg.right_x`]
   return ids.slice(1).map((b, i) => ({ a: ids[i], b, gap: MIN_GAP }))
 }

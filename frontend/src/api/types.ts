@@ -37,6 +37,8 @@ export interface User {
   id: number
   email: string
   is_adult_confirmed: boolean
+  /** Staff see the /staff pages (avatar editor). */
+  is_staff: boolean
   created_at: string
 }
 
@@ -82,17 +84,18 @@ export interface Point {
 
 /** Body landmarks on the 600x1200 canvas. Names are fixed (docs/03). */
 export interface BodyLandmarks {
-  head_top: { y: number }
+  /** head_top, armpit, crotch, foot_bottom: left_x / right_x are set by the staff editor and auto-detection. */
+  head_top: { y: number; left_x?: number; right_x?: number }
   neck: Span
   shoulder: Span
-  armpit: { y: number }
+  armpit: { y: number; left_x?: number; right_x?: number }
   chest: Span
   waist: Span
   hip: Span
-  crotch: { y: number; center_x?: number }
+  crotch: { y: number; center_x?: number; left_x?: number; right_x?: number }
   knee: { y: number; left_leg: LegSpan; right_leg: LegSpan }
   ankle: { left_leg: LegSpan & { y: number }; right_leg: LegSpan & { y: number } }
-  foot_bottom: { y: number }
+  foot_bottom: { y: number; left_x?: number; right_x?: number }
 }
 
 /** T-shirt landmarks, pixels on the garment's own tight-cropped PNG. */
@@ -174,6 +177,23 @@ export interface Avatar {
   landmarks: Partial<BodyLandmarks>
   /** Reference circumferences in cm. */
   measurements: Measurements
+}
+
+// ---------- staff (is_staff only; others get 404) ----------
+
+/** GET staff/avatars/, GET staff/avatars/{id}/ */
+export interface StaffAvatar extends Avatar {
+  height_cm: number | null
+  landmarks_confirmed_at: string | null
+  /** confirmed = saved in the editor; auto = auto-detected starting point. */
+  status: 'confirmed' | 'auto'
+}
+
+/** PATCH staff/avatars/{id}/landmarks/ */
+export interface StaffLandmarksRequest {
+  landmarks: BodyLandmarks
+  height_cm?: number | null
+  measurements?: Measurements
 }
 
 /** GET avatars/nearest/ query. Model path: all measurements required (rule 20). */

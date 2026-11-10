@@ -1,9 +1,11 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 import DemoBadge from './DemoBadge'
+import { useMe } from './useMe'
 
 export default function Layout() {
-  const { user, logout } = useAuthStore()
+  const { logout } = useAuthStore()
+  const user = useMe()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -64,6 +66,7 @@ export default function Layout() {
             <NavLink to="/wardrobe" style={navStyle}>Liboslar</NavLink>
             <NavLink to="/tryon" style={navStyle}>Sinab koʻrish</NavLink>
             <NavLink to="/outfits" style={navStyle}>Koʻrinishlar</NavLink>
+            {user?.is_staff && <NavLink to="/staff/avatars" style={navStyle}>Avatarlar</NavLink>}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {user && (
