@@ -133,7 +133,7 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `pages/LandmarkEditor.tsx`; rules in docs/09 #37-41; 13 vitest tests (`npm test`). Not yet checked by hand in the browser.
       **Garment sanity checks done (2026-11-09, docs/09 #53-54):** server `apps/garments/landmark_checks.py` (400
       `LANDMARKS_INVALID`), editor clamps moves to the order rules (4 px gap), Save needs every point placed. 35 vitest tests.
-      Still to do: body groups + body sanity checks + BodyConfirm wiring. No ESLint config exists yet (`npm run lint` fails).
+      Body groups + body checks done for the staff editor (docs/09 #72). Still to do: BodyConfirm wiring + checks at confirm. No ESLint config exists yet (`npm run lint` fails).
       Body confirm page must send the edited landmarks to `POST body/confirm/` (BodyConfirm.tsx has a TODO).
 - [ ] 6. Garment pipeline: prompts 01 + 04, quality check, Save/Cancel preview (screen 8), delete original, visibility (screen 9).
       **Prompt 01 done (2026-11-09, docs/09 #45-51, uncommitted):** garment AI check in `run_garment_cleaning` (httpx client

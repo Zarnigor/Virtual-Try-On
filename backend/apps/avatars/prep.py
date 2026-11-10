@@ -246,10 +246,13 @@ def fill_missing_edges(lm: dict, mask: np.ndarray) -> dict:
         return _extent(mask, y)
 
     def legs_span(y):
+        # Legs only: runs that reach the hip span, clipped to it (hands hang beside the hips at this height).
         hip = lm.get("hip") or {}
-        lo, hi = hip.get("left_x", 0) - 15, hip.get("right_x", mask.shape[1]) + 15
+        lo, hi = hip.get("left_x", 0) - 3, hip.get("right_x", mask.shape[1]) + 3
         r = [q for q in _runs(mask, y) if q[1] >= lo and q[0] <= hi]
-        return (float(min(q[0] for q in r)), float(max(q[1] for q in r))) if r else _extent(mask, y)
+        if not r:
+            return _extent(mask, y)
+        return (float(max(lo, min(q[0] for q in r))), float(min(hi, max(q[1] for q in r))))
 
     finders = {
         "head_top": lambda y: _extent(mask, min(y + 3, rows[-1])),

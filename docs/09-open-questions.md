@@ -231,3 +231,29 @@ _(none blocking P0)_
 71. **Double sleeves fixed** (2026-11-10): with shoulder landmarks at the sleeve tips (garment #28), upper-sleeve
     fabric was warped by the torso rows AND sampled again by the rigid sleeve's inward reach (added in 98da3c7).
     Each garment pixel now belongs to the torso or a sleeve, never both; the torso widens to meet the sleeve.
+
+## Decided 2026-11-10: staff avatar editor and staff tools (owner asked for these, built autonomously)
+72. **Staff avatar editor** (`/staff/avatars`, `/staff/avatars/:id`, API `staff/avatars/...`, docs/04): the Variant C
+    editor with body groups (`bodyGroups.ts`). Every line has left/right points on the body edge; `head_top`, `armpit`,
+    `crotch`, `foot_bottom` gained `left_x`/`right_x` (crotch keeps `center_x`). (Interpretation) y-only lines get edges
+    too, so each line can be checked on the silhouette. Saving validates (`apps/bodies/landmark_checks.py`, rules in
+    docs/03), recomputes widths and sets `Avatar.landmarks_confirmed_at`; the engine reads `Avatar.landmarks` (test).
+    Non-staff get **404**, anonymous 401. Not-yet-confirmed avatars get edge points from the mask on GET (never written).
+73. **Shared body pipeline** `apps/bodies/pipeline.py` (EXIF strip -> rembg -> code checks `NO_PERSON`,
+    `HEAD_OR_FEET_CUT`, `FIGURE_CLIPPED` -> 600x1200 -> auto landmarks). Used by `POST staff/avatars/` (synchronous,
+    no AI: staff choose the photos) and `seed_avatars --from` (now any subset of the 6; a reseeded or re-uploaded avatar
+    loses its confirmation). The own-body job is **not** switched to it yet: that is step 4 (waits for the 3b findings).
+74. **`BODY_AI_CHECK_ENABLED`** (default 1): 0 skips prompt 02 on own-body uploads and marks `ai_skipped`; honoured only
+    with DEBUG (adults-only is a hard rule, production always checks).
+75. **Chest = fullest torso row** just below the armpit (armpit + 1..8 % of height), replacing "armpit + 2.5 %". Editor
+    hints use one definition per line for body and garment (`lineHints.ts`): hip widest, waist narrowest, chest
+    fullest, crotch where the legs split.
+76. **cm beside the editor:** width_cm = px width x height_cm / (foot_bottom.y - head_top.y); circumference estimate =
+    ellipse with depth 0.6 x width (Ramanujan), labelled "taxmin", editable, saved with `height_cm` to
+    `Avatar.measurements` (merged). Unconfirmed avatars start from the estimate, confirmed ones from the saved values.
+77. **Staff tools:** `create_staff_user --email` (password from `STAFF_PASSWORD` or a prompt; `is_staff`, not superuser).
+    Staff are exempt from `AI_GARMENT_DAILY_LIMIT` only: the slot is still reserved and the AI check still runs
+    (`AI_DEV_BYPASS` untouched, stays 0); the body limit applies to staff too. `promote_garments --list` and
+    `--ids ... --catalog` (public + approved; refuses garments without a cleaned image or landmarks).
+78. **Demo garments checked against their type** (2026-11-10): #17 `tshirt` (short-sleeved gingham top) and #18 `pants`
+    (patched wide-leg trousers) both match (a short-sleeved top is a valid `tshirt`, #46). Nothing deleted.
