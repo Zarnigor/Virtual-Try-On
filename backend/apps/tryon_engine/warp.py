@@ -225,14 +225,13 @@ def find_arms(mask: np.ndarray, lm: dict) -> dict:
 def _garment_span(alpha: np.ndarray, sy: float, fallback: tuple, side: str | None = None, axis: float = 0.0):
     """The garment's OWN span in source row sy, from its silhouette (bulges, balloon panels and gathered cuffs
     are kept; landmark interpolation made every leg a straight panel). side: one leg (split at the crotch axis);
-    None: the extent within the landmark span +-15 %. Falls back to the landmark span."""
+    None: the runs overlapping the landmark span, to their own ends. Falls back to the landmark span."""
     y = min(max(int(round(sy)), 0), alpha.shape[0] - 1)
     near = (fallback[0] + fallback[1]) / 2
-    if side is None:  # whole piece: the garment's extent within the landmark span +-15 % (a leg gap stays inside)
-        pad = 0.15 * (fallback[1] - fallback[0])
-        lo, hi = max(int(fallback[0] - pad), 0), min(int(fallback[1] + pad) + 1, alpha.shape[1])
-        xs = np.nonzero(alpha[y, lo:hi])[0]
-        run = (int(xs[0]) + lo, int(xs[-1]) + lo) if len(xs) else None
+    if side is None:  # whole piece: the runs that overlap the landmark span, to their own ends (bulges kept;
+        # a leg gap stays inside; a separate run beside it, e.g. a hanging sleeve, is not the torso)
+        runs = [q for q in _runs(alpha[y]) if q[1] >= fallback[0] and q[0] <= fallback[1]]
+        run = (min(q[0] for q in runs), max(q[1] for q in runs)) if runs else None
     else:
         run = _leg_run(alpha, y, side, axis, near)
     if run is None or run[1] - run[0] < 0.3 * (fallback[1] - fallback[0]):
@@ -256,7 +255,6 @@ def _leg_run(mask: np.ndarray, y: int, side: str, axis: float, near: float):
 # ---------- garments ----------
 
 TSHIRT_EASE = 0.04  # shoulder line and every torso row: body + 4 %
-SLEEVE_OVERLAP = 4  # px the rigid sleeve reaches into the torso / above the shoulder cap (no skin wedge)
 NECK_MARGIN = 6  # px each side of the neck landmark width that the head/neck overlay covers
 NECK_FEATHER = 1.5  # px sigma of the head/neck overlay edge (~3 px ramp)
 NECK_ARC = 0.25  # the overlay's lower edge dips by this x neck width at the centre (crew collar arc)
@@ -289,7 +287,8 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     """T-shirt keeps its own silhouette (docs/06 "T-shirt fit"): one uniform scale s for both axes, set so the
     garment's shoulder line = body shoulder + ease; below the shoulders every row is max(garment, body + ease)
     (capped), blended in from the shoulder fit by the chest row; the hem is the garment's own (scaled) length.
-    Sleeves are rigid pieces along the upper arm, reaching a few px into the torso so no skin wedge shows."""
+    Sleeves are rigid pieces along the upper arm; every garment pixel is drawn once (sleeve region by the rigid
+    piece, the rest by the torso rows, which widen to meet the sleeve's inner edge so no skin wedge shows)."""
     warnings: list[str] = []
     g, a = garment_lm, body_lm
     img = _bgra(garment_img)
@@ -326,46 +325,12 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     if info is not None:
         info["tshirt_fit"] = {"ratio": sum(ratios) / len(ratios) if ratios else 1.0, "t": t_loose}
 
-    src_rows, dst_rows, worst = [], [], 1.0
-    # collar / neckline above the shoulder line: uniform scale, centred on the body (no fitting)
-    top = np.where(alpha[:, max(int(g_sl), 0):int(g_sr) + 1].any(axis=1))[0]
-    if len(top) and g_sy - top[0] > 2:
-        for sy in np.arange(float(top[0]), g_sy, 3.0):
-            span = _alpha_span(alpha, sy, g_sl, g_sr)
-            if span:
-                src_rows.append((sy, float(span[0]), float(span[1])))
-                dst_rows.append((to_dst(sy), a_cx + (span[0] - g_cx) * s, a_cx + (span[1] - g_cx) * s))
-    sep_y = _f(a["armpit"]["y"])  # below this the arms are separate in the mask: the torso run is the body
-    axis = _crotch_x(a)
-    for y in _ys(a_sy, hem_y):
-        sy = to_src(y)
-        sl, sr = _interp_span(g_rows, sy)
-        bl, br = body_span(a, y)
-        bw = br - bl
-        w = tshirt_row_width((sr - sl) * s, bw, (y - a_sy) / max(chest_dst - a_sy, 1e-6))
-        c = (1 - t_loose) * (bl + br) / 2 + t_loose * a_cx  # tight follows the torso, loose hangs straight
-        l, r = c - w / 2, c + w / 2
-        if mask is not None and y > sep_y:  # the avatar's own top/shorts never show at the sides
-            run = next((q for q in _runs(mask[min(int(y), H - 1)]) if q[0] <= axis <= q[1]), None)
-            if run and run[1] - run[0] < PANTS_MAX_BODY * bw:
-                l, r = min(l, run[0] - 2), max(r, run[1] + 2)
-        src_rows.append((sy, sl, sr))
-        dst_rows.append((y, l, r))
-        if y >= chest_dst and sr - sl > 1:
-            ratio = (r - l) / ((sr - sl) * s)
-            worst = ratio if abs(np.log(ratio)) > abs(np.log(worst)) else worst
-    if worst > PANTS_DISTORT_LIMIT or worst < 1 / PANTS_DISTORT_LIMIT:
-        warnings.append(f"torso: distorted {max(worst, 1 / worst):.2f}x ({'wider' if worst > 1 else 'narrower'})")
-    result = _scanline_strip(img, src_rows, dst_rows, H, W, [], "torso")
-    torso = [r for r in dst_rows if r[0] >= a_sy]
-
-    def torso_edge(side, y):
-        l, r = _interp_span(torso, y)
-        return l if side == "left" else r
-
-    # Sleeves: rigid (uniform s + rotation onto the upper arm), attached at the shoulder. The body's armpit
-    # landmark is NOT used (it marks where the arms separate in the mask, far below the anatomical armpit).
-    hems = {}
+    # Sleeves first (geometry only): rigid (uniform s + rotation onto the upper arm), attached at the shoulder.
+    # The body's armpit landmark is NOT used (it marks where the arms separate in the mask).
+    gw = img.shape[1]
+    yy, xx = np.mgrid[0:gh, 0:gw]
+    sleeves, hems = {}, {}
+    torso_alpha_keep = np.ones((gh, gw), bool)
     for side in ("left", "right"):
         S_g = np.array([_f(g["shoulder"][f"{side}_x"]), g_sy])
         A_g = np.array([_f(g["chest"][f"{side}_x"]), _f(g["chest"]["y"])])
@@ -391,7 +356,8 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
         R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]) * s
 
         along = v_g * SLEEVE_HEM_EXTEND
-        q = [R @ (c - S_g) for c in (S_g, S_g + along, A_g + along, A_g)]
+        src_quad = [S_g, S_g + along, A_g + along, A_g]
+        q = [R @ (c - S_g) for c in src_quad]
         k = 1.0
         if arm:  # longer than allowed on this arm: shorten along the axis (never stretch)
             limit_y = a_sy + SLEEVE_MAX_ARM * (arm["end_y"] - a_sy)
@@ -405,24 +371,75 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
         Kd = np.eye(2) + (k - 1) * np.outer(d, d)
         Mlin = Kd @ R
         quad = [S_b + Kd @ qi for qi in q]  # S, hem top, hem bottom, armhole bottom (dst)
-        # Overlap: the armhole edge reaches inward past the torso edge (+SLEEVE_OVERLAP) and the cap upward,
-        # sampling the garment's own fabric rigidly, so no skin wedge shows between sleeve and torso.
-        inward = 1.0 if side == "left" else -1.0
-        gap = 0.0
-        for u in np.linspace(0, 1, 9):
-            p = quad[0] + u * (quad[3] - quad[0])
-            if a_sy <= p[1] <= hem_y:
-                gap = max(gap, inward * (torso_edge(side, p[1]) - p[0]))
-        reach_in = np.array([inward * (gap + SLEEVE_OVERLAP), 0.0])
-        cap = -d * SLEEVE_OVERLAP
-        poly = [quad[0] + reach_in + cap, quad[1] + cap, quad[2], quad[3] + reach_in]
         M = np.hstack([Mlin, (S_b - Mlin @ S_g).reshape(2, 1)]).astype(np.float32)
+
+        # Which garment pixels are SLEEVE: the quad, plus everything outward of the shoulder->armpit line above
+        # the armpit (puffed sleeve tops). These are drawn only by this rigid piece, the rest only by the torso,
+        # so every garment pixel is drawn exactly once (docs/09 #71).
+        own = np.zeros((gh, gw), np.uint8)
+        cv2.fillPoly(own, [np.round(np.array(src_quad)).astype(np.int32)], 1)
+        n = np.array([A_g[1] - S_g[1], -(A_g[0] - S_g[0])])  # normal of S->A
+        outward = (xx - S_g[0]) * n[0] + (yy - S_g[1]) * n[1]
+        out_sign = np.sign(((S_g[0] - (1 if side == "left" else -1) * 100) - S_g[0]) * n[0])
+        own = own.astype(bool) | ((np.sign(outward) == out_sign) & (yy <= A_g[1]))
+        torso_alpha_keep &= ~own
+        sleeves[side] = (M, own, quad)
+        hems[side] = (np.float32(quad[1]), np.float32(quad[2]), S_b)
+
+    torso_img = img.copy()
+    torso_img[:, :, 3] = np.where(torso_alpha_keep, img[:, :, 3], 0)
+    t_alpha = torso_img[:, :, 3] > 128
+
+    def armhole_x(side, y):
+        """x of the rigid sleeve's inner edge (S_b -> armhole bottom) at dst row y, or None outside it."""
+        p0, p1 = sleeves[side][2][0], sleeves[side][2][3]
+        if not min(p0[1], p1[1]) <= y <= max(p0[1], p1[1]) or abs(p1[1] - p0[1]) < 1e-6:
+            return None
+        return p0[0] + (y - p0[1]) / (p1[1] - p0[1]) * (p1[0] - p0[0])
+
+    src_rows, dst_rows, worst = [], [], 1.0
+    # collar / neckline above the shoulder line: uniform scale, centred on the body (no fitting)
+    top = np.where(t_alpha[:, max(int(g_sl), 0):int(g_sr) + 1].any(axis=1))[0]
+    if len(top) and g_sy - top[0] > 2:
+        for sy in np.arange(float(top[0]), g_sy, 3.0):
+            span = _alpha_span(t_alpha, sy, g_sl, g_sr)
+            if span:
+                src_rows.append((sy, float(span[0]), float(span[1])))
+                dst_rows.append((to_dst(sy), a_cx + (span[0] - g_cx) * s, a_cx + (span[1] - g_cx) * s))
+    sep_y = _f(a["armpit"]["y"])  # below this the arms are separate in the mask: the torso run is the body
+    axis = _crotch_x(a)
+    for y in _ys(a_sy, hem_y):
+        sy = to_src(y)
+        sl, sr = _garment_span(t_alpha, sy, _interp_span(g_rows, sy))
+        bl, br = body_span(a, y)
+        bw = br - bl
+        w = tshirt_row_width((sr - sl) * s, bw, (y - a_sy) / max(chest_dst - a_sy, 1e-6))
+        c = (1 - t_loose) * (bl + br) / 2 + t_loose * a_cx  # tight follows the torso, loose hangs straight
+        l, r = c - w / 2, c + w / 2
+        if mask is not None and y > sep_y:  # the avatar's own top/shorts never show at the sides
+            run = next((q for q in _runs(mask[min(int(y), H - 1)]) if q[0] <= axis <= q[1]), None)
+            if run and run[1] - run[0] < PANTS_MAX_BODY * bw:
+                l, r = min(l, run[0] - 2), max(r, run[1] + 2)
+        xl, xr = armhole_x("left", y), armhole_x("right", y)  # meet the sleeve's inner edge: no skin wedge
+        l = min(l, xl) if xl is not None else l
+        r = max(r, xr) if xr is not None else r
+        src_rows.append((sy, sl, sr))
+        dst_rows.append((y, l, r))
+        if y >= chest_dst and sr - sl > 1:
+            ratio = (r - l) / ((sr - sl) * s)
+            worst = ratio if abs(np.log(ratio)) > abs(np.log(worst)) else worst
+    if worst > PANTS_DISTORT_LIMIT or worst < 1 / PANTS_DISTORT_LIMIT:
+        warnings.append(f"torso: distorted {max(worst, 1 / worst):.2f}x ({'wider' if worst > 1 else 'narrower'})")
+    result = _scanline_strip(torso_img, src_rows, dst_rows, H, W, [], "torso")
+    torso = [r for r in dst_rows if r[0] >= a_sy]
+
+    for side in ("left", "right"):  # each sleeve pixel drawn once, by its rigid piece (+1 px for anti-aliasing)
+        M, own, _ = sleeves[side]
+        piece = cv2.warpAffine(own.astype(np.uint8) * 255, M, (W, H), flags=cv2.INTER_NEAREST)
+        piece = cv2.dilate(piece, np.ones((3, 3), np.uint8))
         warped = _warp_affine_premultiplied(img, M, W, H)
-        piece = np.zeros((H, W), np.uint8)
-        cv2.fillPoly(piece, [np.round(np.array(poly)).astype(np.int32)], 255)
         warped[:, :, 3] = np.where(piece > 0, warped[:, :, 3], 0)
         result = _alpha_composite(result, warped)
-        hems[side] = (np.float32(quad[1]), np.float32(quad[2]), S_b)
 
     if info is not None:
         info["sleeve_hems"] = hems

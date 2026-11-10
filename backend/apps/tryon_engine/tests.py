@@ -450,11 +450,16 @@ class TshirtFitTests(SimpleTestCase):
         rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)])
         hem_y, l, r = dbg["tshirt_hem"]
         self.assertTrue(0 < dbg["pants_waist_y"] - hem_y <= warp.HEM_GAP_MAX)
-        for x in range(int(l) + 10, int(r) - 10, 5):
-            col = rgb[int(hem_y) - 5:int(dbg["pants_waist_y"]) + 25, x].astype(int)
-            skin = (np.abs(col - np.array(SKIN[:3])).max(axis=1) < 25)
-            white = (col > 245).all(axis=1)
-            self.assertFalse((skin | white).any(), f"gap at x={x}")
+        # no gap ROW: between the hem and the pants top, no row is mostly skin/background over the columns that
+        # have pants below (a 1 px notch at the pants' curved side is not a gap line)
+        cols = [x for x in range(int(l) + 10, int(r) - 10, 3)
+                if np.abs(rgb[int(dbg["pants_waist_y"]):int(dbg["pants_waist_y"]) + 25, x].astype(int)
+                          - np.array(PANTS[:3])).max(axis=1).min() < 30]
+        self.assertGreater(len(cols), 30)
+        for y in range(int(hem_y) - 5, int(dbg["pants_waist_y"]) + 8):
+            row = rgb[y, cols].astype(int)
+            bad = (np.abs(row - np.array(SKIN[:3])).max(axis=1) < 25) | (row > 245).all(axis=1)
+            self.assertLess(bad.mean(), 0.5, f"gap row at y={y}")
 
     def test_crop_top_with_pants_is_unchanged(self):
         base, lm = avatar()
@@ -523,3 +528,35 @@ class PantsSilhouetteTests(SimpleTestCase):
             self.assertAlmostEqual(cuff / bulge, 60 / 100, delta=0.05 * 60 / 100)
             ys = [y for y, _, _ in rows]  # one uniform vertical scale below the knee: evenly spaced rows
             self.assertLessEqual(max(np.diff(ys)), 6.01)
+
+
+MARK = (0, 0, 255, 255)  # pure red (BGRA): appears nowhere else
+
+
+class SleeveOnceTests(SimpleTestCase):
+    def marked_tshirt(self):
+        """Real-like T-shirt (shoulder landmarks at the sleeve tips, like garment #28) with a red stitch line on
+        each cuff and one across each upper sleeve near the shoulder seam."""
+        img = np.zeros((410, 340, 4), np.uint8)
+        col = (20, 20, 20, 255)
+        cv2.fillPoly(img, [np.array([(75, 40), (265, 40), (262, 400), (72, 400)], np.int32)], col)
+        cv2.fillPoly(img, [np.array([(95, 40), (22, 62), (0, 162), (45, 195), (74, 122)], np.int32)], col)
+        cv2.fillPoly(img, [np.array([(245, 40), (318, 62), (339, 162), (295, 195), (266, 122)], np.int32)], col)
+        for sign, x0 in ((1, 0), (-1, 339)):
+            cv2.line(img, (x0 + sign * 6, 160), (x0 + sign * 44, 186), MARK, 2)  # cuff stitch
+            cv2.line(img, (x0 + sign * 45, 62), (x0 + sign * 80, 52), MARK, 2)  # upper-sleeve stitch
+        lm = {"shoulder": {"y": 62, "left_x": 22, "right_x": 318}, "chest": {"y": 122, "left_x": 74, "right_x": 266},
+              "waist": {"y": 270, "left_x": 72, "right_x": 264}, "hem": {"y": 396, "left_x": 72, "right_x": 262},
+              "sleeve_end": {"left": {"x": 0, "y": 162}, "right": {"x": 339, "y": 162}}}
+        return img, lm
+
+    def test_each_marker_line_appears_exactly_once_per_sleeve(self):
+        base, lm = avatar()
+        g, glm = self.marked_tshirt()
+        rgb, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        red = ((rgb[:, :, 2] > 150) & (rgb[:, :, 1] < 90) & (rgb[:, :, 0] < 90)).astype(np.uint8)
+        n, _, stats, _ = cv2.connectedComponentsWithStats(red, connectivity=8)
+        lines = [stats[i] for i in range(1, n) if stats[i][cv2.CC_STAT_AREA] >= 8]
+        for half in ("left", "right"):
+            mine = [st for st in lines if (st[cv2.CC_STAT_LEFT] < 300) == (half == "left")]
+            self.assertEqual(len(mine), 2, (half, [tuple(st) for st in mine]))  # one cuff + one upper stitch

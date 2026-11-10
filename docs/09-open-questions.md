@@ -228,3 +228,6 @@ _(none blocking P0)_
     #19/#26/#27 had been deleted in the app).
 70. **Pants silhouette bug** (2026-11-10): the straight lower panel came from landmark-interpolated row spans
     (crotch -> knee -> hem), not from the centreline rule. Rows now use the garment's own silhouette span.
+71. **Double sleeves fixed** (2026-11-10): with shoulder landmarks at the sleeve tips (garment #28), upper-sleeve
+    fabric was warped by the torso rows AND sampled again by the rigid sleeve's inward reach (added in 98da3c7).
+    Each garment pixel now belongs to the torso or a sleeve, never both; the torso widens to meet the sleeve.

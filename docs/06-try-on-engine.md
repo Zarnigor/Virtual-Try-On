@@ -145,3 +145,10 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
   crotch axis; waist..crotch: the extent within the landmark span +-15 %. Landmark span = fallback.
 - Final width = max(garment span * s, body + ease) (capped); only the centreline is smoothed. Below the knee the
   rows keep the single vertical scale (full-length legs: hem snapped to the ankle, one linear map per leg).
+
+### Sleeves drawn once (2026-11-10, docs/09 #71)
+- Garment pixels are split once in the source: SLEEVE = the rigid sleeve quad (shoulder, sleeve_end x 1.15,
+  armpit) plus everything outward of the shoulder->armpit line above the armpit; TORSO = the rest. The torso rows
+  warp only torso pixels, each rigid sleeve only its own (+1 px dilation for anti-aliasing). No inward reach-in.
+- The torso rows widen to the rigid sleeve's inner edge where it lies outside them, so no skin wedge shows.
+- Torso row spans come from the torso silhouette (runs overlapping the landmark span), like the pants.
