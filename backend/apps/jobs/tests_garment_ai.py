@@ -374,6 +374,43 @@ class GarmentAIJobTests(MediaTestCase):
         self.assertTrue(GarmentSerializer(g, context={"request": request}).data["ai_skipped"])
         self.assertEqual(limits.counted_today(self.user.pk, KIND), 0)
 
+    # --- AI cleaning flag (prompt 04, docs/09 #55) ---
+
+    @override_settings(AI_CLEANING_ENABLED=False)
+    def test_cleaning_off_uses_rembg_only(self):
+        g, job = self.upload("tshirt", image_bytes((200, 30, 30)))
+        with FakeGemini(gemini_reply(TSHIRT)) as fake:
+            job = self.run_job(job)
+        self.assertEqual(job.status, "done", job.error_code)
+        self.assertEqual(len(fake.requests), 1)  # prompt 01 only, no image-model call
+        g.refresh_from_db()
+        with g.image.open("rb") as f:
+            out = Image.open(f)
+            out.load()
+        self.assertEqual((out.format, out.mode), ("PNG", "RGBA"))  # alpha channel added
+        self.assertEqual(out.size, (300, 400))  # cropped to the mask bounding box
+        with g.original_image.open("rb") as f:
+            src = Image.open(f).convert("RGB")
+        self.assertEqual(out.getpixel((150, 200)), (*src.getpixel((200, 250)), 255))  # original pixels kept
+
+    @override_settings(AI_CLEANING_ENABLED=True)
+    def test_cleaning_on_fails_clearly_without_spending_ai(self):
+        g, job = self.upload("tshirt")
+        with FakeGemini() as fake, self.assertLogs("apps.jobs.tasks", "ERROR"):
+            job = self.run_job(job)
+        self.assertEqual((job.status, job.error_code), ("failed", "CLEAN_FAILED"))
+        self.assertIn("AI_CLEANING_ENABLED", job.error_detail)
+        self.assertEqual(len(fake.requests), 0)
+        self.assertEqual(limits.counted_today(self.user.pk, KIND), 0)
+        self.assertFalse(Garment.objects.filter(pk=g.pk).exists())
+
+    @override_settings(GEMINI_VALIDATION_MODEL="model-from-env")
+    def test_model_name_comes_only_from_the_setting(self):
+        g, job = self.upload("tshirt")
+        with FakeGemini(gemini_reply(TSHIRT)) as fake:
+            self.run_job(job)
+        self.assertEqual(fake.requests[0].url.path, "/v1beta/models/model-from-env:generateContent")
+
     # --- daily limit ---
 
     @override_settings(AI_GARMENT_DAILY_LIMIT=1)
