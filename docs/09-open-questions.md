@@ -176,3 +176,16 @@ _(none blocking P0)_
     the job fails at once with `CLEAN_FAILED` (clear detail) before prompt 01, so no AI call or daily slot is spent.
     Also: `AI_DEV_BYPASS` now defaults to `0` in `.env.example` and in the docker-compose fallback (never bypass unless
     `.env` says so). The model name for prompt 01 comes only from `GEMINI_VALIDATION_MODEL`.
+
+## Decided 2026-11-10: real avatars, try-on engine, demo mode (owner asked for these steps)
+56. **Real avatars** from `./avatars` (6 JPG, 2400x1792, landscape): `seed_avatars --from /avatars`. Never stretched: one
+    uniform scale = min(1100 / figure height, (300 - 10) / widest half from the body axis), padded to 600x1200 RGBA,
+    figure top y=50, axis x=300; clipping fails loudly. File names map by tokens (`man_slim`, `woman_plus_size` ...).
+    Initial landmarks per avatar from its own mask (no shared defaults); crotch = leg gap, or a seam > 30 grey levels
+    darker just above it when the thighs touch (male plus). Staff editor = source of truth (not built yet).
+    The backend start no longer overwrites seeded avatars (placeholder mode only creates missing ones; `--force`).
+57. **Scanline engine kept** (no mesh warp, item 19): rules in docs/06 "Engine as built". Lengths follow the garment,
+    widths follow the body; rigid sleeves along the outer silhouette, at most half the arm; hands redrawn above.
+58. **Demo mode** (`DEMO_MODE=1`): `build_demo --garments <folder>` precomputes every avatar x garment and T-shirt+pants
+    pair; covered pairs are served as finished jobs (no Celery/Gemini), others take the normal path. Demo garments are
+    approved catalog garments. Public `GET /api/config/` exposes the flag; the UI shows "DEMO".

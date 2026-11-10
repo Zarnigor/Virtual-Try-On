@@ -104,7 +104,9 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
 
 - [ ] 1. Day-1 experiment, properly: 3 real male avatars (avatar-prep + landmark editor), fix sleeves
       (anchor shoulder->about 40% of the arm, not down to the hand), per-leg pants on real separated legs.
-      Then log the scanline-vs-mesh decision (docs/09 item 19, docs/06). **Blocked on the owner: real avatar photos.**
+      Then log the scanline-vs-mesh decision (docs/09 item 19, docs/06).
+      **2026-11-10:** real photos seeded (`seed_avatars --from /avatars`, docs/09 #56); engine reworked and scanline kept
+      (docs/09 #57, docs/06 "Engine as built"); before/after check `tools/tryon_check/run.py`. Left: staff landmark editor.
 - [x] 2. Frontend and backend agree: API contract in docs/04 + `frontend/src/api/types.ts`; paths/fields fixed.
       Committed (e54f802). Environment runs (2026-11-09): Docker via OrbStack, all 5 services up, `manage.py check`,
       migrations and `tsc --noEmit` clean; a 30-check API smoke test passed (register -> body -> garment clean ->
@@ -146,6 +148,8 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
 - [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.
 - [ ] 8. Try-on: hands/forearms above the garment, `quality_warnings[]`, explicit `POST outfits/` save, screens 10-12 per design.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
+      **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
+      README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.
 - [ ] 10. P1 if time: realistic render (prompt 05).
 
 Open questions for the owner (ask once, then log the answers in docs/09):
@@ -154,4 +158,4 @@ Environment: everything runs in Docker (OrbStack). The Mac has git but no host P
 containers (`docker compose exec -T backend ...`, `docker compose exec -T frontend ...`). Add `~/.orbstack/bin` to PATH.
 
 Known gaps that are not bugs in the contract: frontend pages do not follow the design yet (nav names, missing screens
-3, 5, 6, 8, 9, 12, emojis, no locale file). Seeded avatars are drawn placeholders from `seed/avatars.reference.json`.
+3, 5, 6, 8, 9, 12, emojis, no locale file). Avatars are real photos (`./avatars`, not in git); the drawn placeholders are only created when an avatar is missing.
