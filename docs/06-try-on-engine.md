@@ -80,3 +80,12 @@ Scanline strips (torso, pants) + rigid affine sleeves. Diagnosed on the 6 real a
 - Each leg is centred on the body leg's centreline (crotch -> knee -> ankle landmarks), so wide stances get legs on legs;
   near the crotch the leg blends into the waist block. A full-length hem sits on the ankle line.
 - Warning: a row's horizontal scale vs `s` beyond 1.3x (e.g. narrow pants widened over a plus-size body).
+
+### Realism pass (2026-11-10, docs/09 #60, `render_tryon`)
+- Shading: `shading_map` = avatar luminance / its blur (sigma 25, normalised to the garment area), clipped 0.75..1.2,
+  smoothed; garment RGB *= shade ** 0.7 (`shading_strength`, 0 = off). Alpha is never changed.
+- Edges: the 1 px rim is dropped (photo background fringe) and the alpha feathered by ~1 px (colour grown from inside).
+- Contact shadow: blurred garment alpha, 2 px inward and 3 px down, opacity 0.25, only on the figure, under the garment.
+- Pants hang: leg centre = w * body leg line + (1 - w) * straight drop from the crotch row; w = 1 when the garment row is
+  within 1.15x of the leg, 0.5 from 1.35x (linear between). The body leg in the mask is still always covered.
+- Waistband: the top edge dips 4 % of the waist width at the centre (content bent with `cv2.remap`, fading by the hip).

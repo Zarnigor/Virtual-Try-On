@@ -214,3 +214,28 @@ class PantsWidthTests(SimpleTestCase):
         left = cols[cols < 300]
         knee_w = lm["knee"]["left_leg"]["right_x"] - lm["knee"]["left_leg"]["left_x"]
         self.assertLess(left.max() - left.min(), 1.25 * knee_w)
+
+
+class ShadingTests(SimpleTestCase):
+    def test_shading_map_range_and_flat_is_neutral(self):
+        base, _ = avatar()
+        rng = np.random.default_rng(0)
+        base[:, :, :3] = np.clip(base[:, :, :3].astype(int) + rng.integers(-80, 80, base[:, :, :3].shape), 0, 255)
+        region = np.zeros((H, W), bool)
+        region[500:900, 200:400] = True
+        shade = warp.shading_map(base, region)
+        lo, hi = warp.SHADING_RANGE
+        self.assertGreaterEqual(shade.min(), lo - 1e-6)
+        self.assertLessEqual(shade.max(), hi + 1e-6)
+        self.assertTrue((shade[~region] == 1.0).all())
+        flat = np.full((H, W, 4), 128, np.uint8)
+        np.testing.assert_allclose(warp.shading_map(flat, region)[region], 1.0, atol=1e-3)
+
+    def test_shading_never_changes_alpha(self):
+        layer = np.zeros((H, W, 4), np.uint8)
+        layer[100:200, 100:200] = (100, 150, 200, 180)
+        shade = np.full((H, W), 0.8, np.float32)
+        out = warp.apply_shading(layer, shade)
+        np.testing.assert_array_equal(out[:, :, 3], layer[:, :, 3])
+        self.assertLess(out[150, 150, 0], 100)
+        np.testing.assert_array_equal(warp.apply_shading(layer, shade, strength=0)[:, :, :3], layer[:, :, :3])

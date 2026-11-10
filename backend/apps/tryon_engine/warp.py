@@ -23,6 +23,15 @@ SLEEVE_MAX_ARM = 0.5  # short sleeves end at most half way down the arm (shoulde
 SLEEVE_HEM_EXTEND = 1.15  # src sleeve quad is extended a bit so hem trims/lace past sleeve_end are kept
 MAX_SHIRT_BELOW_CROTCH = 0.35  # T-shirt hem at most this fraction of crotch->knee below the crotch
 FULL_LENGTH_TOLERANCE = 0.05  # pants ending within 5% of figure height (~9 cm) of the ankle break over the shoe
+SHADING_STRENGTH = 0.7  # garment RGB *= shade ** strength (0 = off)
+SHADING_SIGMA = 25  # px: luminance below this scale is kept as folds/shadow, above it is the avatar's base tone
+SHADING_RANGE = (0.75, 1.2)
+SHADOW_OPACITY = 0.25  # contact shadow of the garment on the avatar
+SHADOW_OFFSET = (2, 3)  # px inward (towards the axis) and down
+SHADOW_SIGMA = 4
+HANG_LOOSE = 0.5  # loose leg: centreline weight of the body leg (rest: straight drop from the hip)
+HANG_TIGHT_RATIO, HANG_LOOSE_RATIO = 1.15, 1.35  # garment/leg width: <= tight = body line, >= loose = HANG_LOOSE
+WAISTBAND_CURVE = 0.04  # waistband top edge dips by this fraction of the waist width at the centre
 WHITE_THRESHOLD = 235  # base images without transparency: figure = pixels darker than this in any channel
 
 
@@ -355,6 +364,22 @@ def _ys(y0: float, y1: float, step: int = 6) -> list[float]:
     return [float(y) for y in ys] + [float(y1)]
 
 
+def curve_waistband(layer: np.ndarray, top_y: float, hip_y: float, lx: float, rx: float,
+                    depth: float = WAISTBAND_CURVE) -> np.ndarray:
+    """Bend the straight waistband top into a slight curve: the centre drops by depth * waist width, the sides stay;
+    the bend fades out by the hip row (content is moved, not cut)."""
+    H, W = layer.shape[:2]
+    half = max((rx - lx) / 2, 1.0)
+    xs = np.arange(W, dtype=np.float32)
+    u = np.clip((xs - (lx + rx) / 2) / half, -1, 1)
+    drop = depth * (rx - lx) * (1 - u * u)  # per column
+    ys = np.arange(H, dtype=np.float32)[:, None]
+    fade = np.clip(1 - (ys - top_y) / max(hip_y - top_y, 1.0), 0, 1)
+    map_y = (ys - drop[None, :] * fade).astype(np.float32)
+    map_x = np.repeat(xs[None, :], H, axis=0)
+    return cv2.remap(layer, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+
+
 def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
                arms: dict | None = None, info: dict | None = None,
                mask: np.ndarray | None = None) -> tuple[np.ndarray, list]:
@@ -403,6 +428,7 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
         if t >= 1:
             track("waist-crotch", sr - sl, w)
     result = _scanline_strip(img, src_rows, dst_rows, H, W, [], "waist-crotch")
+    result = curve_waistband(result, a_wy, hip_dst, dst_rows[0][1], dst_rows[0][2])
     block_l, block_r = dst_rows[-1][1], dst_rows[-1][2]
 
     g_cx, a_cx = _f(g["crotch"]["center_x"]), _crotch_x(a)
@@ -424,6 +450,7 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
         knee_run = _leg_run(mask, int(a_kn_y), side, a_cx, (body_rows[1][1] + body_rows[1][2]) / 2) \
             if mask is not None else None
         knee_bw = (knee_run[1] - knee_run[0]) if knee_run else body_rows[1][2] - body_rows[1][1]
+        drop_x = (body_rows[0][1] + body_rows[0][2]) / 2  # leg centre at the crotch row, dropped straight down
         src_rows, dst_rows = [], []
         for y in _ys(cr_dst, hem_dst):
             sy = g_cr + (y - cr_dst) * s_leg
@@ -432,6 +459,11 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
             c = (bl + br) / 2  # the body leg's centreline from the landmarks
             run = _leg_run(mask, int(y), side, a_cx, c) if mask is not None else None
             bw = (run[1] - run[0]) if run else br - bl
+            # hang: loose legs fall between the body line and a straight drop from the hip (no V on wide stances)
+            ratio = (sr - sl) * s / max(bw, 1e-6)
+            t = min(max((ratio - HANG_TIGHT_RATIO) / (HANG_LOOSE_RATIO - HANG_TIGHT_RATIO), 0), 1)
+            wb = 1 - t * (1 - HANG_LOOSE)
+            c = wb * c + (1 - wb) * drop_x
             w = pants_width((sr - sl) * s, bw, cap_ref=knee_bw if y > a_kn_y else None)
             l, r = c - w / 2, c + w / 2
             if run:  # the body's leg in the mask is always covered
@@ -449,6 +481,66 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
         if r > PANTS_DISTORT_LIMIT or r < 1 / PANTS_DISTORT_LIMIT:
             warnings.append(f"{label}: distorted {max(r, 1 / r):.2f}x ({'wider' if r > 1 else 'narrower'})")
     return result, warnings
+
+
+# ---------- realism (shading, edges, contact shadow) ----------
+
+def shading_map(base: np.ndarray, region: np.ndarray, sigma: float = SHADING_SIGMA,
+                lo: float = SHADING_RANGE[0], hi: float = SHADING_RANGE[1]) -> np.ndarray:
+    """HxW float32 shade from the avatar's own luminance: gray / blur(gray) inside `region` (blur normalised by
+    the region so the white background does not leak in), clipped to lo..hi and smoothed; 1.0 outside."""
+    gray = cv2.cvtColor(np.ascontiguousarray(base[:, :, :3]), cv2.COLOR_BGR2GRAY).astype(np.float32)
+    m = region.astype(np.float32)
+    if not m.any():
+        return np.ones(region.shape, np.float32)
+    num = cv2.GaussianBlur(gray * m, (0, 0), sigma)
+    den = cv2.GaussianBlur(m, (0, 0), sigma)
+    shade = np.where(m > 0, gray / np.maximum(num / np.maximum(den, 1e-6), 1.0), 1.0)
+    shade = cv2.GaussianBlur(np.clip(shade, lo, hi).astype(np.float32), (0, 0), 1.5)
+    return np.where(m > 0, np.clip(shade, lo, hi), 1.0).astype(np.float32)
+
+
+def apply_shading(layer: np.ndarray, shade: np.ndarray, strength: float = SHADING_STRENGTH) -> np.ndarray:
+    """BGRA layer with RGB multiplied by shade ** strength. Alpha is never modified."""
+    out = layer.copy()
+    out[:, :, :3] = np.clip(layer[:, :, :3].astype(np.float32) * (shade ** strength)[:, :, None], 0, 255)
+    return out
+
+
+def soften_edges(layer: np.ndarray) -> np.ndarray:
+    """Drop the 1 px rim (often the photo's background colour), then feather the alpha edge by about 1 px.
+    The colour under the feathered fringe is taken from the nearest garment pixels (no dark halo)."""
+    a = layer[:, :, 3]
+    if not a.any():
+        return layer
+    k = np.ones((3, 3), np.uint8)
+    inner = cv2.erode(a, k)
+    rgb = layer[:, :, :3].copy()
+    solid = inner > 0
+    fill = rgb * solid[:, :, None]
+    for _ in range(2):  # grow the inner colours outwards over the rim and the feather
+        grown = cv2.dilate(fill, k)
+        grown_m = cv2.dilate(solid.astype(np.uint8), k) > 0
+        fill = np.where(solid[:, :, None], fill, grown)
+        solid = grown_m
+    out = np.empty_like(layer)
+    out[:, :, :3] = fill
+    out[:, :, 3] = cv2.GaussianBlur(inner, (0, 0), 0.8)
+    return out
+
+
+def contact_shadow(alpha: np.ndarray, figure: np.ndarray, axis_x: float,
+                   opacity: float = SHADOW_OPACITY) -> np.ndarray:
+    """HxW float32 darkening (0..opacity) cast by the garment on the avatar: blurred alpha shifted down and
+    inward, only on the figure (never on the background)."""
+    H, W = alpha.shape
+    dx, dy = SHADOW_OFFSET
+    a = alpha.astype(np.float32) / 255.0
+    shifted = np.zeros_like(a)
+    ax = int(round(axis_x))
+    shifted[dy:, dx:ax] = a[:H - dy, :ax - dx]  # left half moves right
+    shifted[dy:, ax:W - dx] = a[:H - dy, ax + dx:]  # right half moves left
+    return cv2.GaussianBlur(shifted, (0, 0), SHADOW_SIGMA) * opacity * figure
 
 
 # ---------- full render ----------
@@ -476,7 +568,8 @@ def arm_overlay_mask(mask: np.ndarray, arms: dict, sleeve_hems: dict | None) -> 
     return out & mask
 
 
-def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600):
+def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600,
+                 shading_strength: float = SHADING_STRENGTH):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Pants are drawn under the T-shirt.
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
@@ -493,6 +586,11 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
             continue
         warped, warns = fn(body_lm, glm, gimg, H, W, arms=arms, info=info, mask=mask)
         warnings += [f"{gtype}: {w}" for w in warns]
+        warped = soften_edges(warped)
+        shade = shading_map(base, mask & (warped[:, :, 3] > 0))
+        warped = apply_shading(warped, shade, shading_strength)
+        dark = contact_shadow(warped[:, :, 3], mask, _crotch_x(body_lm))
+        canvas[:, :, :3] = (canvas[:, :, :3].astype(np.float32) * (1 - dark[:, :, None])).astype(np.uint8)
         canvas = _alpha_composite(canvas, warped)
 
     keep = arm_overlay_mask(mask, arms, info.get("sleeve_hems"))

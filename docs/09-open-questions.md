@@ -194,3 +194,6 @@ _(none blocking P0)_
     the hip a row is max(garment, body + 4 %), capped at 1.8x body (knee width below the knee, so cuffs are not
     squeezed); legs centred on the body's leg centreline. Warnings only when a row's scale differs from the uniform
     scale by > 1.3x. T-shirt keeps the old "widths follow the body" model for now.
+60. **Realism pass** (2026-11-10, docs/06 "Realism pass"): shading from the avatar's luminance (strength 0.7), 1 px
+    rim removal + feather, 0.25 contact shadow on the figure, loose pants hang half way to a vertical drop, curved
+    waistband top. Pure 2D post-processing of the warped garment; nothing of the avatar is redrawn.
