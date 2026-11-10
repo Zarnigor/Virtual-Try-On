@@ -15,7 +15,7 @@ done
 echo "Running migrations..."
 python manage.py migrate --noinput
 
-echo "Seeding avatars (skip if already seeded)..."
+echo "Seeding missing placeholder avatars (existing avatars are kept)..."
 python manage.py seed_avatars || true
 
 echo "Starting server..."

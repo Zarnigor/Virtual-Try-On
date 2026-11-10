@@ -3,7 +3,7 @@ from unittest import mock
 
 import cv2
 import numpy as np
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 from PIL import Image
 
 from apps.avatars import prep
@@ -79,3 +79,30 @@ class DetectTests(SimpleTestCase):
         self.assertAlmostEqual(lm["waist"]["left_x"], ref["waist"]["left_x"], delta=6)
         for leg in ("left_leg", "right_leg"):
             self.assertLess(lm["ankle"][leg]["width"], lm["knee"][leg]["width"])
+
+
+class PlaceholderSeedTests(TestCase):
+    """seed_avatars runs on every backend start: without --force it must not touch seeded avatars."""
+
+    def test_existing_avatars_are_kept(self):
+        import shutil
+        import tempfile
+        from django.core.files.base import ContentFile
+        from django.core.management import call_command
+        from django.test import override_settings
+        from apps.avatars.models import Avatar
+
+        media = tempfile.mkdtemp()
+        try:
+            with override_settings(MEDIA_ROOT=media):
+                real = Avatar(sex="male", build="slim", landmarks={"real": True})
+                real.image.save("real.png", ContentFile(b"real"), save=True)
+                call_command("seed_avatars", stdout=open("/dev/null", "w"))
+                real.refresh_from_db()
+                self.assertEqual(real.landmarks, {"real": True})
+                self.assertEqual(Avatar.objects.count(), 6)  # the 5 missing ones were created
+                call_command("seed_avatars", force=True, stdout=open("/dev/null", "w"))
+                real.refresh_from_db()
+                self.assertNotIn("real", real.landmarks)
+        finally:
+            shutil.rmtree(media, ignore_errors=True)

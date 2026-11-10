@@ -121,12 +121,14 @@ class Command(BaseCommand):
     help = "Seed the 6 avatars from real photos (--from DIR) or as drawn placeholders"
 
     def add_arguments(self, parser):
-        parser.add_argument("--from", dest="src", help="folder with the 6 avatar photos")
+        parser.add_argument("--from", dest="src", help="folder with the 6 avatar photos (always updates)")
+        parser.add_argument("--force", action="store_true",
+                            help="placeholder mode: overwrite existing avatars too (default: only create missing)")
 
     def handle(self, *args, **options):
         if options["src"]:
             return self._from_photos(Path(options["src"]))
-        self._placeholders()
+        self._placeholders(force=options["force"])
 
     def _from_photos(self, folder: Path):
         from PIL import Image
@@ -172,10 +174,16 @@ class Command(BaseCommand):
             )
         self.stdout.write(self.style.SUCCESS("6 avatars seeded from photos. Check the landmarks in the editor."))
 
-    def _placeholders(self):
+    def _placeholders(self, force=False):
+        """Drawn placeholders. Runs on every backend start (entrypoint.sh), so by default it only CREATES
+        missing avatars: it must never overwrite avatars seeded from real photos."""
         data = json.loads(SEED_JSON.read_text())["avatars"]
         for key, av_data in data.items():
             sex, build = key.split("_", 1)
+            existing = Avatar.objects.filter(sex=sex, build=build).exclude(image="").exclude(image__isnull=True).first()
+            if existing and not force:
+                self.stdout.write(f"Kept: {key} (already seeded; --force overwrites)")
+                continue
             lm = {**av_data["landmarks"], "qa": av_data.get("qa", {})}
             col = COLOURS.get(key, (100, 130, 160))
             img_bytes = render_avatar(lm, col)
@@ -187,4 +195,4 @@ class Command(BaseCommand):
             avatar.save()
             self.stdout.write(f"{'Created' if created else 'Updated'}: {key}")
 
-        self.stdout.write(self.style.SUCCESS("6 avatar muvaffaqiyatli yuklandi."))
+        self.stdout.write(self.style.SUCCESS("Placeholder avatars checked."))
