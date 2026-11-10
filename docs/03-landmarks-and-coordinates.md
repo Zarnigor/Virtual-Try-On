@@ -46,6 +46,9 @@ MVP types:
 | pants | waist, hip, crotch, knee (per leg), hem (per leg) |
 Later (not MVP): skirt, dress, outerwear, long sleeves.
 Deformation pairs garment and body landmarks by identical names.
+**Same definition on body and garment** (editor hint per line, `components/landmark-editor/lineHints.ts`): chest = fullest
+point, waist = narrowest, hip = widest point of the hips, crotch = where the legs split, knee = centre of the knee joint;
+hem = lowest edge of the garment, sleeve_end = outermost point of the sleeve.
 
 ## Sanity checks (frontend AND backend)
 - Vertical order: head_top < neck < shoulder < armpit <= chest < waist < hip < crotch < knee < ankle < foot_bottom

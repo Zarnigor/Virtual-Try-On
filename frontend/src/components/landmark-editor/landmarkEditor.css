@@ -106,3 +106,13 @@
 
 .le-actions { margin-top: auto; display: flex; gap: 10px; }
 .le-actions .btn { flex: 1; height: 44px; }
+
+.le-def {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.4;
+}

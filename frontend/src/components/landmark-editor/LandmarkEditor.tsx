@@ -4,6 +4,7 @@ import {
   NO_RULES, axisX, findPoint, fromLandmarks, movePoint, nudgePoint, saveState, snapCenters, toLandmarks,
   type Bounds, type EditorState, type GroupDef, type Rules,
 } from './geometry'
+import { hintFor } from './lineHints'
 import './landmarkEditor.css'
 
 /**
@@ -275,6 +276,10 @@ export default function LandmarkEditor({
               </button>
             ))}
           </div>
+
+          {hintFor(active.group.id) && (
+            <p className="le-def" role="note">{hintFor(active.group.id)}</p>
+          )}
 
           <div
             ref={loupeRef}
