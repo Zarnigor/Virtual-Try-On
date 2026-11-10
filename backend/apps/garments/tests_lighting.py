@@ -1,9 +1,15 @@
 """Lighting flattening of near-solid garments (apps/garments/lighting.py)."""
+from io import StringIO
+
 import cv2
 import numpy as np
+from django.core.files.base import ContentFile
+from django.core.management import call_command
 from django.test import SimpleTestCase
 
 from apps.garments import lighting
+from apps.garments.models import Garment
+from apps.testing import MediaTestCase
 
 
 def garment(fill):
@@ -82,3 +88,49 @@ class TextureThresholdTests(SimpleTestCase):
         cv2.circle(img, (110, 150), 40, (25, 25, 25, 255), 8)
         self.assertFalse(lighting.is_near_solid(img), lighting.texture_measures(img))
         np.testing.assert_array_equal(lighting.flatten_lighting(img), img)
+
+
+class ReflattenCommandTests(MediaTestCase):
+    def setUp(self):
+        super().setUp()
+        self.user = self.make_user()
+
+    def make(self, img):
+        g = Garment(owner=self.user, type="tshirt", landmarks={})
+        g.image.save("g.png", ContentFile(cv2.imencode(".png", cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA))[1].tobytes()),
+                     save=True)
+        return g
+
+    def run_cmd(self, *args):
+        out = StringIO()
+        call_command("reflatten_garments", *args, stdout=out)
+        return out.getvalue()
+
+    def pixels(self, g):
+        g.refresh_from_db()
+        return cv2.imread(g.image.path, cv2.IMREAD_UNCHANGED)
+
+    def test_flattens_solid_once_and_never_touches_prints(self):
+        solid = self.make(garment(solid_black))
+        printed_img = garment(solid_black)
+        cv2.circle(printed_img, (110, 150), 70, (230, 230, 230, 255), -1)
+        printed = self.make(printed_img)
+        before_print = self.pixels(printed).copy()
+
+        out = self.run_cmd("--all-solid", "--dry-run")
+        self.assertIn(f"{solid.pk} tshirt: hf_std", out)
+        self.assertIn("would flatten", out)
+        solid.refresh_from_db()
+        self.assertFalse(solid.lighting_flattened)
+
+        self.run_cmd("--ids", str(solid.pk), str(printed.pk))
+        solid.refresh_from_db()
+        self.assertTrue(solid.lighting_flattened)
+        first = self.pixels(solid).copy()
+        np.testing.assert_array_equal(self.pixels(printed), before_print)
+        printed.refresh_from_db()
+        self.assertFalse(printed.lighting_flattened)
+
+        out = self.run_cmd("--all-solid")  # idempotent
+        self.assertIn(f"{solid.pk}: already flattened, skip", out)
+        np.testing.assert_array_equal(self.pixels(solid), first)

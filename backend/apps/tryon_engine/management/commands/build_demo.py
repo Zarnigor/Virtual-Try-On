@@ -46,9 +46,12 @@ class Command(BaseCommand):
             if meta.get("type") not in ("tshirt", "pants"):
                 raise CommandError(f"{meta_path.name}: type must be tshirt or pants")
             img = cv2.imread(str(png), cv2.IMREAD_UNCHANGED)
+            flattened = False
             if img is not None and img.ndim == 3 and img.shape[2] == 4 and settings.GARMENT_FLATTEN_LIGHTING:
                 # the same processing a cleaned upload gets (docs/09 #67); lighting.py works on RGBA
-                rgba = flatten_lighting(cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA))
+                src = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+                rgba = flatten_lighting(src)
+                flattened = rgba is not src
                 img = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGRA)
             if img is None or img.ndim != 3 or img.shape[2] != 4:
                 raise CommandError(f"{png.name}: must be a transparent (RGBA) PNG")
@@ -56,7 +59,7 @@ class Command(BaseCommand):
                 validate_garment_landmarks(meta["type"], meta.get("landmarks"), img.shape[1], img.shape[0])
             except LandmarksInvalid as e:
                 raise CommandError(f"{meta_path.name}: {e.detail}")
-            specs.append((meta_path.stem, meta, png, img))
+            specs.append((meta_path.stem, meta, png, img, flattened))
         if not specs:
             raise CommandError("no <name>.json garments in the folder")
         avatars = list(Avatar.objects.exclude(image="").order_by("pk"))
@@ -70,7 +73,7 @@ class Command(BaseCommand):
             f.unlink()  # results of a previous build
 
         garments = {}
-        for stem, meta, png, img in specs:
+        for stem, meta, png, img, flattened in specs:
             g = Garment.objects.filter(pk=old.get("garments", {}).get(stem), owner__isnull=True).first()
             if g is None:
                 g = Garment(owner=None, type=meta["type"])
@@ -78,6 +81,7 @@ class Command(BaseCommand):
                 g.image.storage.delete(g.image.name)
             g.type, g.name = meta["type"], meta.get("name", stem)[:100]
             g.landmarks, g.visibility, g.status = meta["landmarks"], "public", "approved"
+            g.lighting_flattened = flattened
             g.image.save(f"demo_{stem}.png", ContentFile(cv2.imencode(".png", img)[1].tobytes()), save=False)
             g.save()
             garments[stem] = (g, img)

@@ -25,6 +25,8 @@ class Garment(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     # True = the AI check was skipped (AI_DEV_BYPASS, local dev only): this garment was NOT validated.
     ai_skipped = models.BooleanField(default=False)
+    # The stored PNG had its photo lighting flattened (apps/garments/lighting.py); never flatten twice.
+    lighting_flattened = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

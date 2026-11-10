@@ -221,3 +221,8 @@ _(none blocking P0)_
     std <= 16 and outlier share (|hf| > 25) <= 1.5 %. Measured: black T-shirts #19/#27/#28 8.1 / 0.9 %, #26 9.3 /
     0.6 % (flatten); pink T-shirt with text #4/#17 32.2 / 46 %, maroon joggers with white print #23 33.6 / 17 %,
     demo pants #18 33.5 / 24 % (keep). Synthetic: solid+gradient 3.7 / 0 %, small text 28 / 8.3 %, large print 50 / 40 %.
+69. **Re-flattening existing garments** (2026-11-10): `manage.py reflatten_garments --ids ... | --all-solid
+    [--dry-run]` rewrites the cleaned PNG of near-solid garments once (`Garment.lighting_flattened`, also set at
+    cleaning and by build_demo); prints are never touched. Owner-approved exception to "garment images are
+    immutable": an admin maintenance step on the processed image, not a user edit. Run on #28 (the black T-shirts
+    #19/#26/#27 had been deleted in the app).

@@ -71,6 +71,7 @@ docker compose exec -T frontend npx tsc --noEmit              # type check
 docker compose exec -T frontend npm test                      # vitest: 35 tests (landmark editor)
 docker compose exec -T backend python manage.py migrate
 docker compose exec -T backend python manage.py seed_avatars [--from /avatars | --force]
+docker compose exec -T backend python manage.py reflatten_garments --all-solid --dry-run   # flatten lighting once
 docker compose exec -T -e ENGINE=new backend python manage.py shell < tools/tryon_check/run.py   # try-on check
 docker compose logs -f backend worker
 docker compose down                                           # stop (add -v to wipe db + media)
