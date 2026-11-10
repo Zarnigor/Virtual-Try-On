@@ -20,7 +20,7 @@ editor with live cm widths and circumference estimates; Save confirms the landma
 `.env` flags (defaults in `.env.example`): `AI_DEV_BYPASS=0` (1 = skip AI checks locally, DEBUG only, garments get a
 "DEV: tekshirilmagan" chip), `AI_CLEANING_ENABLED=0` (prompt 04 not built, docs/09 #55), `DEMO_MODE=0`,
 `TRYON_SHADING` / `TRYON_CONTACT_SHADOW` / `TRYON_EDGE_FEATHER` (realism effects, all `0` = plain opaque garment),
-`TRYON_SHOULDER_CAP` / `TRYON_HEM_SNAP` / `TRYON_HALO_REMOVAL` / `TRYON_NECK_FIX` / `TRYON_NECK_GAP_FILL` (structural try-on steps, all `1`; docs/06 "Layer order"),
+`TRYON_SHOULDER_CAP` / `TRYON_HEM_SNAP` / `TRYON_HALO_REMOVAL` / `TRYON_NECK_FIX` / `TRYON_NECK_GAP_FILL` (structural try-on steps, all `1`; docs/06 "Layer order"), `TRYON_DROPPED_SHOULDER_SINGLE` (`0`, docs/09 #90),
 `BODY_AI_CHECK_ENABLED=1` (prompt 02 on own-body uploads; 0 honoured only with DEBUG),
 `AI_DAILY_LIMIT` / `AI_GARMENT_DAILY_LIMIT` (staff are exempt from the garment limit, the AI check still runs), optional `GEMINI_TIMEOUT_S` (min 60). The first rembg run downloads its
 model (~176 MB, `u2net` volume, kept across rebuilds).

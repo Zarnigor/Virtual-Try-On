@@ -156,6 +156,7 @@ TRYON_HALO_REMOVAL = os.environ.get("TRYON_HALO_REMOVAL", "1") == "1"
 # Neck zone: transparent inner back collar, 1-2 px head/neck edge, smoothed shoulder alpha (docs/06).
 TRYON_NECK_FIX = os.environ.get("TRYON_NECK_FIX", "1") == "1"
 TRYON_NECK_GAP_FILL = os.environ.get("TRYON_NECK_GAP_FILL", "1") == "1"
+TRYON_DROPPED_SHOULDER_SINGLE = os.environ.get("TRYON_DROPPED_SHOULDER_SINGLE", "0") == "1"
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

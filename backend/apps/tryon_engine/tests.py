@@ -992,3 +992,76 @@ class HaloOuterOnlyTests(SimpleTestCase):
         out = warp.remove_halo(img, outer_only=True)
         self.assertFalse(out[10:12, :, 3].any() or out[:, 10:12, 3].any())  # outer contour: 2 px gone
         np.testing.assert_array_equal(out[23:37, 23:37, 3], img[23:37, 23:37, 3])  # the hole's edge untouched
+
+
+class DroppedShoulderTests(SimpleTestCase):
+    """TRYON_DROPPED_SHOULDER_SINGLE: a dropped-shoulder T-shirt (#36-like) is warped as one piece."""
+
+    def dropped(self):
+        """Boxy T-shirt: flat top far out (x 90..210 of shoulders 70..230), sleeves hanging from the seam."""
+        img = np.zeros((330, 300, 4), np.uint8)
+        cv2.fillPoly(img, [np.array([(70, 36), (90, 30), (210, 30), (230, 36), (230, 320), (70, 320)], np.int32)], SHIRT)
+        cv2.fillPoly(img, [np.array([(70, 36), (22, 60), (10, 130), (45, 140), (72, 110)], np.int32)], SHIRT)
+        cv2.fillPoly(img, [np.array([(230, 36), (278, 60), (290, 130), (255, 140), (228, 110)], np.int32)], SHIRT)
+        lm = {"shoulder": {"y": 36, "left_x": 70, "right_x": 230}, "chest": {"y": 110, "left_x": 72, "right_x": 228},
+              "waist": {"y": 210, "left_x": 72, "right_x": 228}, "hem": {"y": 320, "left_x": 70, "right_x": 230},
+              "sleeve_end": {"left": {"x": 26, "y": 136}, "right": {"x": 274, "y": 136}}}
+        return img, lm
+
+    def sloped(self):
+        """Set-in sleeves: the top slopes down from a narrow collar (not dropped)."""
+        g, glm = self.dropped()
+        g[:, :, 3] = 0
+        cv2.fillPoly(g, [np.array([(70, 50), (120, 26), (180, 26), (230, 50), (230, 320), (70, 320)], np.int32)], SHIRT)
+        cv2.fillPoly(g, [np.array([(70, 50), (22, 70), (10, 130), (45, 140), (72, 110)], np.int32)], SHIRT)
+        cv2.fillPoly(g, [np.array([(230, 50), (278, 70), (290, 130), (255, 140), (228, 110)], np.int32)], SHIRT)
+        glm = {**glm, "shoulder": {"y": 50, "left_x": 70, "right_x": 230}}
+        return g, glm
+
+    def render(self, g, glm, flag=True):
+        base, lm = avatar()
+        rgb, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)], dropped_shoulder_single=flag)
+        return rgb, dbg, lm
+
+    def test_no_pixel_above_the_shoulder_line_outside_the_shoulder(self):
+        g, glm = self.dropped()
+        self.assertGreater(warp.dropped_shoulder_ratio(g[:, :, 3] > 128, glm), warp.DROPPED_SHOULDER_RATIO)
+        _, dbg, lm = self.render(g, glm)
+        self.assertTrue(dbg["dropped_shoulder"]["single"])
+        a = dbg["tshirt_layer"][:, :, 3] > 128
+        ys, xs = np.nonzero(a)
+        for side in ("left", "right"):
+            m, c = dbg["shoulder_lines"][side]
+            sx = lm["shoulder"][f"{side}_x"]
+            out = (xs < sx - 4) if side == "left" else (xs > sx + 4)
+            above = (m * (xs + 0.5) + c) - (ys + 0.5) > 1
+            self.assertEqual(int((out & above).sum()), 0, side)
+
+    def test_no_tab_at_the_sleeve_inner_bottom_corner(self):
+        g, glm = self.dropped()
+        _, dbg, _ = self.render(g, glm)
+        a = dbg["tshirt_layer"][:, :, 3] > 128
+        rows = {int(round(y)): (l, r) for y, l, r in dbg["tshirt_rows"]}
+        ys_known = np.array(sorted(rows))
+        alpha = g[:, :, 3] > 128
+        g_rows = [(glm[k]["y"], glm[k]["left_x"], glm[k]["right_x"]) for k in ("shoulder", "chest", "waist", "hem")]
+        for side, corner in (("left", (72, 110)), ("right", (228, 110))):
+            own, _ = warp.sleeve_regions(alpha, glm, side, g_rows)
+            M = dbg["sleeve_transforms"][side]
+            sleeve = cv2.warpAffine((own & alpha).astype(np.float32), M, (W, H)) >= 0.5
+            cx, cy = (M @ np.array([corner[0], corner[1], 1.0])).round().astype(int)
+            for y in range(cy - 4, cy + 4):
+                yk = ys_known[np.argmin(np.abs(ys_known - y))]
+                l, r = rows[yk]
+                for x in range(cx - 4, cx + 4):
+                    if a[y, x]:
+                        self.assertTrue(l - 2 <= x <= r + 2 or sleeve[y, x], (side, x, y))
+
+    def test_normal_shoulders_render_unchanged(self):
+        g, glm = self.sloped()
+        self.assertLess(warp.dropped_shoulder_ratio(g[:, :, 3] > 128, glm), warp.DROPPED_SHOULDER_RATIO)
+        on, dbg, _ = self.render(g, glm, True)
+        off, _, _ = self.render(g, glm, False)
+        self.assertFalse(dbg["dropped_shoulder"]["single"])
+        self.assertEqual(int((on != off).sum()), 0)
+

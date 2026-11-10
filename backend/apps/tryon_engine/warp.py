@@ -293,6 +293,11 @@ HEM_GAP_MAX = 12  # only a hem at most this far above the pants waist is snapped
 SHOULDER_MAX_CHEST = 1.35  # garment shoulder span beyond this x chest span = marked on the sleeves, not the armholes
 SHOULDER_OVER_CHEST = 0.12  # estimated armhole top: this x chest span outward of the armpit
 SLEEVE_MERGED_TOL = 0.06  # x chest span: a run reaching further past the torso's side line is torso + sleeve
+DROPPED_SHOULDER_RATIO = 0.60  # flat shoulder reach x s / avatar shoulder half-width above this: one-piece warp
+#   (measured: #36 white oversized 0.67; #28 0.53, #17 0.50; threshold = midpoint; docs/09 #90)
+DROPPED_FLAT_TOL = 0.03  # x shoulder span: top-edge rows within this of the highest centre pixel count as "flat"
+SINGLE_BEND_BAND = 0.5  # x armhole length: outward of the armhole the torso map bends into the sleeve map over this
+SINGLE_UNDERARM_ROWS = 10  # below the armpit row the bend edge moves from the armpit point to the torso edge
 SLEEVE_CLIP_RADIUS = 1.0  # x armhole length: the shoulder-line clip acts within this distance of the shoulder point
 SLEEVE_OVERLAP = 3  # src px the rigid sleeve reaches past its armhole line over the torso (no seam gap)
 CAP_MAX_DEPTH = 0.03  # shoulder cap: at most this fraction of the figure height below the collar top
@@ -389,7 +394,7 @@ def normalize_tshirt_landmarks(g: dict, alpha: np.ndarray) -> tuple[dict, bool]:
 def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
                 arms: dict | None = None, info: dict | None = None,
                 mask: np.ndarray | None = None, hem_over: float | None = None,
-                under: np.ndarray | None = None) -> tuple[np.ndarray, list]:
+                under: np.ndarray | None = None, dropped_single: bool = False) -> tuple[np.ndarray, list]:
     """T-shirt keeps its own silhouette (docs/06 "T-shirt fit"): one uniform scale s for both axes, set so the
     garment's shoulder line = body shoulder + ease; below the shoulders every row is max(garment, body + ease)
     (capped), blended in from the shoulder fit by the chest row; the hem is the garment's own (scaled) length.
@@ -399,7 +404,9 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     SLEEVE_OVERLAP px over the torso). hem_over: a row the hem must reach when it ends at most HEM_GAP_MAX px
     above it (the pants top): the rows below the chest are stretched by those few px, nothing is repeated.
     under: bool mask of what is worn under the T-shirt (the pants layer): rows that overlap it are at least as wide
-    (a T-shirt hangs over the waistband, the waistband never shows beside it)."""
+    (a T-shirt hangs over the waistband, the waistband never shows beside it).
+    dropped_single (TRYON_DROPPED_SHOULDER_SINGLE): a dropped-shoulder garment (`dropped_shoulder_ratio` above
+    DROPPED_SHOULDER_RATIO) is warped as ONE piece (`_single_piece`) instead of torso + rigid sleeves."""
     warnings: list[str] = []
     g, a = garment_lm, body_lm
     img = _bgra(garment_img)
@@ -618,12 +625,19 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     torso_drawn = torso_layer.copy()
     torso_drawn[owned] = 0  # replaced by the sleeve or hidden under an opaque sleeve pixel: drawn once
     parts = {"torso": torso_drawn, **parts}
+    ratio = dropped_shoulder_ratio(alpha, g)
+    single = dropped_single and ratio > DROPPED_SHOULDER_RATIO and bool(sleeves)
+    if single:  # one continuous warp: the shoulder slope runs into the sleeves, no second layer, no underarm tab
+        result = _single_piece(img, src_rows, dst_rows, sleeves, a_cx, s, H, W)
+        parts = {"single": result}
     if info is not None:
         info["sleeve_hems"] = hems
         info["tshirt_rows"] = torso
         info["tshirt_hem"] = torso[-1]
         info["tshirt_parts"] = parts
         info["shoulder_lines"] = lines
+        info["dropped_shoulder"] = {"ratio": ratio, "single": single}
+        info["sleeve_transforms"] = {side: v[0] for side, v in sleeves.items()}
         info["armhole_lines"] = {side: (v[2], v[3]) for side, v in sleeves.items()}
         info["tshirt_shoulders"] = (float(shoulders["left"][0]), float(shoulders["right"][0]))
         geo = back_collar_geometry(alpha, g, img)  # garment coordinates -> the collar mapping used for the rows above
@@ -652,6 +666,97 @@ def shoulder_slope_line(torso_alpha: np.ndarray, side: str, S_dst, cx: float, sy
     xs, ys = np.array(pts, np.float64).T
     m, c = np.polyfit(xs, ys, 1)
     return float(m), float(c)
+
+
+def dropped_shoulder_ratio(alpha: np.ndarray, g: dict) -> float:
+    """How far the garment's high, flat shoulder line reaches from the centre, relative to its shoulder half-width,
+    times (1 + ease): at the T-shirt's uniform scale this is that reach over the avatar's shoulder half-width
+    (scale-free, so the same for every avatar). Flat = top-edge pixel within DROPPED_FLAT_TOL x shoulder span of the
+    highest one near the centre, contiguous from the centre. A dropped-shoulder garment (#36) keeps its top line far
+    out to the seam; a set-in sleeve slopes down from the collar."""
+    sl, sr = _f(g["shoulder"]["left_x"]), _f(g["shoulder"]["right_x"])
+    if sr - sl < 4:
+        return 0.0
+    top = np.where(alpha.any(axis=0), alpha.argmax(axis=0), 10 ** 6)
+    mid = int(round((sl + sr) / 2))
+    near = top[max(mid - 10, 0):mid + 11]
+    if not len(near) or near.min() >= 10 ** 6:
+        return 0.0
+    tol = DROPPED_FLAT_TOL * (sr - sl)
+    flat = top <= near.min() + tol
+    a = b = mid
+    while a > 0 and flat[a - 1]:
+        a -= 1
+    while b < len(flat) - 1 and flat[b + 1]:
+        b += 1
+    return (b - a + 1) / 2.0 / ((sr - sl) / 2.0) * (1 + TSHIRT_EASE)
+
+
+def _row_inverse(src_rows: list, dst_rows: list, H: int, W: int, s: float):
+    """(map_x, map_y, valid) of the torso row warp, inverse, for every dst pixel (also outside the span: the row's
+    linear map continued). Rows above the first control row continue at the uniform scale; below the last one
+    nothing (valid False)."""
+    order = np.argsort([r[0] for r in dst_rows], kind="stable")
+    d = np.array([dst_rows[i] for i in order], np.float64)
+    g = np.array([src_rows[i] for i in order], np.float64)
+    keep = np.concatenate([[True], np.diff(d[:, 0]) > 1e-6])
+    d, g = d[keep], g[keep]
+    ys = np.arange(H, dtype=np.float64)
+    l, r = np.interp(ys, d[:, 0], d[:, 1]), np.interp(ys, d[:, 0], d[:, 2])
+    sy = np.interp(ys, d[:, 0], g[:, 0])
+    sl, sr = np.interp(ys, d[:, 0], g[:, 1]), np.interp(ys, d[:, 0], g[:, 2])
+    up = ys < d[0, 0]
+    sy[up] = g[0, 0] + (ys[up] - d[0, 0]) / s
+    scale = (sr - sl) / np.maximum(r - l, 1e-6)
+    xs = np.arange(W, dtype=np.float64) + 0.5
+    map_x = sl[:, None] + (xs[None, :] - l[:, None]) * scale[:, None] - 0.5
+    map_y = np.repeat(sy[:, None], W, axis=1)
+    valid = np.repeat((ys <= d[-1, 0])[:, None], W, axis=1)
+    return map_x, map_y, valid, l, r
+
+
+def _single_piece(img: np.ndarray, src_rows: list, dst_rows: list, sleeves: dict, cx: float, s: float,
+                  H: int, W: int) -> np.ndarray:
+    """The whole T-shirt as ONE continuous warp (dropped shoulders, docs/06 "Dropped shoulders"): every dst pixel
+    samples the garment once, through an inverse map that is the torso row map inward of the armhole line and bends
+    smoothly (smoothstep over SINGLE_BEND_BAND x armhole length, outward) into the sleeve's rigid map. Below the
+    armpit row the bend edge is the torso's own edge (reached over SINGLE_UNDERARM_ROWS rows), so the sleeve's inner
+    bottom corner never passes the torso edge: inward of it only the torso map exists."""
+    tx, ty, tvalid, l_rows, r_rows = _row_inverse(src_rows, dst_rows, H, W, s)
+    py, px = np.mgrid[0:H, 0:W].astype(np.float64)
+    map_x, map_y = tx.copy(), ty.copy()
+    wsum = np.zeros((H, W), np.float64)
+    for side, (M, _, S_dst, A_dst) in sleeves.items():
+        S, A = np.asarray(S_dst, np.float64), np.asarray(A_dst, np.float64)
+        t = A - S
+        length = max(float(np.linalg.norm(t)), 1e-6)
+        nrm = np.array([t[1], -t[0]]) / length
+        if (nrm[0] > 0) == (side == "left"):
+            nrm = -nrm
+        delta = (px + 0.5 - S[0]) * nrm[0] + (py + 0.5 - S[1]) * nrm[1]  # outward of the armhole line
+        edge_rows = l_rows if side == "left" else r_rows
+        k = np.clip((np.arange(H) - A[1]) / SINGLE_UNDERARM_ROWS, 0, 1)
+        e = A[0] + k * (edge_rows - A[0])  # bend edge below the armpit row: armpit point -> torso edge
+        below = (px + 0.5 - e[:, None]) * (-1.0 if side == "left" else 1.0)
+        delta = np.where(py + 0.5 > A[1], below, delta)
+        half = (px + 0.5 < cx) if side == "left" else (px + 0.5 >= cx)
+        u = np.clip(delta / (SINGLE_BEND_BAND * length), 0, 1)
+        w = np.where(half, u * u * (3 - 2 * u), 0.0)
+        Minv = cv2.invertAffineTransform(M).astype(np.float64)
+        sx = Minv[0, 0] * px + Minv[0, 1] * py + Minv[0, 2]
+        sy = Minv[1, 0] * px + Minv[1, 1] * py + Minv[1, 2]
+        map_x = map_x * (1 - w) + sx * w
+        map_y = map_y * (1 - w) + sy * w
+        wsum += w
+    ok = tvalid | (wsum >= 1 - 1e-9)  # below the torso rows: only where the sleeve map alone applies
+    map_x = np.where(ok, map_x, -10.0).astype(np.float32)
+    map_y = np.where(ok, map_y, -10.0).astype(np.float32)
+    f = img.astype(np.float32)
+    f[:, :, :3] *= f[:, :, 3:4] / 255.0
+    out = cv2.remap(f, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    a = out[:, :, 3:4] / 255.0
+    out[:, :, :3] = np.where(a > 0, out[:, :, :3] / np.maximum(a, 1e-6), 0)
+    return np.clip(np.rint(out), 0, 255).astype(np.uint8)
 
 
 def tshirt_scale(g: dict, a: dict) -> float:
@@ -1362,7 +1467,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
                  halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True,
-                 source: str = "body"):
+                 source: str = "body", dropped_shoulder_single: bool = False):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1376,6 +1481,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     source: "avatar" (admin avatar photo) or "body" (the user's own photo, the default: fail closed). The neck-gap
     fill paints over the avatar's own clothes, so it runs for avatars only, never for an own body whatever the flag
     (docs/02 rule 12, docs/09 #89).
+    dropped_shoulder_single: TRYON_DROPPED_SHOULDER_SINGLE (default 0, docs/09 #90): dropped-shoulder T-shirts as
+    one piece. Off by default: below the armpit row the sleeves shear into stepped blocks (docs/06 "Known limits").
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -1399,7 +1506,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
             if hem_snap:  # the hem overlaps the waistband: no gap line between them
                 hem_over = info["pants_waist_y"] + info["pants_top_dip"] + HEM_OVER_WAISTBAND
         warped, warns = garment_layer("tshirt", *by_type["tshirt"], body_lm, H, W, arms, info, mask,
-                                      halo_removal=halo_removal, hem_over=hem_over, under=under)
+                                      halo_removal=halo_removal, hem_over=hem_over, under=under,
+                                      dropped_single=dropped_shoulder_single)
         warnings += [f"tshirt: {w}" for w in warns]
         opening = info.get("neck_opening") if neck_fix else None
         head = head_neck_overlay(mask, body_lm, NECK_FEATHER_FIX if neck_fix else NECK_FEATHER, opening)

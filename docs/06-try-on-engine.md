@@ -248,6 +248,9 @@ head/neck edge and (neck-gap fill) a thin strip of the avatar's own tank collar 
 - **Mis-marked shoulder landmarks** are only estimated (see above); marking the armhole tops is still better.
 - **Halo removal** assumes a fringe of at most ~6 px at the warped size; details thinner than 4 px (drawstrings, lace
   tips) lose 2 px. `TRYON_HALO_REMOVAL=0` keeps the cleaned image as is.
+- **Dropped-shoulder one-piece warp** (`TRYON_DROPPED_SHOULDER_SINGLE`, default 0, docs/09 #90): removes the shoulder
+  pad on #36 but shears the sleeves below the armpit into stepped blocks, so it is off; #36 uses the torso + rigid
+  sleeves path described above (with its shoulder corner).
 - **Dropped-shoulder T-shirts** (white oversized #36): the torso's shoulder line runs out past the body's shoulder
   and the rigid sleeve then hangs down at the arm angle, so the outline has a corner at the shoulder. No sleeve pixel is
   above the shoulder line (measured: 0.0 px on 6 avatars x 3 T-shirts); the corner is the garment's own silhouette

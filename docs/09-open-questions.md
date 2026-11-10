@@ -305,3 +305,14 @@ _(none blocking P0)_
     Remaining (docs/06 "Known limits"): dropped-shoulder corner on #36, prints split at the shoulder join, the
     avatar's top beside the torso where the arm touches (pre-existing). No flag had to be set to 0.
 89. (decided 2026-11-10) Neck-gap fill (TRYON_NECK_GAP_FILL) is allowed for admin avatars only; it must be 0 for the own-body path (docs/02 rule 12).
+90. **Dropped-shoulder T-shirts as one piece** (flag `TRYON_DROPPED_SHOULDER_SINGLE`, **default 0**; 2026-11-10).
+    Detection: `dropped_shoulder_ratio` = the garment's flat top-line half-width (top within 3 % of the shoulder span of
+    the highest centre pixel) / its shoulder half-width x 1.04, i.e. that reach at the T-shirt's scale over the avatar's
+    shoulder half-width. Measured: #36 0.67, #28 0.53, #17 0.50 -> threshold 0.60 (midpoint). Above it, `_single_piece`
+    remaps the whole garment once: the torso row map inward of the armhole, bending (smoothstep over half an armhole
+    length) into the rigid sleeve map outward; below the armpit the bend edge is the torso edge. Result on #36: the
+    boxy shoulder pad is gone (crop, male average), but below the armpit row each sleeve shears into stepped blocks
+    sticking out sideways on all 6 avatars (the torso map continued past the torso edge samples the hanging sleeve at
+    the wrong source rows). So the flag is 0; #28/#17 and all set-in sleeves are pixel-identical either way.
+    Next step if wanted: below the armpit use the sleeve map alone (no blend) and verify on a sheet.
+
