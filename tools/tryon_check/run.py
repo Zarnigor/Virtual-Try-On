@@ -1,22 +1,26 @@
-"""Try-on check without a browser: warp existing garments onto every seeded avatar.
+"""Try-on check without a browser: every seeded avatar x {tshirt, pants, both}, with measured defects.
 
 Runs inside the backend container (reads the DB and media, writes nothing to the DB):
-    docker compose exec -T backend python manage.py shell < tools/tryon_check/run.py
+    docker compose cp test-garments/pants_ok.jpg.webp backend:/tmp/tryon_check_in/pants.webp   # optional
+    docker compose exec -T -e ENGINE=new backend python manage.py shell < tools/tryon_check/run.py
     docker compose cp backend:/tmp/tryon_check/. tools/tryon_check/out/
 
-Composition is the same as apps/tryon_engine/tasks.py `_do_warp` (base -> warp -> alpha composite -> white).
+ENGINE=old renders with the committed day-1 engine, copied to /tmp/warp_old.py first
+(git show <rev>:backend/apps/tryon_engine/warp.py), composed exactly like the old tasks._do_warp.
 
-Pants: if /tmp/tryon_check_in/pants.* exists (copy test-garments/pants_ok.jpg.webp there first), it is cut out
-in memory with rembg (mask only, same as jobs.tasks._rembg_clean) and used instead of a DB garment; its landmarks
-are derived from the alpha mask (never saved) and checked with the server's validate_garment_landmarks.
-    docker compose cp test-garments/pants_ok.jpg.webp backend:/tmp/tryon_check_in/pants.webp
+Garments: the newest T-shirt with saved landmarks (AI-checked first). Pants: /tmp/tryon_check_in/pants.* cut out
+in memory with rembg (mask only) and landmarks derived from its alpha (never saved).
 
-Diagnostics per image:
-  - sleeve_end_y: where the sleeve tip lands (hand_y in warp.py) vs armpit / crotch
-  - hand_cover_px: avatar arm pixels (outside the torso and legs) in the forearm/hand zone, i.e. below the
-    sleeve end, that the garment covers. Should be 0: hands and forearms must stay above the garment.
+Measured per image (same measures for both engines):
+  sleeve%   lowest arm row the garment reaches, as % of the arm (shoulder -> hand end). Short sleeve: <= 50.
+  hand_px   forearm/hand pixels (lower half of each arm) covered by the garment. Must be 0.
+  hem       T-shirt: hem row as % of waist -> crotch (0 = waist, 100 = crotch). Pants: hem row - ankle row (px).
+  out_px    garment pixels on the background (outside the figure), torso band rows only.
+Avatar landmark check: every span landmark vs the mask run at its row (deviation > 6 px is reported).
 """
 import glob
+import importlib.util
+import json
 import os
 import traceback
 
@@ -27,9 +31,10 @@ from django.conf import settings
 from apps.avatars.models import Avatar
 from apps.garments.landmark_checks import validate_garment_landmarks
 from apps.garments.models import Garment
-from apps.tryon_engine.warp import _alpha_composite, warp_pants, warp_tshirt
+from apps.tryon_engine import warp as new_warp
 
-OUT = "/tmp/tryon_check"
+ENGINE = os.environ.get("ENGINE", "new")
+OUT = f"/tmp/tryon_check/{ENGINE}"
 os.makedirs(OUT, exist_ok=True)
 H, W = settings.CANVAS_H, settings.CANVAS_W
 
@@ -38,13 +43,10 @@ def read_rgba(path):
     img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
     if img is None:
         raise ValueError(f"cannot read {path}")
-    if img.shape[2] == 3:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
-    return img
+    return cv2.cvtColor(img, cv2.COLOR_BGR2BGRA) if img.shape[2] == 3 else img
 
 
 def runs(row):
-    """[(start, end_exclusive)] of opaque runs in a boolean row."""
     d = np.diff(np.concatenate([[0], row.astype(np.int8), [0]]))
     return list(zip(np.where(d == 1)[0], np.where(d == -1)[0]))
 
@@ -67,37 +69,16 @@ def derive_pants_landmarks(img):
 
     def legs(y):
         r = runs(a[y])
-        if len(r) < 2:
-            raise ValueError(f"legs not separated at y={y}")
         (l0, l1), (r0, r1) = r[0], r[-1]
         return {"left_x": int(l0), "right_x": int(l1 - 1), "y": y}, {"left_x": int(r0), "right_x": int(r1 - 1), "y": y}
 
     knee_y = crotch_y + int(0.45 * (bot - crotch_y))
-    hem_y = bot - int(0.02 * h)
     kl, kr = legs(knee_y)
-    el, er = legs(hem_y)
+    el, er = legs(bot - int(0.02 * h))
     cx = (wl + wr) // 2
-    return {
-        "waist": {"y": waist_y, "left_x": wl, "right_x": wr, "center_x": cx},
-        "hip": {"y": hip_y, "left_x": hl, "right_x": hr},
-        "crotch": {"y": crotch_y, "center_x": cx},
-        "knee": {"y": knee_y, "left_leg": kl, "right_leg": kr},
-        "hem": {"left_leg": el, "right_leg": er},
-    }
-
-
-def torso_band(lm):
-    """Boolean HxW mask of the torso between shoulder and crotch (linear between landmark rows)."""
-    rows = [(lm["shoulder"]["y"], lm["shoulder"]["left_x"], lm["shoulder"]["right_x"])]
-    for k in ("chest", "waist", "hip"):
-        rows.append((lm[k]["y"], lm[k]["left_x"], lm[k]["right_x"]))
-    rows.append((lm["crotch"]["y"], lm["hip"]["left_x"], lm["hip"]["right_x"]))
-    m = np.zeros((H, W), bool)
-    for (y0, l0, r0), (y1, l1, r1) in zip(rows, rows[1:]):
-        for y in range(int(y0), int(y1) + 1):
-            t = (y - y0) / max(y1 - y0, 1)
-            m[y, int(l0 + t * (l1 - l0)):int(r0 + t * (r1 - r0)) + 1] = True
-    return m
+    return {"waist": {"y": waist_y, "left_x": wl, "right_x": wr, "center_x": cx},
+            "hip": {"y": hip_y, "left_x": hl, "right_x": hr}, "crotch": {"y": crotch_y, "center_x": cx},
+            "knee": {"y": knee_y, "left_leg": kl, "right_leg": kr}, "hem": {"left_leg": el, "right_leg": er}}
 
 
 def pants_from_file():
@@ -111,74 +92,139 @@ def pants_from_file():
     img = src.convert("RGBA")
     img.putalpha(mask)
     img = img.crop(mask.getbbox())
-    return cv2.cvtColor(np.array(img), cv2.COLOR_RGBA2BGRA), paths[0]
+    return cv2.cvtColor(np.array(img), cv2.COLOR_RGBA2BGRA)
 
 
 def garment_sets():
-    tshirt = Garment.objects.filter(type="tshirt").exclude(landmarks={}).order_by("ai_skipped", "-pk").first()
-    pants = Garment.objects.filter(type="pants").exclude(image="").order_by("-pk").first()
     out = []
-    if tshirt:
-        out.append(("tshirt", tshirt.image.path, tshirt.landmarks))
-    from_file = pants_from_file()
-    if from_file:
-        img, path = from_file
+    t = Garment.objects.filter(type="tshirt").exclude(landmarks={}).order_by("ai_skipped", "-pk").first()
+    if t:
+        out.append(("tshirt", read_rgba(t.image.path), t.landmarks, f"garment {t.pk}"))
+    img = pants_from_file()
+    if img is not None:
         lm = derive_pants_landmarks(img)
         validate_garment_landmarks("pants", lm, img.shape[1], img.shape[0])
-        cv2.imwrite("/tmp/tryon_check/_pants_cut.png", img)
-        print(f"pants from {path}: landmarks derived from alpha (not saved): {lm}")
-        out.append(("pants", "/tmp/tryon_check/_pants_cut.png", lm))
-    elif pants:
-        img = read_rgba(pants.image.path)
-        lm = pants.landmarks or derive_pants_landmarks(img)
-        validate_garment_landmarks("pants", lm, img.shape[1], img.shape[0])
-        src = "saved" if pants.landmarks else "derived from alpha (not saved)"
-        print(f"pants garment {pants.pk}: landmarks {src}: {lm}")
-        out.append(("pants", pants.image.path, lm))
-    print("garments:", [(t, p) for t, p, _ in out])
+        cv2.imwrite("/tmp/tryon_check/pants_cut.png", img)
+        json.dump(lm, open("/tmp/tryon_check/pants_landmarks.json", "w"))
+        out.append(("pants", img, lm, "test-garments/pants_ok (derived landmarks)"))
+    print("garments:", [(t, s) for t, _, _, s in out])
     return out
+
+
+def old_render(base, lm, garments):
+    spec = importlib.util.spec_from_file_location("warp_old", "/tmp/warp_old.py")
+    old = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(old)
+    canvas = cv2.resize(base, (W, H)).copy()
+    warns = []
+    for gtype, gimg, glm in garments:  # old order: as given
+        fn = old.warp_tshirt if gtype == "tshirt" else old.warp_pants
+        warped, w = fn(lm, glm, gimg, H, W)
+        warns += [f"{gtype}: {x}" for x in w]
+        canvas = old._alpha_composite(canvas, warped)
+    white = np.full((H, W, 3), 255, np.float32)
+    a = canvas[:, :, 3:4].astype(np.float32) / 255.0
+    return (canvas[:, :, :3] * a + white * (1 - a)).astype(np.uint8), warns
+
+
+def flat(base):
+    b = cv2.resize(base, (W, H))
+    a = b[:, :, 3:4].astype(np.float32) / 255.0
+    return (b[:, :, :3] * a + 255 * (1 - a)).astype(np.uint8)
+
+
+def landmark_check(lm, mask):
+    """Span landmarks vs the mask run at the same row (torso run containing the axis, legs per side)."""
+    issues = []
+    axis = new_warp._crotch_x(lm)
+    for k in ("chest", "waist", "hip"):
+        r = new_warp._runs(mask[int(round(lm[k]["y"]))])
+        q = next((x for x in r if x[0] <= axis <= x[1]), None)
+        if q:
+            dl, dr = lm[k]["left_x"] - q[0], lm[k]["right_x"] - q[1]
+            if max(abs(dl), abs(dr)) > 6:
+                issues.append(f"{k} edges off by {dl:+.0f}/{dr:+.0f} px (row {lm[k]['y']:.0f})")
+    for part in ("knee", "ankle"):
+        for s in ("left_leg", "right_leg"):
+            src = lm[part][s]
+            y = lm["knee"]["y"] if part == "knee" else src["y"]
+            r = new_warp._runs(mask[int(round(y))])
+            if not r:
+                continue
+            c = (src["left_x"] + src["right_x"]) / 2
+            q = min(r, key=lambda x: abs((x[0] + x[1]) / 2 - c))
+            dl, dr = src["left_x"] - q[0], src["right_x"] - q[1]
+            if max(abs(dl), abs(dr)) > 6:
+                issues.append(f"{part} {s} edges off by {dl:+.0f}/{dr:+.0f} px")
+    return issues
+
+
+def measure(result, base_flat, mask, lm, arms, types):
+    changed = np.abs(result.astype(int) - base_flat.astype(int)).max(axis=2) > 40
+    m = {}
+    sh_y = lm["shoulder"]["y"]
+    sleeve, hand = [], 0
+    for side in ("left", "right"):
+        arm = arms.get(side)
+        if not arm:
+            continue
+        rows = arm["rows"]
+        mid = rows[0][0] + (arm["end_y"] - rows[0][0]) / 2
+        if "tshirt" in types:
+            reach = [y for y, l, r in rows if changed[y, l:r + 1].mean() > 0.3]
+            sleeve.append(100 * ((max(reach) if reach else sh_y) - sh_y) / (arm["end_y"] - sh_y))
+        hand += sum(int(changed[y, l:r + 1].sum()) for y, l, r in rows if y >= mid)
+    if sleeve:
+        m["sleeve%"] = "/".join(f"{v:.0f}" for v in sleeve)
+    m["hand_px"] = hand
+    cx = int(new_warp._crotch_x(lm))
+    if types == ["tshirt"]:
+        col = np.where(changed[:, cx - 20: cx + 20].any(axis=1))[0]
+        if len(col):
+            m["hem"] = f"{100 * (col.max() - lm['waist']['y']) / (lm['crotch']['y'] - lm['waist']['y']):.0f}% waist->crotch"
+    if "pants" in types:
+        hems = []
+        for s in ("left_leg", "right_leg"):
+            a = lm["ankle"][s]
+            c = int((a["left_x"] + a["right_x"]) / 2)
+            col = np.where(changed[:, c - 5: c + 5].any(axis=1))[0]
+            hems.append(f"{col.max() - a['y']:+.0f}" if len(col) else "none")
+        m["pants_hem_vs_ankle_px"] = "/".join(hems)
+    band = np.zeros_like(mask)
+    band[int(sh_y): int(lm["crotch"]["y"])] = True
+    m["out_px"] = int((changed & ~mask & band).sum())
+    return m
 
 
 def run():
     sets = garment_sets()
     combos = [[s] for s in sets] + ([sets] if len(sets) == 2 else [])
+    rows = []
     for av in Avatar.objects.order_by("pk"):
-        base = cv2.resize(read_rgba(av.image.path), (W, H))
+        base = read_rgba(av.image.path)
         lm = av.landmarks
-        # arm pixels: opaque, outside the torso band; below the crotch also outside the hip span (legs excluded)
-        figure = (base[:, :, 3] > 128) & (base[:, :, :3] < 240).any(axis=2)  # seeded avatars are opaque RGB on white
-        arms = figure & ~torso_band(lm)
-        legs = np.zeros((H, W), bool)
-        cy = int(lm["crotch"]["y"])
-        legs[cy:, int(lm["hip"]["left_x"]):int(lm["hip"]["right_x"]) + 1] = True
-        arms &= ~legs
-        arms[: int(lm["armpit"]["y"])] = False
-        hand_y = lm["armpit"]["y"] + (lm["crotch"]["y"] - lm["chest"]["y"]) * 0.5  # sleeve end in warp.py
-        forearm_hand = arms.copy()
-        forearm_hand[: int(hand_y) + 1] = False
+        mask = new_warp.figure_mask(cv2.resize(base, (W, H)))
+        arms = new_warp.find_arms(mask, lm)
+        lm_issues = landmark_check(lm, mask)
+        print(f"avatar {av.pk} {av.sex} {av.build}: arms found L={bool(arms['left'])} R={bool(arms['right'])}; "
+              f"landmark check: {lm_issues or 'ok'}")
         for combo in combos:
-            name = f"avatar{av.pk}_{av.sex}_{av.build}_" + "+".join(t for t, _, _ in combo)
-            arm_total = int(forearm_hand.sum())
+            types = [t for t, _, _, _ in combo]
+            name = f"avatar{av.pk}_{av.sex}_{av.build}_" + "+".join(types)
             try:
-                canvas = base.copy()
-                report = []
-                for gtype, gpath, glm in combo:
-                    gimg = read_rgba(gpath)
-                    fn = warp_tshirt if gtype == "tshirt" else warp_pants
-                    warped, warns = fn(lm, glm, gimg, H, W)
-                    cover = int(((warped[:, :, 3] > 128) & forearm_hand).sum())
-                    extra = ""
-                    if gtype == "tshirt":
-                        extra = f" sleeve_end_y={hand_y:.0f} (armpit {lm['armpit']['y']:.0f}, crotch {lm['crotch']['y']:.0f})"
-                    report.append(f"{gtype}: warnings={warns or 'none'} hand_cover_px={cover}{extra}")
-                    canvas = _alpha_composite(canvas, warped)
-                white = np.full((H, W, 3), 255, np.float32)
-                alpha = canvas[:, :, 3:4].astype(np.float32) / 255.0
-                rgb = (canvas[:, :, :3] * alpha + white * (1 - alpha)).astype(np.uint8)
+                garments = [(t, img, glm) for t, img, glm, _ in combo]
+                if ENGINE == "old":
+                    rgb, warns = old_render(base, lm, garments)
+                else:
+                    rgb, warns, _ = new_warp.render_tryon(base, lm, garments, H, W)
                 cv2.imwrite(f"{OUT}/{name}.png", rgb)
-                print(f"OK   {name} (forearm/hand px on avatar: {arm_total})\n     " + "\n     ".join(report))
+                m = measure(rgb, flat(base), mask, lm, arms, types)
+                rows.append({"combo": name, "warnings": warns, "landmarks": lm_issues, **m})
+                print(f"OK   {name}: {m}\n     warnings: {warns or 'none'}")
             except Exception:
                 print(f"FAIL {name}\n{traceback.format_exc()}")
+                rows.append({"combo": name, "error": traceback.format_exc().splitlines()[-1]})
+    json.dump(rows, open(f"{OUT}/report.json", "w"), indent=1)
 
 
 run()
