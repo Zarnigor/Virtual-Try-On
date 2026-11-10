@@ -14,7 +14,13 @@ SIGMA_FRACTION = 0.08  # illumination blur sigma as a share of the garment width
 MAX_HUE_STD = 12.0  # degrees: circular hue spread (saturation weighted) above which the garment is multi-colour
 MAX_SAT_STD = 20.0  # HSV saturation spread (0..255) above which the garment is multi-colour
 GREY_SAT = 30  # mean saturation below this: hue is meaningless (grey/white/black garment), only saturation counts
-MAX_DETAIL_STD = 10.0  # std of luminance minus its blur above which the garment counts as printed/patterned
+# Texture is measured on the HIGH-frequency luminance only (L minus its blur, sigma SIGMA_FRACTION of the width),
+# so a lit-from-above gradient on one colour is not texture. Thresholds from the real garments (docs/09 #68):
+# black T-shirts hf_std 8.1-9.3 / frac 0.006-0.009 (flatten); pink T-shirt with text 32 / 0.46, joggers with a
+# white print 33.6 / 0.17 (keep). Small text or a logo can have a low std but always has strong outliers: frac.
+MAX_DETAIL_STD = 16.0  # std of the high-frequency luminance above which the garment counts as printed/patterned
+DETAIL_OUTLIER = 25.0  # |high-frequency luminance| above this is print/text, not fabric
+MAX_DETAIL_FRAC = 0.015  # share of outlier pixels above which the garment counts as printed
 
 
 def _blur_masked(x: np.ndarray, m: np.ndarray, sigma: float) -> np.ndarray:
@@ -39,13 +45,25 @@ def is_near_solid(img: np.ndarray, opaque: np.ndarray | None = None) -> bool:
         r = abs(complex((w * np.cos(hue)).sum(), (w * np.sin(hue)).sum()))
         if np.degrees(np.sqrt(-2 * np.log(max(r, 1e-9)))) > MAX_HUE_STD:
             return False
-    lab = cv2.cvtColor(np.ascontiguousarray(img[:, :, :3]), cv2.COLOR_RGB2LAB).astype(np.float32)
+    m = texture_measures(img, opaque)
+    return m is not None and m["hf_std"] <= MAX_DETAIL_STD and m["hf_frac"] <= MAX_DETAIL_FRAC
+
+
+def texture_measures(img: np.ndarray, opaque: np.ndarray | None = None) -> dict | None:
+    """High-frequency luminance over the opaque area (5 px in from the edge): its std and the share of pixels
+    whose |value| exceeds DETAIL_OUTLIER. Low-frequency lighting (gradients, broad shadows) is removed first."""
+    if opaque is None:
+        opaque = img[:, :, 3] >= 250
+    if opaque.sum() < 100:
+        return None
+    L = cv2.cvtColor(np.ascontiguousarray(img[:, :, :3]), cv2.COLOR_RGB2LAB).astype(np.float32)[:, :, 0]
     xs = np.nonzero(opaque.any(axis=0))[0]
     sigma = max(SIGMA_FRACTION * (xs[-1] - xs[0] + 1), 1.0)
-    L = lab[:, :, 0]
-    detail = (L - _blur_masked(L, opaque.astype(np.float32), sigma))[cv2.erode(opaque.astype(np.uint8),
-                                                                               np.ones((5, 5), np.uint8)) > 0]
-    return detail.size > 0 and float(detail.std()) <= MAX_DETAIL_STD
+    inner = cv2.erode(opaque.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    hf = (L - _blur_masked(L, opaque.astype(np.float32), sigma))[inner]
+    if hf.size == 0:
+        return None
+    return {"hf_std": float(hf.std()), "hf_frac": float((np.abs(hf) > DETAIL_OUTLIER).mean())}
 
 
 def flatten_lighting(img: np.ndarray, strength: float = FLATTEN_STRENGTH) -> np.ndarray:

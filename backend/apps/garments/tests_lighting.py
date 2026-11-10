@@ -49,3 +49,36 @@ class FlattenTests(SimpleTestCase):
         noise = rng.integers(0, 2, (320, 220))[..., None] * 120 + 60  # black/grey print, same hue
         img = garment(lambda ys, xs: (noise * np.ones((1, 1, 3))).astype(np.uint8))
         np.testing.assert_array_equal(lighting.flatten_lighting(img), img)
+
+
+def solid_black(ys, xs):
+    """Black T-shirt lit from above, with a fine knit texture."""
+    rng = np.random.default_rng(3)
+    v = 18 + 40 * ys / 320 + rng.normal(0, 3, ys.shape)
+    return np.clip(v, 0, 255)[..., None].repeat(3, axis=2).astype(np.uint8)
+
+
+class TextureThresholdTests(SimpleTestCase):
+    """The three kinds of garment the thresholds were chosen for (docs/09 #68)."""
+
+    def test_solid_with_gradient_is_flattened(self):
+        img = garment(solid_black)
+        m = lighting.texture_measures(img)
+        self.assertLess(m["hf_std"], lighting.MAX_DETAIL_STD)
+        self.assertTrue(lighting.is_near_solid(img), m)
+
+    def test_solid_with_small_text_is_kept(self):
+        img = garment(solid_black)
+        for i, word in enumerate(("TRYON", "STUDIO")):  # small chest text, ~3 % of the area
+            cv2.putText(img, word, (55, 90 + 28 * i), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (235, 235, 235, 255), 2)
+        m = lighting.texture_measures(img)
+        self.assertGreater(m["hf_frac"], lighting.MAX_DETAIL_FRAC)
+        self.assertFalse(lighting.is_near_solid(img), m)
+        np.testing.assert_array_equal(lighting.flatten_lighting(img), img)
+
+    def test_solid_with_large_print_is_kept(self):
+        img = garment(solid_black)
+        cv2.circle(img, (110, 150), 70, (230, 230, 230, 255), -1)  # big white print on the chest
+        cv2.circle(img, (110, 150), 40, (25, 25, 25, 255), 8)
+        self.assertFalse(lighting.is_near_solid(img), lighting.texture_measures(img))
+        np.testing.assert_array_equal(lighting.flatten_lighting(img), img)

@@ -217,3 +217,7 @@ _(none blocking P0)_
 67. **Solid-colour garments** (2026-11-10): near-solid garments get 80 % of their low-frequency photo lighting removed
     once at cleaning (`GARMENT_FLATTEN_LIGHTING`, default 1); prints untouched. Sleeves warped premultiplied (dark
     edges in the sleeve/torso overlap). Both current demo garments are textured (detail std ~33), so not flattened.
+68. **Texture thresholds from real garments** (2026-11-10): high-frequency luminance (L minus blur at 8 % width),
+    std <= 16 and outlier share (|hf| > 25) <= 1.5 %. Measured: black T-shirts #19/#27/#28 8.1 / 0.9 %, #26 9.3 /
+    0.6 % (flatten); pink T-shirt with text #4/#17 32.2 / 46 %, maroon joggers with white print #23 33.6 / 17 %,
+    demo pants #18 33.5 / 24 % (keep). Synthetic: solid+gradient 3.7 / 0 %, small text 28 / 8.3 %, large print 50 / 40 %.
