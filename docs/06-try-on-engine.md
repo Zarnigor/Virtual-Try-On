@@ -49,3 +49,24 @@ If it fails, stop and discuss the approach before continuing.
 ## Performance
 Result in under about 2 s without AI. AI is only for the optional realistic pass.
 Libraries: `scikit-image` PiecewiseAffineTransform, or OpenCV `remap` / thin-plate spline.
+
+## Engine as built (2026-11-10, `apps/tryon_engine/warp.py`, entry point `render_tryon`)
+Scanline strips (torso, pants) + rigid affine sleeves. Diagnosed on the 6 real avatars with
+`tools/tryon_check/run.py` (before/after images in `tools/tryon_check/out/compare/`, not in git). Rules:
+- **Lengths follow the garment, widths follow the body.** One vertical scale per piece (T-shirt: body/garment
+  shoulder width; pants: waist->crotch rise, both anchored). Every row's width is the body's span at that row
+  (landmarks for the torso, the figure mask for the legs). Pinning each garment row to the same-named body row
+  (day-1 version) distorted the garment wherever the two disagree (body hip = widest row just above the crotch).
+- **T-shirt hem** = the garment's own length (was `hip + 0.3*(crotch-hip)` for every garment). Cut, not
+  squeezed, if it would end more than 35 % of crotch->knee below the crotch. The collar above the shoulder line is kept.
+- **Sleeves**: rigid piece (uniform scale + rotation), outer edge along the figure's outer silhouette edge
+  (deltoid, then arm), attached at the shoulder. Shortened along the arm (warning) if it would pass half the
+  arm. The body `armpit` landmark is not used: it is where the arms separate in the mask, far below the
+  anatomical armpit (was: fixed `±22 px` sliver from shoulder to `armpit + 0.5*(crotch-chest)`).
+- **Pants**: full length if the hem lands within 5 % of figure height of the ankle (it breaks over the shoe),
+  else it ends where the garment ends. Below the knee the hem keeps the garment's own flare relative to its knee
+  (was: squeezed to ankle width, 0.25x). Inner leg edges start at the crotch point (was `±5`/`±10 px`).
+- **Hands and forearms above the garment**: arm runs from the figure mask beyond the sleeve hem are copied back
+  from the base after compositing. Arms touching the body cannot be separated (warning "arm ... not separated").
+- **Warnings** report distortion (horizontal / vertical scale of one segment > 1.4x), not width change.
+- Order: pants under the T-shirt.
