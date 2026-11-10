@@ -26,7 +26,7 @@ These come from the product owner. Do not change them without asking. Log: `09-o
     **shorts or tight leggings**. Arms must not touch the torso, legs apart. Show the sample (tight short-sleeve top + shorts).
 12. Do NOT build anything that removes the user's clothes or redraws their body. Require tight clothing at upload instead.
 13. Garment photo: one garment, front view; user declares type. **MVP types: `tshirt` (short sleeve or sleeveless) and `pants` only.**
-    Hanger/mannequin photos are allowed: AI cleaning removes them (P0). Other types are rejected (WRONG_TYPE).
+    Hanger/mannequin photos are allowed: AI cleaning removes them (P0) **when `AI_CLEANING_ENABLED=1`; off for now, docs/09 #55**. Other types are rejected (WRONG_TYPE).
 14. Only adults: reject suspected minors for body photos (prompt 02) and require an "I am 18+" confirmation.
 
 ## Checks order (cost control)

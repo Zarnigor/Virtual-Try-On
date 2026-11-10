@@ -21,7 +21,8 @@ but the frontend must fully work too (React is required). The owner works and re
   Auth: email + password only (no Google sign-in). Image model: **Nano Banana 2 (standard)** via the official Gemini API.
 - **The garment always adapts to the body.** Garment real size is NOT entered. No tight/loose fit label.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
-- Garment AI cleaning (hanger/background removal, prompt 04) is **in P0**.
+- Garment AI cleaning (hanger/background removal, prompt 04) is in P0 but **off for now** (`AI_CLEANING_ENABLED=0`, no prepaid
+  image credits, docs/09 #55): garments are cleaned by rembg only.
 - Realistic render is saved with the outfit. Originals are deleted after processing.
 
 ## Hard rules (do not break)
@@ -98,7 +99,7 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-Last updated: 2026-11-09. The first task (summary + plan) is done. The owner approved the 10-step plan below.
+Last updated: 2026-11-10. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
 - [ ] 1. Day-1 experiment, properly: 3 real male avatars (avatar-prep + landmark editor), fix sleeves
@@ -137,7 +138,11 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `apps/jobs/gemini.py`, cache `ai_cache.py`, race-safe daily slot `limits.py`, `WRONG_GARMENT_TYPE`, `Garment.ai_skipped`
       + frontend dev warning). Committed (17644c8..5727582); separate daily limits per kind (#52). **Real-API check done 2026-11-09 on `gemini-3.5-flash-lite`:**
       8/8 verdicts as expected (6 photos + 2 wrong-type runs), responseJsonSchema accepted, 1.5-18 s per call. The earlier
-      model (`gemini-3.8-flash`, still in .env) timed out / 503'd. Owner to choose the .env model. Owner to review the defaults in #47-49. Still to do: prompt 04, quality check, Save/Cancel, delete original.
+      model (`gemini-3.8-flash`, still in .env) timed out / 503'd. Owner to choose the .env model. Owner to review the defaults in #47-49.
+      **2026-11-10 (docs/09 #55):** prompt 04 behind `AI_CLEANING_ENABLED` (default 0, rembg only; 1 = stub that fails
+      clearly). `AI_DEV_BYPASS` defaults to 0 in `.env.example` and docker-compose: set `AI_DEV_BYPASS=1` in `.env` for
+      local testing without a key (body uploads fail closed with `AI_UNAVAILABLE` otherwise, prompt 02 is not wired).
+      100 backend tests, tsc, 35 vitest pass. Still to do: prompt 04 (needs credits), quality check, Save/Cancel, delete original.
 - [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.
 - [ ] 8. Try-on: hands/forearms above the garment, `quality_warnings[]`, explicit `POST outfits/` save, screens 10-12 per design.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.

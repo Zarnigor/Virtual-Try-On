@@ -17,9 +17,12 @@ Image model: **Nano Banana 2 (standard)** via the official Gemini API.
    code (`ok: true` alone is never trusted); invalid/empty JSON -> `AI_RESPONSE_INVALID`. Verdicts are cached by image hash
    (+ declared type, prompt hash, model): a cache hit makes no AI call and uses no daily slot. Code: `apps/jobs/ai_schemas.py`,
    `apps/jobs/tasks.py` (`_check_garment_with_ai`), `apps/jobs/gemini.py`, `apps/jobs/ai_cache.py`, `apps/jobs/limits.py`.
-3. AI cleaning: `04-garment-cleaning.txt` (image model, 3:4, 1K). Background colour from garment brightness
-   (white garments: #808080, otherwise #EDEDED).
-4. rembg (or flat-colour keying) -> transparent PNG -> crop to the alpha bounding box.
+3. AI cleaning (**optional, `AI_CLEANING_ENABLED`, default off**, docs/09 #55): `04-garment-cleaning.txt` (image model, 3:4, 1K).
+   Background colour from garment brightness (white garments: #808080, otherwise #EDEDED). Not built yet: with the flag on,
+   the job fails with `CLEAN_FAILED` before prompt 01 runs. **With the flag off, hanger/mannequin photos are not cleaned**:
+   the hanger stays in the image wherever rembg keeps it.
+4. rembg (or flat-colour keying) -> transparent PNG -> crop to the alpha bounding box. With cleaning off this is the only
+   cleaning step: rembg returns the mask only, the original pixels are kept, alpha is added (`_rembg_clean`).
 5. Quality check (code): compare mean colour and area/shape of the garment before/after; large difference = reject.
 6. User preview: Save or Cancel. Only Save persists. Delete the original upload.
 7. LandmarkEditor with the garment's landmark set; the user chooses visibility.

@@ -169,3 +169,10 @@ _(none blocking P0)_
     until the user moves a point). Save is disabled until every point is placed, with the hint "Saqlash uchun barcha
     nuqtalarni qoʻying (n / total)."; a failed save shows the backend's `LANDMARKS_INVALID` message.
 
+## Decided 2026-11-10: AI garment cleaning off for now, decided by owner
+55. **AI cleaning (prompt 04) is optional and off** (`AI_CLEANING_ENABLED`, default `0`). Reason: the image model needs
+    prepaid credits we do not have. Off: `run_garment_cleaning` runs prompt 01 (unchanged) then rembg only (mask only,
+    original pixels kept, alpha added, cropped). Hanger/mannequin photos are not cleaned. On: prompt 04 is not built, so
+    the job fails at once with `CLEAN_FAILED` (clear detail) before prompt 01, so no AI call or daily slot is spent.
+    Also: `AI_DEV_BYPASS` now defaults to `0` in `.env.example` and in the docker-compose fallback (never bypass unless
+    `.env` says so). The model name for prompt 01 comes only from `GEMINI_VALIDATION_MODEL`.

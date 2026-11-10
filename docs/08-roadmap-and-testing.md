@@ -13,7 +13,7 @@ If the result is poor, stop and decide (fallbacks in the same file) before build
 - Seed command for 6 avatars (data from the prepared images, no admin UI).
 - Own-body flow: upload, code checks, rembg, landmarks, confirm/lock, delete body, measurements change once per year.
 - Avatar flow: sex + required measurements -> nearest avatar.
-- Garment upload with **AI cleaning** (prompts 01 and 04, Nano Banana 2): hanger photos allowed, preview Save/Cancel, landmark marking, private visibility.
+- Garment upload with **AI cleaning** (prompts 01 and 04, Nano Banana 2; prompt 04 off for now via `AI_CLEANING_ENABLED`, docs/09 #55): hanger photos allowed, preview Save/Cancel, landmark marking, private visibility.
 - Starter catalog prepared offline.
 - Try-on engine (mesh warp: T-shirt torso + 2 sleeves, pants waist-hip + 2 legs), composite.
 - Body AI validation (prompt 02): P0 recommended, see open question 12.
