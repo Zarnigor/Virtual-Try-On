@@ -726,3 +726,105 @@ class TshirtLayerTests(SimpleTestCase):
     def test_layer_order_is_explicit(self):
         self.assertEqual(warp.LAYER_ORDER, ("avatar", "pants", "shoulder_cap", "tshirt_torso", "tshirt_sleeves",
                                             "head_neck", "hands_forearms"))
+
+
+INNER = (20, 20, 20, 255)  # the inner back collar of the synthetic crew-neck T-shirt
+
+
+class NeckFixTests(SimpleTestCase):
+    """TRYON_NECK_FIX: transparent inner back collar, crisp head/neck edge, smooth shoulder alpha, neck zone only."""
+
+    def crew_tshirt(self):
+        """T-shirt with a flat back rim (x 120..180 at y 8), sloping shoulders and a dark inner back collar."""
+        g, glm = tshirt()
+        g[:] = 0
+        cv2.fillPoly(g, [np.array([(120, 8), (180, 8), (230, 30), (230, 320), (70, 320), (70, 30)], np.int32)], SHIRT)
+        cv2.fillPoly(g, [np.array([(70, 30), (8, 110), (40, 135), (75, 100)], np.int32)], SHIRT)
+        cv2.fillPoly(g, [np.array([(230, 30), (292, 110), (260, 135), (225, 100)], np.int32)], SHIRT)
+        yy, xx = np.mgrid[0:g.shape[0], 0:g.shape[1]]
+        inner = (((xx - 150) / 24.0) ** 2 + ((yy - 8) / 18.0) ** 2 <= 1) & (yy >= 8)
+        g[inner] = INNER
+        return g, glm
+
+    def layers(self, fix):
+        base, lm = avatar()
+        g, glm = self.crew_tshirt()
+        _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)], neck_fix=fix)
+        return dbg["tshirt_layer"][:, :, 3], dbg, lm
+
+    def test_inner_back_collar_is_transparent_and_the_ring_stays(self):
+        on, dbg, lm = self.layers(True)
+        off, _, _ = self.layers(False)
+        op = dbg["neck_opening"]
+        cx, y0, hw = int(op["cx"]), int(op["y0"]), op["hw"]
+        self.assertEqual(int(off[y0 + 10, cx]), 255)  # flag off: the dark inner back is drawn
+        self.assertEqual(int(on[y0 + 10, cx]), 0)  # flag on: transparent, the avatar's neck shows
+        self.assertEqual(int(on[y0 + 4, cx - int(hw) + 6]), 0)
+        self.assertEqual(int(on[y0 + 10, cx + int(hw) + 6]), 255)  # the collar ring beside it is untouched
+        below = int(y0 + op["depth"]) + 6
+        self.assertEqual(int(on[below, cx]), 255)  # and the ring under it (the front neckline)
+
+    def test_nothing_changes_outside_the_neck_zone(self):
+        on, _, lm = self.layers(True)
+        off, _, _ = self.layers(False)
+        z0, z1 = warp.neck_zone_rows(lm, H)
+        np.testing.assert_array_equal(on[:z0], off[:z0])
+        np.testing.assert_array_equal(on[z1 + 1:], off[z1 + 1:])
+        self.assertTrue((on[z0:z1 + 1] != off[z0:z1 + 1]).any())
+
+    def test_the_head_never_gets_the_opening_or_the_skin_repainted(self):
+        base, lm = avatar()
+        g, glm = self.crew_tshirt()
+        rgb_on, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)], neck_fix=True)
+        # the avatar's pixels in the opening are the avatar's own (the base image), not painted
+        op = warp.render_tryon(base, lm, [("tshirt", g, glm)])[2]["neck_opening"]
+        y, x = int(op["y0"]) + 12, int(op["cx"])
+        np.testing.assert_allclose(rgb_on[y, x], SKIN[:3], atol=1)
+
+    def test_v_neck_or_wide_rim_is_left_alone(self):
+        base, lm = avatar()
+        g, glm = tshirt()  # flat top as wide as the shoulders: not a crew neck
+        _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        self.assertNotIn("neck_opening", dbg)
+        self.assertIsNone(warp.back_collar_geometry(g[:, :, 3] > 128, glm))
+
+    def test_a_solid_block_without_a_darker_inner_back_is_left_alone(self):
+        base, lm = avatar()
+        g, glm = self.crew_tshirt()
+        g[(g[:, :, :3] == np.array(INNER[:3])).all(axis=2)] = SHIRT  # inner back painted like the ring
+        _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        self.assertNotIn("neck_opening", dbg)
+
+    def test_edge_ramp_is_1_to_2_px(self):
+        base, lm = avatar()
+        mask = warp.figure_mask(base)
+        soft = lambda f: int(((lambda w: (w > 0.02) & (w < 0.98))(warp.head_neck_overlay(mask, lm, f))).sum())  # noqa: E731
+        self.assertLess(soft(warp.NECK_FEATHER_FIX), 0.6 * soft(warp.NECK_FEATHER))
+        # the ramp across the neck's side edge is at most 2 px wide
+        w = warp.head_neck_overlay(mask, lm, warp.NECK_FEATHER_FIX)[150, :]
+        edge = np.nonzero((w > 0.02) & (w < 0.98))[0]
+        self.assertLessEqual(len(edge), 4)  # two edges, 1-2 px each
+
+    def test_shoulder_alpha_is_smoothed_and_the_interior_untouched(self):
+        _, lm = avatar()
+        layer = np.zeros((H, W, 4), np.uint8)
+        layer[:, :, :3] = SHIRT[:3]
+        rng = np.random.default_rng(3)
+        edge = (300 + 0.4 * (np.arange(H) - 230)).astype(int) + rng.integers(-1, 2, H)  # jittery slope
+        for y in range(230, 300):
+            layer[y, :edge[y], 3] = 255
+        out = warp.smooth_shoulder_alpha(layer, lm)
+
+        def position(a):  # sub-pixel edge x per row = coverage
+            return (a[240:290, :, 3].astype(float) / 255).sum(axis=1)  # away from the block's own end rows
+
+        roughness = lambda p: float(np.abs(np.diff(p, 2)).sum())  # noqa: E731
+        self.assertLess(roughness(position(out)), 0.6 * roughness(position(layer)))
+        solid = cv2.erode((layer[:, :, 3] == 255).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+        np.testing.assert_array_equal(out[solid], layer[solid])
+        z0, z1 = warp.neck_zone_rows(lm, H)
+        self.assertTrue(z0 <= 230 and 300 <= z1)
+        # colour of newly visible edge pixels is the garment's, never black
+        vis = (out[:, :, 3] > 0) & (layer[:, :, 3] == 0)
+        self.assertTrue(vis.any())
+        self.assertTrue((out[vis][:, :3] == np.array(SHIRT[:3])).all())

@@ -271,6 +271,15 @@ def _leg_run(mask: np.ndarray, y: int, side: str, axis: float, near: float):
 TSHIRT_EASE = 0.04  # shoulder line and every torso row: body + 4 %
 NECK_MARGIN = 6  # px each side of the neck landmark width that the head/neck overlay covers
 NECK_FEATHER = 1.5  # px sigma of the head/neck overlay edge (~3 px ramp)
+NECK_FEATHER_FIX = 0.6  # px sigma in the neck zone with TRYON_NECK_FIX: a 1-2 px antialiased edge
+NECK_ZONE = 0.06  # neck zone = neck row .. shoulder row, +- this fraction of the figure height
+OPENING_MAX_WIDTH = 0.58  # back-collar rim wider than this x the chest span is not a crew neck (V necks, lapels)
+OPENING_MIN_WIDTH = 0.12
+OPENING_DEPTH = 0.33  # inner opening depth below the rim top, x its width (crew neck, front lower than back)
+OPENING_INSET = 0.1  # the opening is this share narrower than the rim on each side: the collar ring stays
+OPENING_DARKER = 0.9  # the inner back must be darker than the collar ring under it by this factor (mean luminance)
+OPENING_FEATHER = 0.7  # px sigma of the opening's edge (antialiased, ~1.5 px)
+SHOULDER_SMOOTH = 1.5  # px sigma of the shoulder-edge alpha smoothing inside the neck zone
 NECK_ARC = 0.25  # the overlay's lower edge dips by this x neck width at the centre (crew collar arc)
 NECK_RISE = 0.3  # ... and rises by this x neck width above the neck row at the sides (U shape)
 CAP_FEATHER = 1.0  # px sigma of the shoulder-cap fill edge (~2 px)
@@ -573,6 +582,10 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
         info["tshirt_hem"] = torso[-1]
         info["tshirt_parts"] = parts
         info["tshirt_shoulders"] = (float(shoulders["left"][0]), float(shoulders["right"][0]))
+        geo = back_collar_geometry(alpha, g, img)  # garment coordinates -> the collar mapping used for the rows above
+        if geo:  # the shoulder line (same uniform scale, centred on the body)
+            info["neck_opening"] = {"cx": a_cx + (geo["cx"] - g_cx) * s, "hw": geo["hw"] * s, "y0": to_dst(geo["y0"]),
+                                    "depth": geo["depth"] * s}
     return result, warnings
 
 
@@ -582,7 +595,106 @@ def tshirt_scale(g: dict, a: dict) -> float:
         (_f(g["shoulder"]["right_x"]) - _f(g["shoulder"]["left_x"]))
 
 
-def head_neck_overlay(base_mask: np.ndarray, lm: dict) -> np.ndarray:
+def back_collar_geometry(alpha: np.ndarray, g: dict, img: np.ndarray | None = None) -> dict | None:
+    """Garment coordinates of the inner back collar of a crew neck, or None. A ghost-mannequin photo shows the
+    inside of the back of the collar through the neck hole: dark fabric between the back rim (the garment's flat
+    top edge, found as the run of columns whose top pixel is within 3 px of the highest one, around the centre) and
+    the front neckline below it (modelled as a half ellipse OPENING_DEPTH x the rim width deep). Returns
+    {cx, hw, y0, depth}; None if the rim is not crew-neck sized (V necks, lapels: nothing is removed) or, when the
+    image is given, if the inside is not clearly darker than the ring below it (nothing to tell them apart)."""
+    chest_w = _f(g["chest"]["right_x"]) - _f(g["chest"]["left_x"])
+    cx0 = (_f(g["shoulder"]["left_x"]) + _f(g["shoulder"]["right_x"])) / 2
+    lo, hi = max(int(cx0 - 0.5 * chest_w), 0), min(int(cx0 + 0.5 * chest_w) + 1, alpha.shape[1])
+    if hi - lo < 10:
+        return None
+    sub = alpha[:, lo:hi]
+    has = sub.any(axis=0)
+    top = np.where(has, sub.argmax(axis=0), 10 ** 6)
+    mid = (hi - lo) // 2
+    y_top = int(top[max(mid - int(0.1 * chest_w), 0):mid + int(0.1 * chest_w) + 1].min())
+    if y_top >= 10 ** 6:
+        return None
+    flat = top <= y_top + 3
+    a = b = mid
+    while a > 0 and flat[a - 1]:
+        a -= 1
+    while b < len(flat) - 1 and flat[b + 1]:
+        b += 1
+    width = b - a + 1
+    if not OPENING_MIN_WIDTH * chest_w <= width <= OPENING_MAX_WIDTH * chest_w:
+        return None
+    geo = {"cx": lo + (a + b) / 2.0 + 0.5, "hw": width / 2.0 * (1 - OPENING_INSET), "y0": float(y_top),
+           "depth": OPENING_DEPTH * width}
+    if img is not None:  # a solid block of one colour has no inner back to remove: it must be darker than the ring
+        lum = cv2.cvtColor(np.ascontiguousarray(img[:, :, :3]), cv2.COLOR_BGR2GRAY).astype(np.float32)
+        yy, xx = np.mgrid[0:alpha.shape[0], 0:alpha.shape[1]].astype(np.float32)
+        ex, ey = (xx + 0.5 - geo["cx"]) / geo["hw"], (yy + 0.5 - geo["y0"]) / geo["depth"]
+        inside = (ex * ex + ey * ey <= 0.64) & (yy >= geo["y0"]) & alpha
+        ring = (ey > 1.1) & (ey < 1.1 + 0.35) & (np.abs(ex) <= 0.8) & alpha
+        if inside.sum() < 20 or ring.sum() < 20 or lum[inside].mean() > OPENING_DARKER * lum[ring].mean():
+            return None
+    return geo
+
+
+def neck_zone_rows(lm: dict, H: int) -> tuple[int, int]:
+    """First and last row of the neck zone: neck row .. shoulder row, +- NECK_ZONE of the figure height."""
+    fig_h = _f(lm.get("foot_bottom", {}).get("y", H - 50)) - _f(lm.get("head_top", {}).get("y", 50))
+    return (max(int(_f(lm["neck"]["y"]) - NECK_ZONE * fig_h), 0),
+            min(int(_f(lm["shoulder"]["y"]) + NECK_ZONE * fig_h), H - 1))
+
+
+def clear_back_collar(layer: np.ndarray, opening: dict | None, lm: dict) -> np.ndarray:
+    """T-shirt layer with its inner back collar made transparent (alpha only; RGB and the avatar are untouched):
+    the avatar's own neck shows through. The region is the column + half ellipse of `opening` (dst px) inside the neck zone,
+    antialiased by OPENING_FEATHER. Everything outside the neck zone rows is returned unchanged."""
+    if not opening or "neck" not in lm:
+        return layer
+    H, W = layer.shape[:2]
+    z0, z1 = neck_zone_rows(lm, H)
+    yy, xx = np.mgrid[z0:z1 + 1, 0:W].astype(np.float32)
+    ex = (xx + 0.5 - opening["cx"]) / max(opening["hw"], 1e-6)
+    ey = (yy + 0.5 - opening["y0"]) / max(opening["depth"], 1e-6)
+    # a column above the rim top line (the rim itself belongs to the opening) + the half ellipse below it
+    rim = 1.0 / (1 - OPENING_INSET)  # the full rim width: its top lip (ey <= 0.1) belongs to the opening
+    inside = ((np.abs(ex) <= rim) & (ey <= 0.1)) | ((np.abs(ex) <= 1.0) & ((ey <= 0) | ((ex * ex + ey * ey) <= 1.0)))
+    soft = cv2.GaussianBlur(inside.astype(np.float32), (0, 0), OPENING_FEATHER)
+    soft = np.where(inside, np.maximum(soft, 0.5 + 0.5 * soft), soft)  # the inside is cleared at least half
+    out = layer.copy()
+    out[z0:z1 + 1, :, 3] = np.clip(np.rint(layer[z0:z1 + 1, :, 3] * (1 - np.clip(soft, 0, 1))), 0, 255).astype(np.uint8)
+    return out
+
+
+def smooth_shoulder_alpha(layer: np.ndarray, lm: dict) -> np.ndarray:
+    """T-shirt layer whose alpha edge inside the neck zone rows is smoothed: the binary mask is blurred
+    (SHOULDER_SMOOTH) and thresholded with a ~1.5 px antialiased ramp, which removes the 1 px stair steps of the
+    shoulder slope. Pixels that become visible take the colour of the nearest solid garment pixel; the solid
+    interior (alpha 255 two px away from an edge) and everything outside the zone rows are untouched."""
+    H, W = layer.shape[:2]
+    z0, z1 = neck_zone_rows(lm, H)
+    a = layer[z0:z1 + 1, :, 3]
+    if not a.any():
+        return layer
+    soft = cv2.GaussianBlur((a > 127).astype(np.float32), (0, 0), SHOULDER_SMOOTH)
+    smooth = np.clip((soft - 0.5) * 2.5 + 0.5, 0, 1) * 255
+    interior = cv2.erode((a >= 250).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+    new = np.where(interior, a, np.rint(smooth)).astype(np.uint8)
+    out = layer.copy()
+    out[z0:z1 + 1, :, 3] = new
+    grown = np.zeros((H, W), bool)
+    grown[z0:z1 + 1] = (new > 0) & (a < 250)
+    grown &= layer[:, :, 3] < 250
+    if grown.any():  # colour: local mean of the solid garment pixels around (a single stitch cannot dominate)
+        ok = (layer[:, :, 3] >= 250).astype(np.float32)
+        num = cv2.GaussianBlur(layer[:, :, :3].astype(np.float32) * ok[:, :, None], (0, 0), 2.0)
+        den = cv2.GaussianBlur(ok, (0, 0), 2.0)
+        mean = np.where(den[:, :, None] > 0.05, num / np.maximum(den, 1e-6)[:, :, None], 0)
+        has = grown & (den > 0.05)
+        out[:, :, :3][has] = np.clip(np.rint(mean[has]), 0, 255).astype(np.uint8)
+        _colour_from_nearest_opaque(out, grown & ~has, ok=ok > 0)
+    return out
+
+
+def head_neck_overlay(base_mask: np.ndarray, lm: dict, feather: float = NECK_FEATHER) -> np.ndarray:
     """HxW float weight (0..1) of the avatar's head and neck drawn ON TOP of the garment: figure pixels within the
     neck width + NECK_MARGIN and above a U-shaped lower edge (half ellipse: NECK_ARC x neck width below the `neck`
     row at the centre, rising NECK_RISE x neck width above it at the sides, like a crew collar that wraps the neck),
@@ -601,16 +713,17 @@ def head_neck_overlay(base_mask: np.ndarray, lm: dict) -> np.ndarray:
     bottom = _f(n["y"]) - rise + (depth + rise) * np.sqrt(1 - u * u)  # lowest under the chin centre
     yy = np.arange(H, dtype=np.float32)[:, None]
     out[:] = ((yy < bottom[None, :]) & (xs[None, :] >= lx) & (xs[None, :] <= rx)).astype(np.float32)
-    out = cv2.GaussianBlur(out, (0, 0), NECK_FEATHER)
+    out = cv2.GaussianBlur(out, (0, 0), feather)
     return out * base_mask
 
 
 def shoulder_cap_layer(tshirt: np.ndarray, figure: np.ndarray, lm: dict, head: np.ndarray,
-                       shoulders: tuple | None) -> np.ndarray:
+                       shoulders: tuple | None, skip: tuple | None = None) -> np.ndarray:
     """BGRA layer of the two shoulder caps: figure pixels ABOVE the T-shirt's own top edge, between each collar
     top point (the garment's highest pixel on that side) and the shoulder point, at most CAP_MAX_DEPTH of the
     figure height deep and never above the collar top. Colour: the garment pixel just below, in the same column.
-    Nothing inside the neckline, below the garment's top edge or beyond the shoulder points is touched."""
+    Nothing inside the neckline, below the garment's top edge or beyond the shoulder points is touched.
+    skip: columns (x0, x1) the cap never covers (the opened neckline with TRYON_NECK_FIX: the skin shows there)."""
     H, W = figure.shape
     out = np.zeros_like(tshirt)
     opaque = tshirt[:, :, 3] >= 250
@@ -635,6 +748,8 @@ def shoulder_cap_layer(tshirt: np.ndarray, figure: np.ndarray, lm: dict, head: n
             if y1 > y0:
                 region[y0:y1, x] = True
                 out[y0:y1 + 2, x, :3] = tshirt[min(y1 + 2, H - 1), x, :3]
+    if skip:
+        region[:, max(int(np.floor(skip[0])), 0):max(int(np.ceil(skip[1])) + 1, 0)] = False
     region &= figure & (head < 0.5)
     soft = cv2.GaussianBlur(region.astype(np.float32), (0, 0), CAP_FEATHER)
     out[:, :, 3] = np.clip(np.maximum(soft, region) * 255 * figure, 0, 255).astype(np.uint8)
@@ -1075,13 +1190,15 @@ LAYER_ORDER = ("avatar", "pants", "shoulder_cap", "tshirt_torso", "tshirt_sleeve
 def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600,
                  shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
-                 halo_removal: bool = True):
+                 halo_removal: bool = True, neck_fix: bool = True):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> shoulder cap (only figure pixels above the T-shirt's top
     edge) -> T-shirt torso -> rigid sleeves (each once) -> the avatar's head/neck -> its hands/forearms.
     The realism effects are off by default (TRYON_SHADING / TRYON_CONTACT_SHADOW / TRYON_EDGE_FEATHER); the
     structural steps shoulder_cap / hem_snap / halo_removal are on by default (TRYON_SHOULDER_CAP / TRYON_HEM_SNAP
-    / TRYON_HALO_REMOVAL, see flags.render_flags).
+    / TRYON_HALO_REMOVAL, see flags.render_flags). neck_fix (TRYON_NECK_FIX, default 1): in the neck zone the
+    T-shirt's inner back collar is made transparent (the avatar's neck shows), the head/neck edge is a 1-2 px
+    antialiased edge and the shoulder-edge alpha is smoothed; nothing else changes.
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -1090,7 +1207,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     canvas = base.copy()  # base alpha kept as is: forcing 255 inside the mask showed a grey halo at soft edges
     arms = find_arms(mask, body_lm)
     warnings, info = [], {}
-    head = head_neck_overlay(mask, body_lm)
+    head = head_neck_overlay(mask, body_lm, NECK_FEATHER_FIX if neck_fix else NECK_FEATHER)
     by_type = {t: (img, lm) for t, img, lm in garments if t in ("tshirt", "pants")}
     layers = []
     if "pants" in by_type:
@@ -1108,9 +1225,15 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                                       halo_removal=halo_removal, hem_over=hem_over, under=under)
         warnings += [f"tshirt: {w}" for w in warns]
         if shoulder_cap:
-            cap = shoulder_cap_layer(warped, mask, body_lm, head, info.get("tshirt_shoulders"))
+            op = info.get("neck_opening") if neck_fix else None
+            skip = (op["cx"] - op["hw"] / (1 - OPENING_INSET) - 2, op["cx"] + op["hw"] / (1 - OPENING_INSET) + 2) \
+                if op else None
+            cap = shoulder_cap_layer(warped, mask, body_lm, head, info.get("tshirt_shoulders"), skip)
             info["shoulder_cap"] = cap
             layers.append(("shoulder_cap", cap))
+        if neck_fix:
+            warped = smooth_shoulder_alpha(clear_back_collar(warped, info.get("neck_opening"), body_lm), body_lm)
+        info["tshirt_layer"] = warped
         layers.append(("tshirt", warped))
     for gtype, warped in layers:
         if edge_feather and gtype != "shoulder_cap":

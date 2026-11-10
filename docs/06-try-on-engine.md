@@ -191,6 +191,23 @@ Shoulder landmarks on the sleeves (`normalize_tshirt_landmarks`): when the garme
 at 12 % of the chest span outward of each armpit, on the top outline, with a warning. Otherwise the uniform scale
 shrank the whole garment (torso "distorted 1.45x wider") and the armhole line cut each sleeve in two.
 
+### Neck zone (2026-11-10, docs/09 #85, flag `TRYON_NECK_FIX`, default 1)
+Neck zone = neck row .. shoulder row, +- 6 % of the figure height (`neck_zone_rows`). Only the T-shirt layer's alpha
+and the head/neck edge change there; the avatar is never repainted, other layers are untouched.
+- **Inner back collar transparent** (`back_collar_geometry`, `clear_back_collar`): a ghost-mannequin photo shows the
+  inside of the back of the collar through the neck hole. It is the area between the back rim (the run of columns whose
+  top pixel is within 3 px of the highest one, around the centre) and the front neckline, modelled as a half ellipse
+  0.33 x rim width deep, 10 % narrower than the rim on each side so the collar ring stays. Applied only if the rim is
+  crew-neck sized (12-58 % of the chest span) AND the inside is at least 10 % darker (mean luminance) than the ring below
+  it; otherwise nothing is removed. The region (a column above the rim line + the half ellipse) is made transparent in
+  the finished layer (alpha only, edge antialiased ~1.5 px), so the avatar's own neck shows through.
+- **Head/neck overlay** stays on top; its feather is sigma 0.6 px (1-2 px ramp) instead of 1.5 px (`NECK_FEATHER_FIX`).
+- **Shoulder edge** (`smooth_shoulder_alpha`): in the neck zone rows the binary alpha is blurred (sigma 1.5) and
+  re-thresholded with a ~1.5 px ramp; newly visible pixels take the local mean of solid garment colour; the solid
+  interior is untouched.
+- The shoulder cap skips the columns of the opened neckline (it painted a black lip beside it).
+- Check tool: `tools/tryon_check/neck.py` (before/after crops, 3x, `out/neck/`).
+
 ### Known limits (draft, 2026-11-10; contact sheets: `tools/tryon_check/matrix.py`)
 - **The avatar's own clothes show wherever the garment does not cover them** (never redrawn, hard rule): the grey
   top under a crop top that ends more than ~20 px above the pants (female plus + #34), and its straps beside a wide
@@ -206,3 +223,7 @@ shrank the whole garment (torso "distorted 1.45x wider") and the armhole line cu
   tips) lose 2 px. `TRYON_HALO_REMOVAL=0` keeps the cleaned image as is.
 - **Too long T-shirts** are cut flat at crotch + 35 % (the hem trim is lost: #17 on male plus).
 - **Demo results** precomputed before this change are stale until `build_demo` is run again.
+- **Neck fix on V necks and blouses**: a garment with a dark inside that passes the crew-neck size test (blouse #17) gets
+  a scoop neckline instead of its V. Garments whose inner back is as bright as the ring (white shirts without shading)
+  keep the old look (a flat patch under the chin). `TRYON_NECK_FIX=0` restores the previous behaviour.
+

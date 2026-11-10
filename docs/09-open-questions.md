@@ -279,3 +279,10 @@ _(none blocking P0)_
     avatars, rigid puff sleeves, stale demo results (run `build_demo` again).
     Check tool: `tools/tryon_check/matrix.py` (contact sheet per garment set, `MATRIX_CROP` for zoomed sheets).
 
+## Decided 2026-11-10: neckline compositing (owner asked, built autonomously)
+85. **Neck fix** (`TRYON_NECK_FIX`, default 1, docs/06 "Neck zone"): the T-shirt's inner back collar is made transparent
+    (crew-neck-sized rim, clearly darker than the ring), head/neck edge feather 1.5 -> 0.6 px, shoulder-edge alpha
+    smoothed, all inside the neck zone only. Garment #34 (pink crop top) no longer exists in the DB, and there is no white
+    T-shirt: the check uses #28, the blouse #17 and `white28` (#28 recoloured to white in memory, never saved). Re-run
+    `neck.py` with real ones when uploaded (`NECK_IDS`). Demo results need `build_demo` again.
+
