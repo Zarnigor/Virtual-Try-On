@@ -9,3 +9,9 @@ output/
 .idea/
 *.log
 test-garments/
+
+# try-on check output (tools/tryon_check/run.py)
+tools/tryon_check/out/
+
+# real avatar photos (never committed)
+avatars/
