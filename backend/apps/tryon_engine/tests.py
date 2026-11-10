@@ -418,20 +418,49 @@ class TshirtFitTests(SimpleTestCase):
         self.assertGreater(len(set(bottoms.values())), 3)  # not a straight horizontal edge
         self.assertGreater(centre - side, 0.15 * (n["right_x"] - n["left_x"]))  # dips at the centre
 
-    def test_no_skin_in_the_shoulder_band(self):
+    def collared_tshirt(self):
+        """T-shirt whose top edge rises from the shoulder tips to two collar peaks beside a scooped neckline."""
+        g, glm = tshirt()
+        cv2.fillPoly(g, [np.array([(70, 30), (115, 8), (150, 22), (185, 8), (230, 30)], np.int32)], SHIRT)
+        return g, glm
+
+    def test_shoulder_cap_covers_the_skin_between_collar_and_shoulder_only(self):
         base, lm = avatar()
         trap = np.array([(272, 205), (328, 205), (398, 258), (202, 258)], np.int32)  # sloping trapezius
         cv2.fillPoly(base, [trap], SKIN)
-        g, glm = tshirt()
+        g, glm = self.collared_tshirt()
         rgb, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)])
-        head = warp.head_neck_overlay(warp.figure_mask(base), lm)
-        n = lm["neck"]
+        cap = dbg["shoulder_cap"][:, :, 3] > 0
+        self.assertGreater(int(cap.sum()), 20)  # the trapezius does rise above the garment's shoulder slope
+        tshirt_a = dbg["tshirt_parts"]["torso"][:, :, 3] >= 250
+        cols = np.nonzero(tshirt_a.any(axis=0))[0]
+        top = tshirt_a.argmax(axis=0)
+        peak_l = min((x for x in cols if x < 300), key=lambda x: top[x])
+        peak_r = min((x for x in cols if x >= 300), key=lambda x: top[x])
+        y_top = min(top[peak_l], top[peak_r])
+        ys, xs = np.nonzero(cap)
+        # clipped to its own region: never above the collar top, never inside the neckline, never deep, never
+        # outside the figure, never beyond the shoulder points
+        self.assertGreaterEqual(ys.min(), y_top - 2)
+        self.assertFalse(cap[:, peak_l + 3:peak_r - 2].any())
+        self.assertLessEqual(ys.max() - ys.min(), warp.CAP_MAX_DEPTH * 1090 + 3)
+        self.assertFalse((cap & ~cv2.dilate(warp.figure_mask(base).astype(np.uint8), np.ones((3, 3))).astype(bool)).any())
+        sl, sr = dbg["tshirt_shoulders"]
+        self.assertTrue(sl - 2 <= xs.min() and xs.max() <= sr + 2)
+        # and it does its job: below the collar top, between the collar peaks and the shoulders, no skin is left
         band = np.zeros((H, W), bool)
-        band[n["y"]:lm["shoulder"]["y"] + 30] = True
-        band[:, n["left_x"] - warp.NECK_MARGIN - 2:n["right_x"] + warp.NECK_MARGIN + 3] = False
-        band &= warp.figure_mask(base) & (head < 0.01) & ~dbg["arm_mask"]
+        band[y_top + 2:lm["shoulder"]["y"] + 30, int(sl) + 3:peak_l] = True
+        band[y_top + 2:lm["shoulder"]["y"] + 30, peak_r + 1:int(sr) - 2] = True
+        band &= warp.figure_mask(base) & ~dbg["arm_mask"]
         skin = (np.abs(rgb.astype(int) - np.array(SKIN[:3])).max(axis=2) < 25) & band
         self.assertEqual(int(skin.sum()), 0)
+
+    def test_shoulder_cap_flag_off_draws_nothing(self):
+        base, lm = avatar()
+        cv2.fillPoly(base, [np.array([(272, 205), (328, 205), (398, 258), (202, 258)], np.int32)], SKIN)
+        g, glm = self.collared_tshirt()
+        _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)], shoulder_cap=False)
+        self.assertNotIn("shoulder_cap", dbg)
 
     def test_wide_pants_never_reach_above_their_waist(self):
         base, lm = avatar()
@@ -443,23 +472,32 @@ class TshirtFitTests(SimpleTestCase):
         self.assertFalse(is_pants[:int(np.ceil(dbg["pants_waist_y"]))].any())
         self.assertTrue(is_pants[int(dbg["pants_waist_y"]) + 20].any())
 
-    def test_hem_just_above_the_waist_is_extended_over_the_waistband(self):
+    def test_hem_just_above_the_waist_is_snapped_over_the_waistband(self):
         base, lm = avatar()
         g, glm = tshirt(hem_y=193)  # hem lands ~8 px above the body (= pants) waist
+        g[150:, :, 1] = np.clip(160 - (np.arange(150, g.shape[0]) - 150) * 2, 0, 255)[:, None]  # vertical gradient
+        g[:, :, 1] *= (g[:, :, 3] > 0)
         p, plm = pants()
         rgb, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)])
+        alone, _, dbg_alone = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        self.assertTrue(0 < dbg["pants_waist_y"] - dbg_alone["tshirt_hem"][0] <= warp.HEM_GAP_MAX)
         hem_y, l, r = dbg["tshirt_hem"]
-        self.assertTrue(0 < dbg["pants_waist_y"] - hem_y <= warp.HEM_GAP_MAX)
-        # no gap ROW: between the hem and the pants top, no row is mostly skin/background over the columns that
-        # have pants below (a 1 px notch at the pants' curved side is not a gap line)
+        self.assertGreaterEqual(hem_y, dbg["pants_waist_y"] + warp.HEM_OVER_WAISTBAND)  # over the waistband
+        # stretched, not repeated: the gradient keeps changing down to the hem (a repeated row would be flat)
+        col = rgb[int(hem_y) - 14:int(hem_y) - 1, 300, 1].astype(int)
+        self.assertGreaterEqual(len(set(col.tolist())), 8)
+        self.assertTrue((np.diff(col) <= 0).all())
+        # no gap ROW between the hem and the pants top over the columns that have pants below
         cols = [x for x in range(int(l) + 10, int(r) - 10, 3)
-                if np.abs(rgb[int(dbg["pants_waist_y"]):int(dbg["pants_waist_y"]) + 25, x].astype(int)
+                if np.abs(rgb[int(hem_y) + 2:int(hem_y) + 25, x].astype(int)
                           - np.array(PANTS[:3])).max(axis=1).min() < 30]
         self.assertGreater(len(cols), 30)
-        for y in range(int(hem_y) - 5, int(dbg["pants_waist_y"]) + 8):
+        for y in range(int(dbg_alone["tshirt_hem"][0]) - 5, int(hem_y) + 3):
             row = rgb[y, cols].astype(int)
             bad = (np.abs(row - np.array(SKIN[:3])).max(axis=1) < 25) | (row > 245).all(axis=1)
             self.assertLess(bad.mean(), 0.5, f"gap row at y={y}")
+        off, _, dbg_off = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)], hem_snap=False)
+        self.assertAlmostEqual(dbg_off["tshirt_hem"][0], dbg_alone["tshirt_hem"][0])  # flag off: the gap stays
 
     def test_crop_top_with_pants_is_unchanged(self):
         base, lm = avatar()
@@ -560,3 +598,131 @@ class SleeveOnceTests(SimpleTestCase):
         for half in ("left", "right"):
             mine = [st for st in lines if (st[cv2.CC_STAT_LEFT] < 300) == (half == "left")]
             self.assertEqual(len(mine), 2, (half, [tuple(st) for st in mine]))  # one cuff + one upper stitch
+
+
+class RowWarpTests(SimpleTestCase):
+    """_warp_rows: one clipped, sub-pixel layer."""
+
+    def src(self):
+        img = np.zeros((20, 40, 4), np.uint8)
+        img[:, 10:30] = (10, 200, 90, 255)
+        return img
+
+    def test_nothing_outside_the_rows_and_colour_kept_inside(self):
+        out = warp._warp_rows(self.src(), [(0, 10, 30), (19, 10, 30)], [(100, 50, 110), (160, 50, 110)], 300, 200)
+        a = out[:, :, 3]
+        self.assertFalse(a[:100].any() or a[161:].any())
+        self.assertFalse(a[:, :48].any() or a[:, 112:].any())
+        inner = out[105:155, 55:105]
+        self.assertTrue((inner[:, :, 3] == 255).all())
+        self.assertTrue((inner[:, :, :3] == np.array([10, 200, 90])).all())
+
+    def test_edges_are_sub_pixel(self):
+        rows_src = [(0, 10, 30), (19, 10, 30)]
+        whole = warp._warp_rows(self.src(), rows_src, [(100, 50.0, 70.0), (160, 50.0, 70.0)], 300, 200)
+        half = warp._warp_rows(self.src(), rows_src, [(100, 50.5, 70.5), (160, 50.5, 70.5)], 300, 200)
+        self.assertEqual(whole[130, 50, 3], 255)
+        self.assertEqual(whole[130, 49, 3], 0)
+        self.assertTrue(90 < half[130, 50, 3] < 165)  # half a pixel covered: about half the alpha
+        self.assertTrue(90 < half[130, 70, 3] < 165)
+        np.testing.assert_allclose(half[130, 50, :3], [10, 200, 90], atol=1)  # the colour is not darkened
+
+    def test_width_follows_the_rows_between_control_rows(self):
+        out = warp._warp_rows(self.src(), [(0, 10, 30), (19, 10, 30)], [(100, 50, 110), (160, 20, 140)], 300, 200)
+        widths = (out[:, :, 3] > 128).sum(axis=1)[100:161]
+        self.assertTrue((np.diff(widths) >= 0).all())
+        self.assertAlmostEqual(int(widths[30]), 90, delta=2)
+
+
+class HaloTests(SimpleTestCase):
+    def test_edge_is_eroded_and_recoloured_from_the_interior(self):
+        img = np.zeros((60, 60, 4), np.uint8)
+        img[10:50, 10:50] = (255, 255, 255, 255)  # white photo fringe ...
+        img[13:47, 13:47] = (40, 30, 200, 255)  # ... around the garment colour
+        out = warp.remove_halo(img)
+        self.assertFalse(out[10:12, :, 3].any() or out[:, 10:12, 3].any())  # 2 px gone
+        self.assertTrue((out[12:48, 12:48, 3] == 255).all())
+        visible = out[out[:, :, 3] > 0][:, :3]
+        self.assertTrue((visible == np.array([40, 30, 200])).all())  # no white left
+        np.testing.assert_array_equal(out[20:40, 20:40], img[20:40, 20:40])  # interior untouched
+
+    def test_flag_off_keeps_the_garment_as_cleaned(self):
+        base, lm = avatar()
+        g, glm = tshirt()
+        on, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        off, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)], halo_removal=False)
+        is_shirt = lambda rgb: (np.abs(rgb.astype(int) - np.array(SHIRT[:3])).max(axis=2) < 30)  # noqa: E731
+        self.assertGreater(int(is_shirt(off).sum()), int(is_shirt(on).sum()))
+
+
+class TshirtLayerTests(SimpleTestCase):
+    """The T-shirt's pieces: torso and two rigid sleeves, every garment pixel in exactly one of them."""
+
+    def joined_tshirt(self):
+        """Sleeves that hang down along the torso and stay joined to it below the armpit row (no gap)."""
+        img = np.zeros((330, 300, 4), np.uint8)
+        cv2.fillPoly(img, [np.array([(70, 30), (230, 30), (230, 320), (70, 320)], np.int32)], SHIRT)
+        cv2.fillPoly(img, [np.array([(70, 30), (30, 60), (20, 160), (70, 160)], np.int32)], SHIRT)
+        cv2.fillPoly(img, [np.array([(230, 30), (270, 60), (280, 160), (230, 160)], np.int32)], SHIRT)
+        lm = {"shoulder": {"y": 30, "left_x": 70, "right_x": 230}, "chest": {"y": 100, "left_x": 70, "right_x": 230},
+              "waist": {"y": 200, "left_x": 70, "right_x": 230}, "hem": {"y": 320, "left_x": 70, "right_x": 230},
+              "sleeve_end": {"left": {"x": 20, "y": 160}, "right": {"x": 280, "y": 160}}}
+        return img, lm
+
+    def regions(self, g, glm):
+        alpha = g[:, :, 3] > 128
+        rows = [(glm[k]["y"], glm[k]["left_x"], glm[k]["right_x"]) for k in ("shoulder", "chest", "waist", "hem")]
+        return alpha, {side: warp.sleeve_regions(alpha, glm, side, rows) for side in ("left", "right")}
+
+    def test_sleeve_regions_are_disjoint_and_overlap_the_torso_by_a_few_px(self):
+        for g, glm in (tshirt(), self.joined_tshirt()):
+            alpha, reg = self.regions(g, glm)
+            self.assertFalse((reg["left"][0] & reg["right"][0] & alpha).any())
+            for side in ("left", "right"):
+                own, draw = reg[side]
+                self.assertGreater(int((own & alpha).sum()), 500)
+                self.assertTrue((draw | ~own).all())  # draw contains own
+                extra = draw & ~own & alpha
+                self.assertLessEqual(int(extra.sum(axis=1).max()), 2 * warp.SLEEVE_OVERLAP + 2)
+
+    def test_joined_sleeve_is_split_from_the_torso_below_the_armpit(self):
+        g, glm = self.joined_tshirt()
+        alpha, reg = self.regions(g, glm)
+        torso = alpha & ~reg["left"][0] & ~reg["right"][0]
+        for y in range(105, 158, 5):  # rows where sleeve and torso are one run in the image
+            xs = np.nonzero(torso[y])[0]
+            self.assertTrue(66 <= xs.min() <= 74 and 226 <= xs.max() <= 234, (y, xs.min(), xs.max()))
+            self.assertTrue(reg["left"][0][y, 40] and reg["right"][0][y, 260])
+        self.assertFalse(reg["left"][0][250:, :].any() and (reg["left"][0][250:] & alpha[250:]).any())
+
+    def test_torso_layer_stays_inside_its_rows_and_sleeves_on_their_side(self):
+        base, lm = avatar()
+        g, glm = tshirt()
+        mask = warp.figure_mask(base)
+        info = {}
+        warp.warp_tshirt(lm, glm, g, H, W, arms=warp.find_arms(mask, lm), info=info, mask=mask)
+        parts = info["tshirt_parts"]
+        self.assertEqual(set(parts), {"torso", "sleeve_left", "sleeve_right"})
+        torso = parts["torso"][:, :, 3] > 0
+        for y, l, r in info["tshirt_rows"]:
+            xs = np.nonzero(torso[int(y)])[0]
+            self.assertTrue(len(xs) and xs.min() >= l - 3 and xs.max() <= r + 3, (y, l, r))
+        self.assertFalse(torso[int(info["tshirt_hem"][0]) + 12:].any())
+        self.assertFalse((parts["sleeve_left"][:, 300:, 3] > 0).any())
+        self.assertFalse((parts["sleeve_right"][:, :300, 3] > 0).any())
+
+    def test_shoulder_landmarks_on_the_sleeves_are_moved_to_the_armholes(self):
+        g, glm = tshirt()
+        same, changed = warp.normalize_tshirt_landmarks(glm, g[:, :, 3] > 128)
+        self.assertFalse(changed)
+        self.assertIs(same, glm)
+        wide = {**glm, "shoulder": {"y": 60, "left_x": 20, "right_x": 280}}  # marked at the sleeve tips
+        fixed, changed = warp.normalize_tshirt_landmarks(wide, g[:, :, 3] > 128)
+        self.assertTrue(changed)
+        chest_w = glm["chest"]["right_x"] - glm["chest"]["left_x"]
+        self.assertAlmostEqual(fixed["shoulder"]["left_x"], glm["chest"]["left_x"] - warp.SHOULDER_OVER_CHEST * chest_w)
+        self.assertLess(fixed["shoulder"]["y"], glm["chest"]["y"])
+
+    def test_layer_order_is_explicit(self):
+        self.assertEqual(warp.LAYER_ORDER, ("avatar", "pants", "shoulder_cap", "tshirt_torso", "tshirt_sleeves",
+                                            "head_neck", "hands_forearms"))

@@ -149,6 +149,10 @@ DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
 TRYON_SHADING = os.environ.get("TRYON_SHADING", "0") == "1"
 TRYON_CONTACT_SHADOW = os.environ.get("TRYON_CONTACT_SHADOW", "0") == "1"
 TRYON_EDGE_FEATHER = os.environ.get("TRYON_EDGE_FEATHER", "0") == "1"
+# Structural try-on steps (docs/06 "Layer order"), on by default; set to 0 if one of them produces artifacts.
+TRYON_SHOULDER_CAP = os.environ.get("TRYON_SHOULDER_CAP", "1") == "1"
+TRYON_HEM_SNAP = os.environ.get("TRYON_HEM_SNAP", "1") == "1"
+TRYON_HALO_REMOVAL = os.environ.get("TRYON_HALO_REMOVAL", "1") == "1"
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
