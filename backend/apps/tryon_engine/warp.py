@@ -32,6 +32,9 @@ HANG_LOOSE = 0.5  # loose leg: centreline weight of the body leg (rest: straight
 LOOSE_FROM, LOOSE_FULL = 1.05, 1.15  # garment/body knee width (mean of both legs): smoothstep tight -> loose
 WAISTBAND_CURVE = 0.04  # waistband top edge dips by this fraction of the waist width at the centre
 OPENING_COLOR_DIST = 40  # a hole whose colour is this close to the photo background is a real opening (kept)
+ROW_STEP = 3  # dst px between control rows of the row warp
+ROW_SMOOTH = 5  # control rows averaged per span edge (about 15 px): removes per-row jitter, keeps the silhouette
+ROW_PAD = 3.0  # src px outside a (smoothed) span that still belong to the row: bumps of the real edge
 WHITE_THRESHOLD = 235  # base images without transparency: figure = pixels darker than this in any channel
 
 
@@ -105,7 +108,8 @@ def _interp_span(rows: list, y: float) -> tuple[float, float]:
     return rows[-1][1], rows[-1][2]
 
 
-def _warp_rows(src: np.ndarray, src_rows: list, dst_rows: list, H: int, W: int, pad: float = 1.0) -> np.ndarray:
+def _warp_rows(src: np.ndarray, src_rows: list, dst_rows: list, H: int, W: int,
+               pad: float = ROW_PAD) -> np.ndarray:
     """One clipped layer: every dst row maps linearly onto a src row span. Rows are (y, lx, rx) with y a pixel row
     and lx/rx pixel EDGES (a run of pixels a..b is the span a..b+1); between consecutive rows everything is
     interpolated. Sampling is bilinear on premultiplied colour (cv2.remap), so widths and positions are sub-pixel
@@ -139,6 +143,19 @@ def _warp_rows(src: np.ndarray, src_rows: list, dst_rows: list, H: int, W: int, 
     w[:, :, :3] = np.where(a > 0, w[:, :, :3] / np.maximum(a, 1e-6), 0)
     out[y0:y1 + 1] = np.clip(np.rint(w), 0, 255).astype(np.uint8)
     return out
+
+
+def _smooth_rows(rows: list, window: int = ROW_SMOOTH) -> list:
+    """Rows (y, lx, rx) with lx/rx averaged over `window` neighbours (ends replicated). Silhouette spans read per
+    row jitter by a pixel; unsmoothed, every oblique line inside the garment turns into stair steps."""
+    if len(rows) < 3 or window < 2:
+        return rows
+    a = np.array(rows, np.float64)
+    pad = window // 2
+    k = np.ones(window) / window
+    for c in (1, 2):
+        a[:, c] = np.convolve(np.pad(a[:, c], pad, mode="edge"), k, mode="valid")
+    return [tuple(r) for r in a]
 
 
 def _tail_rows(alpha: np.ndarray, src_rows: list, dst_rows: list, s: float) -> None:
@@ -266,7 +283,6 @@ SLEEVE_OVERLAP = 3  # src px the rigid sleeve reaches past its armhole line over
 CAP_MAX_DEPTH = 0.03  # shoulder cap: at most this fraction of the figure height below the collar top
 HALO_ERODE = 2  # px removed from the garment's alpha edge (photo background fringe)
 PRESCALE_BELOW = 0.8  # garments that would be shrunk more than this are area-resampled to their final size first
-ROW_STEP = 3  # dst px between control rows of the row warp
 
 
 def tshirt_looseness(ratios) -> float:
@@ -357,7 +373,8 @@ def normalize_tshirt_landmarks(g: dict, alpha: np.ndarray) -> tuple[dict, bool]:
 
 def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
                 arms: dict | None = None, info: dict | None = None,
-                mask: np.ndarray | None = None, hem_over: float | None = None) -> tuple[np.ndarray, list]:
+                mask: np.ndarray | None = None, hem_over: float | None = None,
+                under: np.ndarray | None = None) -> tuple[np.ndarray, list]:
     """T-shirt keeps its own silhouette (docs/06 "T-shirt fit"): one uniform scale s for both axes, set so the
     garment's shoulder line = body shoulder + ease; below the shoulders every row is max(garment, body + ease)
     (capped), blended in from the shoulder fit by the chest row; the hem is the garment's own (scaled) length.
@@ -365,7 +382,9 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     Three clipped pieces, each garment pixel in exactly one (docs/06 "Layer order"): the TORSO (row warp of the
     garment without its sleeve regions) and two rigid SLEEVES (uniform s + rotation onto the upper arm, drawn once,
     SLEEVE_OVERLAP px over the torso). hem_over: a row the hem must reach when it ends at most HEM_GAP_MAX px
-    above it (the pants top): the rows below the chest are stretched by those few px, nothing is repeated."""
+    above it (the pants top): the rows below the chest are stretched by those few px, nothing is repeated.
+    under: bool mask of what is worn under the T-shirt (the pants layer): rows that overlap it are at least as wide
+    (a T-shirt hangs over the waistband, the waistband never shows beside it)."""
     warnings: list[str] = []
     g, a = garment_lm, body_lm
     img = _bgra(garment_img)
@@ -516,6 +535,10 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
             run = next((q for q in _runs(mask[min(int(y), H - 1)]) if q[0] <= axis <= q[1]), None)
             if run and run[1] - run[0] < PANTS_MAX_BODY * bw:
                 half = max(half, c - (run[0] - 2), run[1] + 3 - c)
+        if under is not None:
+            run = next((q for q in _runs(under[min(int(y), H - 1)]) if q[0] <= axis <= q[1]), None)
+            if run and run[1] - run[0] < PANTS_MAX_BODY * bw:
+                half = max(half, c - (run[0] - 1), run[1] + 2 - c)
         l, r = c - half, c + half
         xl, xr = armhole_x("left", y), armhole_x("right", y)  # meet the sleeve's armhole edge: no skin wedge
         l = min(l, xl) if xl is not None else l
@@ -528,6 +551,8 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
             worst = ratio if abs(np.log(ratio)) > abs(np.log(worst)) else worst
     if worst > PANTS_DISTORT_LIMIT or worst < 1 / PANTS_DISTORT_LIMIT:
         warnings.append(f"torso: distorted {max(worst, 1 / worst):.2f}x ({'wider' if worst > 1 else 'narrower'})")
+    n_collar = len(src_rows) - len(torso)
+    src_rows[n_collar:], dst_rows[n_collar:] = _smooth_rows(src_rows[n_collar:]), _smooth_rows(dst_rows[n_collar:])
     if not cut_hem:
         _tail_rows(t_alpha, src_rows, dst_rows, s * v_stretch)
     parts = {"torso": _warp_rows(torso_img, src_rows, dst_rows, H, W)}
@@ -746,7 +771,8 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
         dst_rows.append((y, c - w / 2, c + w / 2))
         if t >= 1:
             track("waist-crotch", sr - sl, w)
-    result = _warp_rows(img, src_rows, dst_rows, H, W)
+    src_rows, dst_rows = _smooth_rows(src_rows), _smooth_rows(dst_rows)
+    result = _warp_rows(img, src_rows, dst_rows, H, W, pad=1.0)
     result = curve_waistband(result, a_wy, hip_dst, dst_rows[0][1], dst_rows[0][2])
     top_dip = WAISTBAND_CURVE * (dst_rows[0][2] - dst_rows[0][1])
     block_l, block_r = dst_rows[-1][1], dst_rows[-1][2]
@@ -806,8 +832,13 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
                 track(f"{side}-leg", sr - sl, r - l)
         if info is not None:
             info.setdefault("pants_leg_rows", {})[side] = dst_rows
+        # the first row stays exact (it joins the waist block); the leg is cut at the crotch axis: no pad there
+        src_rows[1:], dst_rows[1:] = _smooth_rows(src_rows[1:]), _smooth_rows(dst_rows[1:])
         _tail_rows(g_alpha, src_rows, dst_rows, 1 / s_leg)
-        strip = _warp_rows(img, src_rows, dst_rows, H, W)
+        leg_img = img.copy()
+        other = slice(int(np.ceil(g_cx)), None) if side == "left" else slice(0, int(g_cx))
+        leg_img[int(g_cr):, other, 3] = 0  # this leg only: the padded span never samples the other leg
+        strip = _warp_rows(leg_img, src_rows, dst_rows, H, W)
         result = _alpha_composite(result, strip)
 
     for label, r in worst.items():
@@ -891,12 +922,13 @@ def _colour_from_nearest_opaque(img: np.ndarray, where: np.ndarray, ok: np.ndarr
 
 def remove_halo(img: np.ndarray, px: int = HALO_ERODE) -> np.ndarray:
     """Garment without its photo-background fringe: the alpha is eroded by px (the soft edge moves inward and
-    stays soft), and the RGB of the new edge ring (the next px, where fringe colour is still blended in) is taken
-    from the nearest interior pixel. Pixels deeper than 2 * px keep their colour exactly."""
+    stays soft), and the RGB of the new edge ring (the next 2 * px, where fringe colour is still blended in) is taken
+    from the nearest interior pixel. Pixels deeper than 3 * px keep their colour exactly."""
     a = np.ascontiguousarray(img[:, :, 3])
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * px + 1, 2 * px + 1))
     er = cv2.erode(a, k, borderType=cv2.BORDER_CONSTANT, borderValue=0)
-    deep = cv2.erode(er, k, borderType=cv2.BORDER_CONSTANT, borderValue=0)
+    k2 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (4 * px + 1, 4 * px + 1))
+    deep = cv2.erode(er, k2, borderType=cv2.BORDER_CONSTANT, borderValue=0)
     out = img.copy()
     _colour_from_nearest_opaque(out, (er > 0) & (deep < 250), ok=deep >= 250)
     out[:, :, 3] = er
@@ -1067,11 +1099,13 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         warnings += [f"pants: {w}" for w in warns]
         layers.append(("pants", warped))
     if "tshirt" in by_type:
-        hem_over = None
-        if hem_snap and "pants" in by_type:  # the hem overlaps the waistband: no gap line between them
-            hem_over = info["pants_waist_y"] + info["pants_top_dip"] + HEM_OVER_WAISTBAND
+        hem_over, under = None, None
+        if "pants" in by_type:
+            under = layers[0][1][:, :, 3] > 128
+            if hem_snap:  # the hem overlaps the waistband: no gap line between them
+                hem_over = info["pants_waist_y"] + info["pants_top_dip"] + HEM_OVER_WAISTBAND
         warped, warns = garment_layer("tshirt", *by_type["tshirt"], body_lm, H, W, arms, info, mask,
-                                      halo_removal=halo_removal, hem_over=hem_over)
+                                      halo_removal=halo_removal, hem_over=hem_over, under=under)
         warnings += [f"tshirt: {w}" for w in warns]
         if shoulder_cap:
             cap = shoulder_cap_layer(warped, mask, body_lm, head, info.get("tshirt_shoulders"))
