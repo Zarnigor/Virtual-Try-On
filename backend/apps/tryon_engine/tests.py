@@ -239,3 +239,43 @@ class ShadingTests(SimpleTestCase):
         np.testing.assert_array_equal(out[:, :, 3], layer[:, :, 3])
         self.assertLess(out[150, 150, 0], 100)
         np.testing.assert_array_equal(warp.apply_shading(layer, shade, strength=0)[:, :, :3], layer[:, :, :3])
+
+
+class PantsCenterlineTests(SimpleTestCase):
+    def outer_edges(self, garment_scale, flare=40):
+        base, lm = avatar()
+        lm["knee"]["left_leg"] = {"left_x": 238, "right_x": 296}  # knee inward of the thigh (male_plus shape)
+        lm["knee"]["right_leg"] = {"left_x": 304, "right_x": 362}
+        p, plm = pants(flare=flare)
+        if garment_scale != 1:
+            p = cv2.resize(p, (int(p.shape[1] * garment_scale), p.shape[0]), interpolation=cv2.INTER_NEAREST)
+            plm = scale_x(plm, garment_scale)
+        rgb, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)])
+        is_pants = (np.abs(rgb.astype(int) - np.array(PANTS[:3])).max(axis=2) < 40)
+        ky = lm["knee"]["y"]
+        left, right = [], []
+        for y in range(ky - 100, ky + 101, 2):
+            cols = np.where(is_pants[y])[0]
+            left.append(cols[cols < 300].min())
+            right.append(cols[cols >= 300].max())
+        return np.diff(left), np.diff(right)
+
+    def assert_monotonic(self, d):
+        """Edge positions never reverse by more than 1 px in total (a slow bulge counts, not just steps)."""
+        e = np.concatenate([[0], np.cumsum(d)])
+        up = (np.maximum.accumulate(e) - e).max()
+        down = (e - np.minimum.accumulate(e)).max()
+        self.assertLessEqual(min(up, down), 1, e.tolist())
+
+    def test_loose_pants_edges_are_monotonic_across_an_inward_knee(self):
+        dl, dr = self.outer_edges(2)
+        self.assert_monotonic(dl)
+        self.assert_monotonic(dr)
+
+    def test_smooth_centerline_limits_the_knee_pull(self):
+        x = [warp.leg_centerline(y, (670, 252), (860, 267), (1040, 252), 0.25) for y in range(670, 1041, 10)]
+        self.assertLessEqual(max(x) - 252, 0.25 * 15 + 0.5)
+        x_full = warp.leg_centerline(860, (670, 252), (860, 267), (1040, 252), 1.0)
+        self.assertAlmostEqual(x_full, 267, delta=0.5)  # tight: through the knee
+        mono = [warp.leg_centerline(y, (670, 240), (860, 275), (1040, 260), 0.25) for y in range(670, 1041, 5)]
+        self.assertTrue(all(b >= a - 1e-6 for a, b in zip(mono, mono[1:])))

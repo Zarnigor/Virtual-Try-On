@@ -29,6 +29,7 @@ SHADING_RANGE = (0.75, 1.2)
 SHADOW_OPACITY = 0.25  # contact shadow of the garment on the avatar
 SHADOW_OFFSET = (2, 3)  # px inward (towards the axis) and down
 SHADOW_SIGMA = 4
+LOOSE_KNEE_PULL = 0.25  # loose legs: the knee moves the smooth centreline by at most this share of its offset
 HANG_LOOSE = 0.5  # loose leg: centreline weight of the body leg (rest: straight drop from the hip)
 HANG_TIGHT_RATIO, HANG_LOOSE_RATIO = 1.15, 1.35  # garment/leg width: <= tight = body line, >= loose = HANG_LOOSE
 WAISTBAND_CURVE = 0.04  # waistband top edge dips by this fraction of the waist width at the centre
@@ -364,6 +365,24 @@ def _ys(y0: float, y1: float, step: int = 6) -> list[float]:
     return [float(y) for y in ys] + [float(y1)]
 
 
+def leg_centerline(y: float, top: tuple, knee: tuple, ankle: tuple, knee_weight: float) -> float:
+    """Leg centre x at row y; points are (y, x). knee_weight >= 1: the piecewise line through the knee (tight).
+    Otherwise a quadratic Bezier from top to ankle (control at mid height) that is off the straight line at the
+    knee row by knee_weight of the knee's offset; the control x is clamped between the end points so x(y) is
+    monotonic (no kink, no bulge at the knee)."""
+    (y0, x0), (yk, xk), (y2, x2) = top, knee, ankle
+    if knee_weight >= 1:
+        return _interp_span([(y0, x0, x0), (yk, xk, xk), (y2, x2, x2)], y)[0]
+    span = max(y2 - y0, 1e-6)
+    u = min(max((y - y0) / span, 0.0), 1.0)
+    uk = min(max((yk - y0) / span, 0.05), 0.95)
+    xs = x0 + uk * (x2 - x0)
+    target = xs + knee_weight * (xk - xs)
+    x1 = (target - (1 - uk) ** 2 * x0 - uk ** 2 * x2) / (2 * uk * (1 - uk))
+    x1 = min(max(x1, min(x0, x2)), max(x0, x2))
+    return (1 - u) ** 2 * x0 + 2 * u * (1 - u) * x1 + u ** 2 * x2
+
+
 def curve_waistband(layer: np.ndarray, top_y: float, hip_y: float, lx: float, rx: float,
                     depth: float = WAISTBAND_CURVE) -> np.ndarray:
     """Bend the straight waistband top into a slight curve: the centre drops by depth * waist width, the sides stay;
@@ -451,18 +470,20 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
             if mask is not None else None
         knee_bw = (knee_run[1] - knee_run[0]) if knee_run else body_rows[1][2] - body_rows[1][1]
         drop_x = (body_rows[0][1] + body_rows[0][2]) / 2  # leg centre at the crotch row, dropped straight down
+        # Loose or tight is decided once per leg at the knee row (per-row switching would itself make kinks).
+        knee_ratio = (_f(gk["right_x"]) - _f(gk["left_x"])) * s / max(knee_bw, 1e-6)
+        loose = knee_ratio >= HANG_TIGHT_RATIO
+        centre_pts = [(y_, (l_ + r_) / 2) for y_, l_, r_ in body_rows]
+        t_hang = min(max((knee_ratio - HANG_TIGHT_RATIO) / (HANG_LOOSE_RATIO - HANG_TIGHT_RATIO), 0), 1)
+        wb = 1 - t_hang * (1 - HANG_LOOSE)  # hang: loose legs fall towards a straight drop (no V on wide stances)
         src_rows, dst_rows = [], []
         for y in _ys(cr_dst, hem_dst):
             sy = g_cr + (y - cr_dst) * s_leg
             sl, sr = _interp_span(leg_src, sy)
             bl, br = _interp_span(body_rows, y)
-            c = (bl + br) / 2  # the body leg's centreline from the landmarks
-            run = _leg_run(mask, int(y), side, a_cx, c) if mask is not None else None
+            c = leg_centerline(y, *centre_pts, LOOSE_KNEE_PULL if loose else 1.0)
+            run = _leg_run(mask, int(y), side, a_cx, (bl + br) / 2) if mask is not None else None
             bw = (run[1] - run[0]) if run else br - bl
-            # hang: loose legs fall between the body line and a straight drop from the hip (no V on wide stances)
-            ratio = (sr - sl) * s / max(bw, 1e-6)
-            t = min(max((ratio - HANG_TIGHT_RATIO) / (HANG_LOOSE_RATIO - HANG_TIGHT_RATIO), 0), 1)
-            wb = 1 - t * (1 - HANG_LOOSE)
             c = wb * c + (1 - wb) * drop_x
             w = pants_width((sr - sl) * s, bw, cap_ref=knee_bw if y > a_kn_y else None)
             l, r = c - w / 2, c + w / 2

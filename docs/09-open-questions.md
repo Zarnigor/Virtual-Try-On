@@ -197,3 +197,6 @@ _(none blocking P0)_
 60. **Realism pass** (2026-11-10, docs/06 "Realism pass"): shading from the avatar's luminance (strength 0.7), 1 px
     rim removal + feather, 0.25 contact shadow on the figure, loose pants hang half way to a vertical drop, curved
     waistband top. Pure 2D post-processing of the warped garment; nothing of the avatar is redrawn.
+61. **Loose pants do not bend at the knee** (2026-11-10, docs/06 "Loose-leg centreline"): loose legs (knee ratio
+    >= 1.15x) use a smooth monotonic centreline with at most 25 % knee pull; tight legs keep the knee line. Loose/tight
+    and the hang weight are decided per leg, not per row.
