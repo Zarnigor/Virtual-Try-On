@@ -34,6 +34,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
+      - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:
@@ -57,6 +58,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
+      - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:

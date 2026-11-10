@@ -138,6 +138,10 @@ GEMINI_TIMEOUT_S = max(60.0, float(os.environ.get("GEMINI_TIMEOUT_S", 60)))  # s
 GEMINI_RETRY_BACKOFF_S = 2.0  # one retry on 429/5xx after this pause
 AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT", 5))  # body checks per user per day (Asia/Tashkent)
 AI_GARMENT_DAILY_LIMIT = int(os.environ.get("AI_GARMENT_DAILY_LIMIT", 5))  # garment checks per user per day
+# AI garment cleaning (prompt 04, image model) needs prepaid image credits we do not have (docs/09 #55). Off by default:
+# garments go straight to rembg (mask only, original pixels kept). Prompt 04 is not built yet, so turning it on makes
+# every garment job fail with a clear error instead of silently skipping the cleaning.
+AI_CLEANING_ENABLED = os.environ.get("AI_CLEANING_ENABLED", "0") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
 PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", BASE_DIR.parent / "prompts"))  # docker: ./prompts -> /prompts
 

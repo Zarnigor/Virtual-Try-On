@@ -42,5 +42,6 @@ docker compose logs -f backend worker
 docker compose down                                       # stop (add -v to wipe db + media)
 ```
 Optional: `cp .env.example .env` and set `GEMINI_API_KEY` and `GEMINI_VALIDATION_MODEL` (the garment check, prompt 01, is
-wired; the body check is a stub until step 4). `AI_DEV_BYPASS=1` (the docker default) skips the AI; set `AI_DEV_BYPASS=0`
-in .env to call Gemini. Optional `GEMINI_TIMEOUT_S` (minimum 60).
+wired; the body check is a stub until step 4). `AI_DEV_BYPASS=0` is the default (Gemini is called); set `AI_DEV_BYPASS=1`
+in .env to skip the AI locally (DEBUG only; body uploads need it until step 4). `AI_CLEANING_ENABLED=0` (default) cleans
+garments with rembg only; prompt 04 is not built (docs/09 #55). Optional `GEMINI_TIMEOUT_S` (minimum 60).

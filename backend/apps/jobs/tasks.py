@@ -178,13 +178,17 @@ def run_garment_cleaning(job_pk: int):
         _fail(job, "GARMENT_NOT_FOUND")
         return
     try:
+        if settings.AI_CLEANING_ENABLED:
+            # Checked before prompt 01 so a misconfiguration never spends an AI call or a daily slot.
+            _ai_clean_not_built()
         if settings.AI_DEV_BYPASS:  # local dev only: always skips the AI call, cache and slot (docs/09 #24)
             ai = {"ai_skipped": True, "ai_cached": False}
             garment.ai_skipped = True
             garment.save(update_fields=["ai_skipped"])
         else:
             ai = {"ai_skipped": False, **_check_garment_with_ai(job, garment)}
-        # TODO step 6: prompt 04 (AI cleaning, removes hangers) runs here, before rembg; until then rembg only.
+        # AI_CLEANING_ENABLED=0 (default, docs/09 #55): no prompt 04, rembg only. Hangers are NOT removed.
+        # TODO step 6: when prompt 04 is built, run it here (before rembg) if settings.AI_CLEANING_ENABLED.
         _rembg_clean(garment)
         _done(job, {"cleaned": True, **ai})
     except JobRejected as e:
@@ -194,6 +198,13 @@ def run_garment_cleaning(job_pk: int):
         logger.exception("garment_clean job %d failed", job_pk)
         _fail(job, "CLEAN_FAILED", str(e))
         garment.delete()
+
+
+def _ai_clean_not_built():
+    """Stub for prompt 04 (AI garment cleaning). Raises so an enabled flag never silently skips the cleaning."""
+    raise NotImplementedError(
+        "AI_CLEANING_ENABLED=1 but prompt 04 (AI garment cleaning) is not built yet; set AI_CLEANING_ENABLED=0"
+    )
 
 
 def _rembg_clean(garment):
