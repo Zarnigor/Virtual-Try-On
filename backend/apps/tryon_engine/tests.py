@@ -160,3 +160,57 @@ class PantsTests(SimpleTestCase):
         rgb, _, _ = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)])
         y = int(lm["waist"]["y"]) + 20
         np.testing.assert_allclose(rgb[y, 300], SHIRT[:3], atol=30)
+
+
+def scale_x(lm, k):
+    """Landmarks with every *_x multiplied by k."""
+    return {key: scale_x(v, k) if isinstance(v, dict) else (v * k if key.endswith("_x") else v) for key, v in lm.items()}
+
+
+class PantsWidthTests(SimpleTestCase):
+    def test_loose_garment_keeps_its_own_width(self):
+        self.assertEqual(warp.pants_width(150, 100), 150)
+
+    def test_tight_garment_gets_body_plus_ease(self):
+        self.assertAlmostEqual(warp.pants_width(80, 100), 100 * (1 + warp.PANTS_EASE))
+
+    def test_cap_at_body_multiple(self):
+        self.assertAlmostEqual(warp.pants_width(300, 100), 100 * warp.PANTS_MAX_BODY)
+
+    def test_cuff_below_the_knee_is_capped_by_the_knee_not_the_ankle(self):
+        self.assertAlmostEqual(warp.pants_width(120, 30), 54)  # capped by the thin ankle row itself
+        self.assertEqual(warp.pants_width(120, 30, cap_ref=70), 120)  # knee reference: the cuff keeps its width
+        self.assertAlmostEqual(warp.pants_width(300, 30, cap_ref=70), 126)
+
+    def test_waist_blend_goes_from_body_fit_to_garment(self):
+        self.assertAlmostEqual(warp.waist_blend_width(150, 100, 0), 104)
+        self.assertAlmostEqual(warp.waist_blend_width(150, 100, 1), 150)
+        mid = warp.waist_blend_width(150, 100, 0.5)
+        self.assertTrue(104 < mid < 150)
+        self.assertAlmostEqual(warp.waist_blend_width(150, 100, -1), 104)  # clamped
+
+    def test_loose_pants_stay_wider_than_the_leg(self):
+        base, lm = avatar()
+        p, plm = pants(flare=0)
+        p = cv2.resize(p, (p.shape[1] * 2, p.shape[0]), interpolation=cv2.INTER_NEAREST)  # twice as wide
+        plm = scale_x(plm, 2)
+        rgb, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)])
+        y = int(lm["knee"]["y"])
+        cols = np.where((np.abs(rgb[y].astype(int) - np.array(PANTS[:3])).max(axis=1) < 30))[0]
+        left = cols[cols < 300]
+        knee_w = lm["knee"]["left_leg"]["right_x"] - lm["knee"]["left_leg"]["left_x"]
+        self.assertGreater(left.max() - left.min(), 1.15 * knee_w)
+
+    def test_tight_pants_hug_the_leg(self):
+        base, lm = avatar()
+        p, plm = pants(flare=0)
+        plm["knee"]["left_leg"] = {"left_x": 55, "right_x": 129}  # on the drawn edges (fixture lm are wider)
+        plm["knee"]["right_leg"] = {"left_x": 151, "right_x": 225}
+        rgb, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)])
+        y = int(lm["knee"]["y"])
+        skin = (np.abs(rgb[y].astype(int) - np.array(SKIN[:3])).max(axis=1) < 30)
+        self.assertFalse(skin[200:400].any())  # no skin shows at the knee
+        cols = np.where((np.abs(rgb[y].astype(int) - np.array(PANTS[:3])).max(axis=1) < 30))[0]
+        left = cols[cols < 300]
+        knee_w = lm["knee"]["left_leg"]["right_x"] - lm["knee"]["left_leg"]["left_x"]
+        self.assertLess(left.max() - left.min(), 1.25 * knee_w)

@@ -70,3 +70,13 @@ Scanline strips (torso, pants) + rigid affine sleeves. Diagnosed on the 6 real a
   from the base after compositing. Arms touching the body cannot be separated (warning "arm ... not separated").
 - **Warnings** report distortion (horizontal / vertical scale of one segment > 1.4x), not width change.
 - Order: pants under the T-shirt.
+
+### Pants fit (2026-11-10, docs/09 #59, `warp_pants`, `pants_width`)
+- One uniform scale `s` for both axes: garment waist..hem -> body waist..ankle (full length) or the rise (shorter pants).
+  The garment keeps its own leg width, taper and cuffs (loose joggers stay loose).
+- Waistband: body waist + 4 % ease, smoothly blended (smoothstep) to the garment's own scaled width at its hip row.
+- Below the hip: `pants_width = min(max(garment * s, body + 4 %), 1.8 * ref)`, `ref` = the row's body width, or the
+  body knee width below the knee (a flared cuff is not squeezed to the ankle). The body leg in the mask is always covered.
+- Each leg is centred on the body leg's centreline (crotch -> knee -> ankle landmarks), so wide stances get legs on legs;
+  near the crotch the leg blends into the waist block. A full-length hem sits on the ankle line.
+- Warning: a row's horizontal scale vs `s` beyond 1.3x (e.g. narrow pants widened over a plus-size body).

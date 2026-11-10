@@ -189,3 +189,8 @@ _(none blocking P0)_
 58. **Demo mode** (`DEMO_MODE=1`): `build_demo --garments <folder>` precomputes every avatar x garment and T-shirt+pants
     pair; covered pairs are served as finished jobs (no Celery/Gemini), others take the normal path. Demo garments are
     approved catalog garments. Public `GET /api/config/` exposes the flag; the UI shows "DEMO".
+59. **Pants keep their own silhouette** (2026-11-10, docs/06 "Pants fit"): one uniform scale (waist..hem vs waist..ankle,
+    rise for short pants); only the waistband fits the body (+4 % ease), blended to the garment's width by the hip; below
+    the hip a row is max(garment, body + 4 %), capped at 1.8x body (knee width below the knee, so cuffs are not
+    squeezed); legs centred on the body's leg centreline. Warnings only when a row's scale differs from the uniform
+    scale by > 1.3x. T-shirt keeps the old "widths follow the body" model for now.

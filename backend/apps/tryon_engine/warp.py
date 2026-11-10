@@ -7,6 +7,8 @@ Design rules (fixes of the day-1 version, see docs/06):
 - Lengths follow the GARMENT, widths follow the BODY. The garment's own proportions decide how long the
   sleeves, the T-shirt and the pants are (scaled by the body/garment shoulder or hip ratio); the body decides
   the widths ("the garment always adapts to the body").
+- Pants are the exception (docs/06 "Pants fit"): one uniform scale keeps their own silhouette; only the waistband
+  fits the body, below the hip a row is max(garment, body + ease) capped at 1.8x body, legs centred on the body's legs.
 - No fixed pixel offsets. Sleeves follow the avatar's arm axis, fitted from the figure mask.
 - Sleeves are clamped to at most SLEEVE_MAX_ARM of the arm length (warning), never stretched to the hands.
 - Hands and forearms are drawn ABOVE the garment: arm pixels from the figure mask beyond the sleeve hem are
@@ -217,34 +219,6 @@ def _leg_run(mask: np.ndarray, y: int, side: str, axis: float, near: float):
     return best
 
 
-def _densify_leg(src: list, dst: list, mask: np.ndarray | None, side: str, axis: float, step: int = 12):
-    """Insert rows every `step` px; each dst row covers the body's leg in the mask (+2 px ease) and never gets
-    narrower than the landmark-interpolated span (so flares stay). Fixes skin/shorts showing at the thighs."""
-    if mask is None:
-        return src, dst
-    out_s, out_d = [src[0]], [dst[0]]
-    for i in range(len(dst) - 1):
-        (sy0, *_), (sy1, *_) = src[i], src[i + 1]
-        (dy0, dl0, dr0), (dy1, dl1, dr1) = dst[i], dst[i + 1]
-        for y in range(int(dy0) + step, int(dy1), step):
-            t = (y - dy0) / max(dy1 - dy0, 1e-6)
-            sy = sy0 + t * (sy1 - sy0)
-            sl, sr = _interp_span([src[i], src[i + 1]], sy)
-            l, r = dl0 + t * (dl1 - dl0), dr0 + t * (dr1 - dr0)
-            run = _leg_run(mask, y, side, axis, (l + r) / 2)
-            if run:
-                l, r = min(l, run[0] - 2), max(r, run[1] + 2)
-                if side == "left":
-                    r = min(r, axis)  # inner edge never crosses to the other leg
-                else:
-                    l = max(l, axis)
-            out_s.append((sy, sl, sr))
-            out_d.append((float(y), l, r))
-        out_s.append(src[i + 1])
-        out_d.append(dst[i + 1])
-    return out_s, out_d
-
-
 # ---------- garments ----------
 
 def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
@@ -349,77 +323,131 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     return result, warnings
 
 
+PANTS_EASE = 0.04  # pants cover the body with ~4% ease (no skin/underwear showing)
+PANTS_MAX_BODY = 1.8  # a pants row is never wider than this times the body
+PANTS_DISTORT_LIMIT = 1.3  # warn when a row's horizontal scale differs from the uniform scale by more
+
+
+def _smooth(t: float) -> float:
+    t = min(max(t, 0.0), 1.0)
+    return t * t * (3 - 2 * t)
+
+
+def pants_width(garment_w: float, body_w: float, ease: float = PANTS_EASE, cap: float = PANTS_MAX_BODY,
+                cap_ref: float | None = None) -> float:
+    """Width of a pants row below the hip: the garment's own (uniformly scaled) width, but at least the body plus
+    ease so nothing shows through, and at most `cap` times `cap_ref` (default: the body width of the row; below
+    the knee the knee width, so cuffs and flares are not squeezed to the thin ankle)."""
+    if body_w <= 0:
+        return garment_w
+    ref = max(body_w, cap_ref or 0)
+    return min(max(garment_w, body_w * (1 + ease)), ref * cap)
+
+
+def waist_blend_width(garment_w: float, body_w: float, t: float, ease: float = PANTS_EASE) -> float:
+    """Between waist (t=0) and hip (t=1): from the body-fitted waistband to the garment's own width (smoothstep)."""
+    k = _smooth(t)
+    return (1 - k) * body_w * (1 + ease) + k * pants_width(garment_w, body_w, ease)
+
+
+def _ys(y0: float, y1: float, step: int = 6) -> list[float]:
+    ys = list(np.arange(y0, y1, step, dtype=np.float64))
+    return [float(y) for y in ys] + [float(y1)]
+
+
 def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
                arms: dict | None = None, info: dict | None = None,
                mask: np.ndarray | None = None) -> tuple[np.ndarray, list]:
+    """Pants keep their own silhouette: one uniform scale for both axes (waist..hem vs the body's waist..ankle,
+    or the rise for shorter pants). Only the waistband is fitted to the body; below the hip each row is
+    pants_width(garment, body). Each leg is centred on the body's leg centreline (crotch -> knee -> ankle)."""
     warnings: list[str] = []
     g, a = garment_lm, body_lm
     img = _bgra(garment_img)
 
-    g_cr, a_cr = _f(g["crotch"]["y"]), _f(a["crotch"]["y"])
     g_wy, a_wy = _f(g["waist"]["y"]), _f(a["waist"]["y"])
-    s_v = (a_cr - a_wy) / (g_cr - g_wy)  # rise scale: waist and crotch are anchored, used for the leg length too
-    # The garment's hip row lands where its own proportions say (not on the body's hip landmark, which is the
-    # widest row and sits just above the crotch); widths follow the body at every row.
+    g_cr, a_cr = _f(g["crotch"]["y"]), _f(a["crotch"]["y"])
+    g_hy = _f(g["hip"]["y"])
+    legs = ("left_leg", "right_leg")
+    g_hem_y = sum(_f(g["hem"][leg]["y"]) for leg in legs) / 2
+    a_ank_y = sum(_f(a["ankle"][leg]["y"]) for leg in legs) / 2
+    fig_h = _f(a.get("foot_bottom", {}).get("y", H - 50)) - _f(a.get("head_top", {}).get("y", 50))
+    s_rise = (a_cr - a_wy) / (g_cr - g_wy)
+    full = a_wy + (g_hem_y - g_wy) * s_rise >= a_ank_y - FULL_LENGTH_TOLERANCE * fig_h
+    s = (a_ank_y - a_wy) / (g_hem_y - g_wy) if full else s_rise
+    to_dst = lambda gy: a_wy + (gy - g_wy) * s  # noqa: E731
+
+    worst: dict[str, float] = {}
+
+    def track(label, src_w, dst_w):
+        if src_w > 1:
+            r = dst_w / (src_w * s)
+            if abs(np.log(r)) > abs(np.log(worst.get(label, 1.0))):
+                worst[label] = r
+
+    # waist -> crotch block, centred on the body
     g_rows = [(g_wy, _f(g["waist"]["left_x"]), _f(g["waist"]["right_x"])),
-              (_f(g["hip"]["y"]), _f(g["hip"]["left_x"]), _f(g["hip"]["right_x"])),
+              (g_hy, _f(g["hip"]["left_x"]), _f(g["hip"]["right_x"])),
               (g_cr, _f(g["hip"]["left_x"]), _f(g["hip"]["right_x"]))]
-    to_src = lambda dy: g_wy + (dy - a_wy) / s_v  # noqa: E731
-    dst_ys = [a_wy, a_wy + (_f(g["hip"]["y"]) - g_wy) * s_v, a_cr]
-    dst_ys += [_f(a["hip"]["y"])] if a_wy < _f(a["hip"]["y"]) < a_cr else []
-    block_src, block_dst = _mapped_rows(g_rows, dst_ys, to_src, a)
-    result = _scanline_strip(img, block_src, block_dst, H, W, warnings, "waist-crotch")
+    hip_dst, cr_dst = to_dst(g_hy), to_dst(g_cr)
+    src_rows, dst_rows = [], []
+    for y in _ys(a_wy, cr_dst):
+        sy = g_wy + (y - a_wy) / s
+        sl, sr = _interp_span(g_rows, sy)
+        bl, br = body_span(a, y)
+        t = (y - a_wy) / max(hip_dst - a_wy, 1e-6)
+        w = waist_blend_width((sr - sl) * s, br - bl, t) if t < 1 else pants_width((sr - sl) * s, br - bl)
+        c = (bl + br) / 2
+        src_rows.append((sy, sl, sr))
+        dst_rows.append((y, c - w / 2, c + w / 2))
+        if t >= 1:
+            track("waist-crotch", sr - sl, w)
+    result = _scanline_strip(img, src_rows, dst_rows, H, W, [], "waist-crotch")
+    block_l, block_r = dst_rows[-1][1], dst_rows[-1][2]
 
     g_cx, a_cx = _f(g["crotch"]["center_x"]), _crotch_x(a)
-    fig_h = _f(a.get("foot_bottom", {}).get("y", H - 50)) - _f(a.get("head_top", {}).get("y", 50))
+    g_kn_y, a_kn_y = _f(g["knee"]["y"]), _f(a["knee"]["y"])
     for side in ("left", "right"):
         leg = f"{side}_leg"
-        g_knee, a_knee = g["knee"][leg], a["knee"][leg]
-        g_hem, a_ank = g["hem"][leg], a["ankle"][leg]
-        g_outer = _f(g["hip"][f"{side}_x"])
-        a_outer = _f(a["hip"][f"{side}_x"])
-        top_src = (g_cr, g_outer, g_cx) if side == "left" else (g_cr, g_cx, g_outer)
-        top_dst = (a_cr, a_outer, a_cx) if side == "left" else (a_cr, a_cx, a_outer)
-
-        hem_y = a_cr + (_f(g_hem["y"]) - g_cr) * s_v
-        ank_y = _f(a_ank["y"])
-        full = hem_y >= ank_y - FULL_LENGTH_TOLERANCE * fig_h
-        a_kl, a_kr = _f(a_knee["left_x"]), _f(a_knee["right_x"])
-        if full:
-            hem_y = ank_y
-            knee_dst_y = _f(a["knee"]["y"])
-            knee_l, knee_r = a_kl, a_kr
-        else:  # shorter pants: proportional along the leg, widths from the body's leg at that height
-            knee_dst_y = a_cr + (_f(g["knee"]["y"]) - g_cr) * s_v
-
-            def leg_at(y):
-                t = (y - a_cr) / max(_f(a["knee"]["y"]) - a_cr, 1e-6)
-                if t <= 1:
-                    return top_dst[1] + t * (a_kl - top_dst[1]), top_dst[2] + t * (a_kr - top_dst[2])
-                t2 = (y - _f(a["knee"]["y"])) / max(ank_y - _f(a["knee"]["y"]), 1e-6)
-                return a_kl + t2 * (_f(a_ank["left_x"]) - a_kl), a_kr + t2 * (_f(a_ank["right_x"]) - a_kr)
-            knee_l, knee_r = leg_at(knee_dst_y)
-
-        # Hem width: the body's leg width, or the garment's own hem relative to its knee if wider (flares).
-        g_kw = _f(g_knee["right_x"]) - _f(g_knee["left_x"])
-        s_knee = (knee_r - knee_l) / g_kw if g_kw > 0 else 1.0
-        g_hw = (_f(g_hem["right_x"]) - _f(g_hem["left_x"])) * s_knee
-        if full:
-            body_l, body_r = _f(a_ank["left_x"]), _f(a_ank["right_x"])
-        else:
-            body_l, body_r = leg_at(hem_y)
-        c = (body_l + body_r) / 2
-        hw = max(body_r - body_l, g_hw)
-        hem_dst = (hem_y, c - hw / 2, c + hw / 2)
-
-        leg_src = [top_src, (_f(g["knee"]["y"]), _f(g_knee["left_x"]), _f(g_knee["right_x"])),
-                   (_f(g_hem["y"]), _f(g_hem["left_x"]), _f(g_hem["right_x"]))]
-        leg_dst = [top_dst, (knee_dst_y, knee_l, knee_r), hem_dst]
-        _segment_warning(f"{side}-leg thigh", leg_src[0], leg_src[1], leg_dst[0], leg_dst[1], warnings)
-        _segment_warning(f"{side}-leg shin", leg_src[1], leg_src[2], leg_dst[1], leg_dst[2], warnings)
-        leg_src, leg_dst = _densify_leg(leg_src, leg_dst, mask, side, a_cx)
-        strip = _scanline_strip(img, leg_src, leg_dst, H, W, [], f"{side}-leg")
+        gk, gh, ak, aa = g["knee"][leg], g["hem"][leg], a["knee"][leg], a["ankle"][leg]
+        g_outer, a_outer = _f(g["hip"][f"{side}_x"]), _f(a["hip"][f"{side}_x"])
+        leg_src = [(g_cr, g_outer, g_cx) if side == "left" else (g_cr, g_cx, g_outer),
+                   (g_kn_y, _f(gk["left_x"]), _f(gk["right_x"])),
+                   (_f(gh["y"]), _f(gh["left_x"]), _f(gh["right_x"]))]
+        body_rows = [(a_cr, a_outer, a_cx) if side == "left" else (a_cr, a_cx, a_outer),
+                     (a_kn_y, _f(ak["left_x"]), _f(ak["right_x"])),
+                     (_f(aa["y"]), _f(aa["left_x"]), _f(aa["right_x"]))]
+        hem_dst = _f(aa["y"]) if full else to_dst(_f(gh["y"]))
+        s_leg = (_f(gh["y"]) - g_cr) / max(hem_dst - cr_dst, 1e-6)  # src px per dst px (= 1/s up to hem snapping)
+        knee_dst = cr_dst + (g_kn_y - g_cr) / s_leg
+        top = (block_l, a_cx) if side == "left" else (a_cx, block_r)
+        knee_run = _leg_run(mask, int(a_kn_y), side, a_cx, (body_rows[1][1] + body_rows[1][2]) / 2) \
+            if mask is not None else None
+        knee_bw = (knee_run[1] - knee_run[0]) if knee_run else body_rows[1][2] - body_rows[1][1]
+        src_rows, dst_rows = [], []
+        for y in _ys(cr_dst, hem_dst):
+            sy = g_cr + (y - cr_dst) * s_leg
+            sl, sr = _interp_span(leg_src, sy)
+            bl, br = _interp_span(body_rows, y)
+            c = (bl + br) / 2  # the body leg's centreline from the landmarks
+            run = _leg_run(mask, int(y), side, a_cx, c) if mask is not None else None
+            bw = (run[1] - run[0]) if run else br - bl
+            w = pants_width((sr - sl) * s, bw, cap_ref=knee_bw if y > a_kn_y else None)
+            l, r = c - w / 2, c + w / 2
+            if run:  # the body's leg in the mask is always covered
+                l, r = min(l, run[0] - 2), max(r, run[1] + 2)
+            k = 1 - _smooth((y - cr_dst) / max(knee_dst - cr_dst, 1e-6))  # join the waist block at the crotch
+            l, r = k * top[0] + (1 - k) * l, k * top[1] + (1 - k) * r
+            src_rows.append((sy, sl, sr))
+            dst_rows.append((y, l, r))
+            if k < 0.5:
+                track(f"{side}-leg", sr - sl, r - l)
+        strip = _scanline_strip(img, src_rows, dst_rows, H, W, [], f"{side}-leg")
         result = _alpha_composite(result, strip)
+
+    for label, r in worst.items():
+        if r > PANTS_DISTORT_LIMIT or r < 1 / PANTS_DISTORT_LIMIT:
+            warnings.append(f"{label}: distorted {max(r, 1 / r):.2f}x ({'wider' if r > 1 else 'narrower'})")
     return result, warnings
 
 
