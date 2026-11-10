@@ -200,3 +200,5 @@ _(none blocking P0)_
 61. **Loose pants do not bend at the knee** (2026-11-10, docs/06 "Loose-leg centreline"): loose legs (knee ratio
     >= 1.15x) use a smooth monotonic centreline with at most 25 % knee pull; tight legs keep the knee line. Loose/tight
     and the hang weight are decided per leg, not per row.
+62. **Looseness per garment, smooth** (2026-11-10, replaces the per-leg cut of #61): mean knee ratio of both legs,
+    smoothstep 1.05x .. 1.15x drives the knee pull (1 -> 0.25) and the hang weight (1 -> 0.5); both legs share them.

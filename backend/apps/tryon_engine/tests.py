@@ -279,3 +279,29 @@ class PantsCenterlineTests(SimpleTestCase):
         self.assertAlmostEqual(x_full, 267, delta=0.5)  # tight: through the knee
         mono = [warp.leg_centerline(y, (670, 240), (860, 275), (1040, 260), 0.25) for y in range(670, 1041, 5)]
         self.assertTrue(all(b >= a - 1e-6 for a, b in zip(mono, mono[1:])))
+
+    def test_looseness_is_one_smooth_weight_per_garment(self):
+        self.assertEqual(warp.pants_looseness([1.0, 1.02])["t"], 0)
+        self.assertEqual(warp.pants_looseness([1.2, 1.3])["t"], 1)
+        mid = warp.pants_looseness([1.12, 1.16])
+        self.assertAlmostEqual(mid["ratio"], 1.14)
+        self.assertTrue(0 < mid["t"] < 1 and warp.LOOSE_KNEE_PULL < mid["knee_pull"] < 1 and 0.5 < mid["hang"] < 1)
+
+    def test_male_plus_like_ratios_give_equal_weights_for_both_legs(self):
+        base, lm = avatar()
+        p, plm = pants(flare=0)
+        s = (1040 - 480) / (plm["hem"]["left_leg"]["y"] - plm["waist"]["y"])
+        mask = warp.figure_mask(base)
+        widths = []
+        for side, ratio in (("left", 1.12), ("right", 1.16)):
+            k = lm["knee"][f"{side}_leg"]
+            run = warp._leg_run(mask, lm["knee"]["y"], side, 300, (k["left_x"] + k["right_x"]) / 2)
+            widths.append(ratio * (run[1] - run[0]) / s)
+        plm["knee"]["left_leg"] = {"left_x": 128 - widths[0], "right_x": 128}
+        plm["knee"]["right_leg"] = {"left_x": 152, "right_x": 152 + widths[1]}
+        _, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm)])
+        legs = dbg["pants_fit"]["legs"]
+        self.assertAlmostEqual(legs["left"]["ratio"], 1.12, delta=0.01)
+        self.assertAlmostEqual(legs["right"]["ratio"], 1.16, delta=0.01)
+        self.assertEqual(legs["left"]["knee_pull"], legs["right"]["knee_pull"])
+        self.assertEqual(legs["left"]["hang"], legs["right"]["hang"])

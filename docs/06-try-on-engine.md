@@ -91,8 +91,10 @@ Scanline strips (torso, pants) + rigid affine sleeves. Diagnosed on the 6 real a
 - Waistband: the top edge dips 4 % of the waist width at the centre (content bent with `cv2.remap`, fading by the hip).
 
 ### Loose-leg centreline (2026-11-10, docs/09 #61, `leg_centerline`)
-- Per leg, at the knee row: garment knee width * s >= 1.15x the body knee width = loose, else tight.
+- Once per garment (docs/09 #62): looseness t = smoothstep of the MEAN knee ratio (garment knee width * s / body knee
+  width, both legs) over 1.05x .. 1.15x. Both legs use the same t, so a symmetric garment fits symmetrically.
+  Centre = (1 - t) * tight line + t * loose curve; hang weight = 1 - 0.5 t.
 - Tight: the centre follows the piecewise crotch -> knee -> ankle line (hugs the leg).
 - Loose: a quadratic Bezier from the crotch-row centre to the ankle centre; the knee pulls it by at most 25 % of its
   offset from the straight line, and the control point is clamped between the ends, so the edges are monotonic (no kink
-  or bulge at inward knees, e.g. male_plus). The hang weight (0.5 .. 1, ramp 1.15x .. 1.35x) is now also per leg.
+  or bulge at inward knees, e.g. male_plus).
