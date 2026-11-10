@@ -22,6 +22,7 @@ services:
       - media:/app/media
       - u2net:/root/.u2net   # rembg model cache (176 MB), survives container rebuilds
       - ./prompts:/prompts:ro  # AI prompt texts (settings.PROMPTS_DIR)
+      - ./avatars:/avatars:ro  # real avatar photos for seed_avatars --from /avatars (not in git)
     ports:
       - "8000:8000"
     environment:

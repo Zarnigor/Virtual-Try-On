@@ -14,4 +14,4 @@ test-garments/
 tools/tryon_check/out/
 
 # real avatar photos (never committed)
-avatars/
+/avatars/
