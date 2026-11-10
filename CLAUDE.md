@@ -157,6 +157,7 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       Neck-gap fill runs for admin avatars only (`render_tryon(source="avatar")`), never for an own body (docs/09 #89).
       Dropped-shoulder one-piece warp for #36 built behind `TRYON_DROPPED_SHOULDER_SINGLE`, default 0 (sleeves shear
       below the armpit; docs/09 #90).
+      T-shirt hem rule `TRYON_HEM_RULE` (default 1, proposed, docs/09 #91): hem at hip + 0.35 x (crotch - hip).
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

@@ -315,4 +315,12 @@ _(none blocking P0)_
     sticking out sideways on all 6 avatars (the torso map continued past the torso edge samples the hanging sleeve at
     the wrong source rows). So the flag is 0; #28/#17 and all set-in sleeves are pixel-identical either way.
     Next step if wanted: below the armpit use the sleeve map alone (no blend) and verify on a sheet.
+91. **T-shirt hem length rule (proposed, confirm with owner)**, flag `TRYON_HEM_RULE` (default 1), constants in
+    settings (`TRYON_HEM_HIP_FRACTION` 0.35, `TRYON_HEM_CROTCH_MARGIN` 10). Bodies have no hem landmark:
+    hem_y = hip_y + 0.35 x (crotch_y - hip_y), at most crotch_y - 10 px. The garment's real bottom edge (hem landmark
+    + trims below it) lands on hem_y: uniform scale down to the chest row (sleeves stay aligned), then the chest ->
+    hem rows are stretched or squeezed (warning beyond 1.25x); widths unchanged; the crotch cut and the hem snap over
+    the pants are not used with the rule (the hem is below the waistband anyway). Measured on #17, #28, #36 x 6
+    avatars: rendered hem 0-2 px above hem_y, never below the crotch. `TRYON_HEM_RULE=0` restores the garment's own
+    length (crop tops stay short).
 

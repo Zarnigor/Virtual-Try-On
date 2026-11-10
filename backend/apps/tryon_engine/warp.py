@@ -394,7 +394,8 @@ def normalize_tshirt_landmarks(g: dict, alpha: np.ndarray) -> tuple[dict, bool]:
 def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
                 arms: dict | None = None, info: dict | None = None,
                 mask: np.ndarray | None = None, hem_over: float | None = None,
-                under: np.ndarray | None = None, dropped_single: bool = False) -> tuple[np.ndarray, list]:
+                under: np.ndarray | None = None, dropped_single: bool = False,
+                hem_rule: tuple[float, float] | None = None) -> tuple[np.ndarray, list]:
     """T-shirt keeps its own silhouette (docs/06 "T-shirt fit"): one uniform scale s for both axes, set so the
     garment's shoulder line = body shoulder + ease; below the shoulders every row is max(garment, body + ease)
     (capped), blended in from the shoulder fit by the chest row; the hem is the garment's own (scaled) length.
@@ -406,7 +407,10 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     under: bool mask of what is worn under the T-shirt (the pants layer): rows that overlap it are at least as wide
     (a T-shirt hangs over the waistband, the waistband never shows beside it).
     dropped_single (TRYON_DROPPED_SHOULDER_SINGLE): a dropped-shoulder garment (`dropped_shoulder_ratio` above
-    DROPPED_SHOULDER_RATIO) is warped as ONE piece (`_single_piece`) instead of torso + rigid sleeves."""
+    DROPPED_SHOULDER_RATIO) is warped as ONE piece (`_single_piece`) instead of torso + rigid sleeves.
+    hem_rule (TRYON_HEM_RULE): (hip fraction, crotch margin px). The hem lands on `body_hem_y` whatever the
+    garment's own length: uniform scale s down to the chest row (aligned with the sleeves), then the chest -> hem
+    rows are stretched or squeezed (never cut, never repeated). Hem snap and the crotch cut are then not used."""
     warnings: list[str] = []
     g, a = garment_lm, body_lm
     img = _bgra(garment_img)
@@ -425,9 +429,16 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     g_rows = [(_f(g[k]["y"]), _f(g[k]["left_x"]), _f(g[k]["right_x"])) for k in ("shoulder", "chest", "waist", "hem")]
 
     g_hem = min(_f(g["hem"]["y"]), gh - 1.0)
+    if hem_rule is not None:  # the garment's real bottom edge (trims below the hem landmark) is what lands on the
+        # body's hem row: the same rows _tail_rows would add, at most 8 % of the garment height
+        x0, x1 = max(int(_f(g["hem"]["left_x"])), 0), max(int(np.ceil(_f(g["hem"]["right_x"]))), 1)
+        below = np.nonzero(alpha[int(g_hem):, x0:x1].any(axis=1))[0]
+        if len(below):
+            # sampled at pixel centres: the last pixel's 50 % alpha edge is at its row + 0.5 (stays sharp when stretched)
+            g_hem = min(g_hem + min(float(below[-1]) + 0.5 - (g_hem - int(g_hem)), 0.08 * gh), gh - 1.0)
     hem_y = to_dst(g_hem)  # the garment's own length: crop tops stay short
     hem_max = _f(a["crotch"]["y"]) + MAX_SHIRT_BELOW_CROTCH * (_f(a["knee"]["y"]) - _f(a["crotch"]["y"]))
-    cut_hem = hem_y > hem_max
+    cut_hem = hem_y > hem_max and hem_rule is None
     if cut_hem:  # cut, never squeeze
         warnings.append(f"hem: garment is {hem_y - hem_max:.0f} px too long for this body, cut at the limit")
         hem_y = hem_max
@@ -435,11 +446,17 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
     chest_dst = to_dst(_f(g["chest"]["y"]))
     knot = min(chest_dst, hem_y - 1.0)  # the vertical scale is s down to here; below it the hem may be snapped
     hem_own = hem_y
-    if hem_over is not None and 0 <= hem_over - HEM_OVER_WAISTBAND - hem_y <= HEM_GAP_MAX + 0.04 * (a_sr - a_sl) \
+    if hem_rule is not None:  # the body's hem row (TRYON_HEM_RULE): the garment's length is fitted to it
+        hem_y = body_hem_y(a, *hem_rule) + HALO_ERODE  # the edge fix takes HALO_ERODE px off the bottom edge
+        knot = min(chest_dst, hem_y - 1.0)
+    elif hem_over is not None and 0 <= hem_over - HEM_OVER_WAISTBAND - hem_y <= HEM_GAP_MAX + 0.04 * (a_sr - a_sl) \
             and hem_over <= hem_max:
         hem_y = hem_over
     g_knot = g_sy + (knot - a_sy) / s
-    v_stretch = (hem_y - knot) / max(hem_own - knot, 1e-6)  # 1 unless snapped
+    v_stretch = (hem_y - knot) / max(hem_own - knot, 1.0)  # 1 unless snapped or fitted by the hem rule
+    if hem_rule is not None and abs(v_stretch - 1) > 0.25:
+        warnings.append(f"hem: garment length fitted to the body ({'stretched' if v_stretch > 1 else 'squeezed'}"
+                        f" {max(v_stretch, 1 / v_stretch):.2f}x below the chest)")
 
     def to_src(dy):
         return g_sy + (dy - a_sy) / s if dy <= knot else g_knot + (dy - knot) / (s * v_stretch)
@@ -580,7 +597,7 @@ def warp_tshirt(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int
         warnings.append(f"torso: distorted {max(worst, 1 / worst):.2f}x ({'wider' if worst > 1 else 'narrower'})")
     n_collar = len(src_rows) - len(torso)
     src_rows[n_collar:], dst_rows[n_collar:] = _smooth_rows(src_rows[n_collar:]), _smooth_rows(dst_rows[n_collar:])
-    if not cut_hem:
+    if not cut_hem and hem_rule is None:  # with the hem rule the bottom edge is already the last row
         _tail_rows(t_alpha, src_rows, dst_rows, s * v_stretch)
     torso_layer = _warp_rows(torso_img, src_rows, dst_rows, H, W)
 
@@ -666,6 +683,13 @@ def shoulder_slope_line(torso_alpha: np.ndarray, side: str, S_dst, cx: float, sy
     xs, ys = np.array(pts, np.float64).T
     m, c = np.polyfit(xs, ys, 1)
     return float(m), float(c)
+
+
+def body_hem_y(lm: dict, hip_fraction: float, crotch_margin: float) -> float:
+    """The body's T-shirt hem row (TRYON_HEM_RULE; bodies have no hem landmark): hip + hip_fraction x (crotch - hip),
+    never lower than crotch - crotch_margin."""
+    hip, crotch = _f(lm["hip"]["y"]), _f(lm["crotch"]["y"])
+    return min(hip + hip_fraction * (crotch - hip), crotch - crotch_margin)
 
 
 def dropped_shoulder_ratio(alpha: np.ndarray, g: dict) -> float:
@@ -1467,7 +1491,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
                  halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True,
-                 source: str = "body", dropped_shoulder_single: bool = False):
+                 source: str = "body", dropped_shoulder_single: bool = False, hem_rule: bool = False,
+                 hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1483,6 +1508,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     (docs/02 rule 12, docs/09 #89).
     dropped_shoulder_single: TRYON_DROPPED_SHOULDER_SINGLE (default 0, docs/09 #90): dropped-shoulder T-shirts as
     one piece. Off by default: below the armpit row the sleeves shear into stepped blocks (docs/06 "Known limits").
+    hem_rule (TRYON_HEM_RULE, default 1 in settings, False here so direct calls keep the garment's own length): the
+    T-shirt hem lands on hip + hem_hip_fraction x (crotch - hip), at most crotch - hem_crotch_margin (docs/09 #91).
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -1507,7 +1534,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                 hem_over = info["pants_waist_y"] + info["pants_top_dip"] + HEM_OVER_WAISTBAND
         warped, warns = garment_layer("tshirt", *by_type["tshirt"], body_lm, H, W, arms, info, mask,
                                       halo_removal=halo_removal, hem_over=hem_over, under=under,
-                                      dropped_single=dropped_shoulder_single)
+                                      dropped_single=dropped_shoulder_single,
+                                      hem_rule=(hem_hip_fraction, hem_crotch_margin) if hem_rule else None)
         warnings += [f"tshirt: {w}" for w in warns]
         opening = info.get("neck_opening") if neck_fix else None
         head = head_neck_overlay(mask, body_lm, NECK_FEATHER_FIX if neck_fix else NECK_FEATHER, opening)

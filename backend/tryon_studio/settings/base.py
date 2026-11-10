@@ -157,6 +157,10 @@ TRYON_HALO_REMOVAL = os.environ.get("TRYON_HALO_REMOVAL", "1") == "1"
 TRYON_NECK_FIX = os.environ.get("TRYON_NECK_FIX", "1") == "1"
 TRYON_NECK_GAP_FILL = os.environ.get("TRYON_NECK_GAP_FILL", "1") == "1"
 TRYON_DROPPED_SHOULDER_SINGLE = os.environ.get("TRYON_DROPPED_SHOULDER_SINGLE", "0") == "1"
+# T-shirt hem rule (docs/09 #91): hem row = hip + FRACTION x (crotch - hip), at most crotch - MARGIN px
+TRYON_HEM_RULE = os.environ.get("TRYON_HEM_RULE", "1") == "1"
+TRYON_HEM_HIP_FRACTION = float(os.environ.get("TRYON_HEM_HIP_FRACTION", "0.35"))
+TRYON_HEM_CROTCH_MARGIN = float(os.environ.get("TRYON_HEM_CROTCH_MARGIN", "10"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

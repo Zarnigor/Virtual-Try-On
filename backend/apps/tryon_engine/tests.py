@@ -1065,3 +1065,44 @@ class DroppedShoulderTests(SimpleTestCase):
         self.assertFalse(dbg["dropped_shoulder"]["single"])
         self.assertEqual(int((on != off).sum()), 0)
 
+
+
+class HemRuleTests(SimpleTestCase):
+    """TRYON_HEM_RULE: the T-shirt hem lands on hip + 0.35 x (crotch - hip), at most crotch - 10 px."""
+
+    VARIANTS = ((640, 670), (600, 670), (620, 700), (560, 650), (640, 720), (655, 668))  # (hip, crotch); last: clamped
+
+    def bottom(self, layer, lm):
+        cx = int(lm["crotch"]["center_x"])
+        rows = np.nonzero((layer[:, :, 3] > 128)[:, cx - 20:cx + 21].any(axis=1))[0]
+        return int(rows.max())
+
+    def test_hem_lands_on_the_body_hem_row_for_any_garment_length(self):
+        self.assertAlmostEqual(warp.body_hem_y({"hip": {"y": 655}, "crotch": {"y": 668}}, 0.35, 10), 658)
+        for name, hem in (("normal", 320), ("very long", 560), ("very short", 150)):
+            g, glm = tshirt(hem_y=hem)
+            for hip, crotch in self.VARIANTS:
+                base, lm = avatar()
+                lm["hip"]["y"], lm["crotch"]["y"] = hip, crotch
+                _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)], hem_rule=True)
+                target = warp.body_hem_y(lm, 0.35, 10)
+                got = self.bottom(dbg["tshirt_layer"], lm)
+                self.assertLessEqual(abs(got - target), 3, (name, hip, crotch, got, target))
+                self.assertLess(got, crotch, (name, hip, crotch))
+
+    def test_flag_off_keeps_the_garment_length(self):
+        g, glm = tshirt(hem_y=150)
+        base, lm = avatar()
+        _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, glm)], hem_rule=False)
+        self.assertLess(self.bottom(dbg["tshirt_layer"], lm), warp.body_hem_y(lm, 0.35, 10) - 50)  # crop top stays short
+
+    def test_pants_render_unchanged(self):
+        base, lm = avatar()
+        p, plm = pants()
+        on, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)], hem_rule=True)
+        off, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)], hem_rule=False)
+        self.assertEqual(int((on != off).sum()), 0)
+        g, glm = tshirt(hem_y=560)
+        both, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)], hem_rule=True)
+        y = int(warp.body_hem_y(lm, 0.35, 10)) + 6  # below the T-shirt: the pants exactly as drawn alone
+        np.testing.assert_array_equal(both[y:], on[y:])

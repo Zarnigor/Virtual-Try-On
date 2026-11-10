@@ -199,6 +199,12 @@ Width rules (unchanged, now symmetric): row width = max(garment * s, body + ease
 centre, also when the body run in the mask forces it wider. Body under a T-shirt includes the pants: a T-shirt row
 that overlaps the pants layer is at least as wide as the pants there (no waistband beside the hem).
 
+Hem length rule (flag `TRYON_HEM_RULE`, default 1, docs/09 #91, proposed): the T-shirt's bottom edge lands on
+`body_hem_y` = hip + 0.35 x (crotch - hip), at most crotch - 10 px (settings `TRYON_HEM_HIP_FRACTION`,
+`TRYON_HEM_CROTCH_MARGIN`), + the 2 px the edge fix takes off. Uniform scale down to the chest row, then the chest ->
+hem rows are stretched or squeezed; widths unchanged; no crotch cut, no hem snap, no tail rows (the trims below the hem
+landmark are part of the fitted length). With the flag off, the rules below apply.
+
 Hem over waistband (`hem_over`, flag `TRYON_HEM_SNAP`, default 1): a hem that ends 0..(12 px + 4 % of the shoulder
 width) above the pants top is moved to 6 px past it (plus the waistband's centre dip) by stretching the rows below
 the chest row; nothing is repeated. A crop top further up is left alone.
@@ -262,7 +268,10 @@ head/neck edge and (neck-gap fill) a thin strip of the avatar's own tank collar 
   female slim/average): those rows are not widened (the mask run includes the arm). Same as before this round.
 - **Neck-gap fill is for admin avatars only** (docs/09 #89, docs/02 rule 12): `render_tryon(source=...)` runs it only for
   `source="avatar"`; an own body (`"body"`, also the default) never gets it, whatever `TRYON_NECK_GAP_FILL` says.
-- **Too long T-shirts** are cut flat at crotch + 35 % (the hem trim is lost: #17 on male plus).
+- **Hem rule squeezes or stretches** the chest -> hem rows (docs/09 #91): a garment much longer or shorter than the
+  rule (a peplum blouse like #17, a crop top) loses its own proportions below the chest; crop tops no longer show
+  as crop tops while `TRYON_HEM_RULE=1`.
+- **Too long T-shirts** (hem rule off) are cut flat at crotch + 35 % (the hem trim is lost: #17 on male plus).
 - **Demo results** precomputed before this change are stale until `build_demo` is run again.
 - **Neck fix on V necks and blouses**: a garment with a dark inside that passes the crew-neck size test (blouse #17) gets
   a scoop neckline instead of its V. Garments whose inner back is as bright as the ring (white shirts without shading)
