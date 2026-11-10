@@ -228,6 +228,12 @@ export interface TryOnRequest {
   garment_ids: number[]
 }
 
+/** GET /api/config/ (public). */
+export interface AppConfig {
+  /** Backend runs with DEMO_MODE=1: some try-on results are precomputed (job.result.demo = true). */
+  demo_mode: boolean
+}
+
 export interface TryOnResponse {
   job_id: number
   outfit_id: number

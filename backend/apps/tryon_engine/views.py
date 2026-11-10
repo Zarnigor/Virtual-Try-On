@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from apps.jobs.models import Job
 from apps.outfits.models import Outfit
@@ -11,6 +11,34 @@ from .tasks import run_tryon
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def app_config(request):
+    """GET /api/config/: public flags the frontend needs before login (demo label)."""
+    from django.conf import settings
+    return Response({"demo_mode": settings.DEMO_MODE})
+
+
+def _serve_demo(request, avatar_obj, garments):
+    """DEMO_MODE: a precomputed result for this exact (avatar, garments) pair, as a finished job. None if absent."""
+    from pathlib import Path
+    from django.conf import settings
+    from django.core.files.base import ContentFile
+    from . import demo
+
+    rel = demo.lookup(avatar_obj.pk, [g.pk for g in garments])
+    if rel is None:
+        return None
+    outfit = Outfit.objects.create(user=request.user, avatar=avatar_obj)
+    outfit.garments.set(garments)
+    # A copy, not a reference: deleting the outfit deletes its file and must not break the demo set.
+    data = (Path(settings.MEDIA_ROOT) / rel).read_bytes()
+    outfit.result_image.save(f"result_{outfit.pk}.png", ContentFile(data), save=True)
+    job = Job.objects.create(user=request.user, kind="tryon", target_id=outfit.pk, status="done",
+                             result={"outfit_id": outfit.pk, "demo": True})
+    return Response({"job_id": job.pk, "outfit_id": outfit.pk}, status=202)
 
 
 @api_view(["POST"])
@@ -67,6 +95,12 @@ def start_tryon(request):
     types = [g.type for g in garments]
     if len(types) != len(set(types)):
         return Response({"detail": "Duplicate garment types"}, status=400)
+
+    from django.conf import settings
+    if settings.DEMO_MODE and avatar_obj is not None:
+        served = _serve_demo(request, avatar_obj, garments)
+        if served is not None:
+            return served
 
     outfit = Outfit.objects.create(
         user=request.user,

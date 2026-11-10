@@ -50,6 +50,7 @@ General rules
 | PATCH | garments/{id}/visibility/ | `{visibility: private\|public}` | `Garment` |
 | GET | jobs/{id}/ | | `Job {id, kind, status, result, error_code, error_message, ...}` |
 | POST | tryon/ | `{base: body\|avatar, avatar_id?, garment_ids[]}` | 202 `{job_id, outfit_id}` |
+| GET | config/ | (public, no auth) | `AppConfig {demo_mode}` |
 | GET | outfits/ | | `Outfit[]` |
 | GET | outfits/{id}/ | | `Outfit` |
 | DELETE | outfits/{id}/ | | 204 |
@@ -61,6 +62,9 @@ Notes
 - Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, visibility, status, owned_by_me, ai_skipped, created_at`.
   `ai_skipped` (read-only) = the AI check was skipped by `AI_DEV_BYPASS` (local dev only): the frontend shows a dev warning.
 - Outfit fields: `id, body, avatar, garments[], result_url, realistic_url, created_at`.
+- **Demo mode** (`DEMO_MODE=1`, `apps/tryon_engine/demo.py`): `POST tryon/` for an (avatar, garments) pair built by
+  `manage.py build_demo` returns the same 202 shape, but the job is already `done` with `result.demo = true` (no Celery).
+  Other pairs take the normal path. Demo garments are approved public catalog garments (owner empty).
 
 Not built yet (add here and in types.ts when built): `POST tryon/{id}/realistic/`, `POST outfits/` (explicit save; today every
 try-on creates an outfit), `POST garments/{id}/report/`, admin moderation endpoints, `GET assets/sample-pose/`,

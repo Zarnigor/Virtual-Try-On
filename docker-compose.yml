@@ -23,6 +23,7 @@ services:
       - u2net:/root/.u2net   # rembg model cache (176 MB), survives container rebuilds
       - ./prompts:/prompts:ro  # AI prompt texts (settings.PROMPTS_DIR)
       - ./avatars:/avatars:ro  # real avatar photos for seed_avatars --from /avatars (not in git)
+      - ./demo_garments:/demo_garments  # build_demo / export_demo_garments folder (not in git)
     ports:
       - "8000:8000"
     environment:
@@ -36,6 +37,7 @@ services:
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
+      - DEMO_MODE=${DEMO_MODE:-0}  # precomputed try-on results (manage.py build_demo)
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:
@@ -60,6 +62,7 @@ services:
       - GEMINI_VALIDATION_MODEL=${GEMINI_VALIDATION_MODEL:-}
       - AI_DEV_BYPASS=${AI_DEV_BYPASS:-0}  # local dev only, see settings/base.py
       - AI_CLEANING_ENABLED=${AI_CLEANING_ENABLED:-0}  # prompt 04, off: no image credits (docs/09 #55)
+      - DEMO_MODE=${DEMO_MODE:-0}  # precomputed try-on results (manage.py build_demo)
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:

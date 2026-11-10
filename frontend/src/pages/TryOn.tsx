@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { listAvatars, type Avatar } from '../api/avatars'
 import { listGarments, type Garment } from '../api/garments'
+import { getConfig } from '../api/config'
 import { startTryon } from '../api/tryon'
 import { getOutfit } from '../api/outfits'
 import { usePoll } from '../components/usePoll'
@@ -24,7 +25,10 @@ export default function TryOn() {
 
   useEffect(() => {
     listAvatars().then(({ data }) => setAvatars(data)).catch(() => {})
-    listGarments('mine').then(({ data }) => setGarments(data)).catch(() => {})
+    // Demo mode also lists the catalog (the demo garments); otherwise only the user's own garments, as before.
+    getConfig().then((c) =>
+      listGarments(c.demo_mode ? 'all' : 'mine').then(({ data }) => setGarments(data)).catch(() => {}),
+    )
   }, [])
 
   useEffect(() => {
@@ -267,6 +271,11 @@ export default function TryOn() {
 
           {resultUrl && (
             <div style={{ width: '100%' }}>
+              {job?.result?.demo === true && (
+                <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
+                  <strong>DEMO:</strong> bu natija oldindan tayyorlangan (demo rejimi).
+                </p>
+              )}
               <img
                 src={resultUrl}
                 alt="Natija"

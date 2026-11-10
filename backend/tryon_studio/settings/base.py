@@ -142,6 +142,9 @@ AI_GARMENT_DAILY_LIMIT = int(os.environ.get("AI_GARMENT_DAILY_LIMIT", 5))  # gar
 # garments go straight to rembg (mask only, original pixels kept). Prompt 04 is not built yet, so turning it on makes
 # every garment job fail with a clear error instead of silently skipping the cleaning.
 AI_CLEANING_ENABLED = os.environ.get("AI_CLEANING_ENABLED", "0") == "1"
+# Demo mode (apps/tryon_engine/demo.py): precomputed try-on results from `manage.py build_demo` are served at once
+# for the (avatar, garments) pairs they cover; no Celery, no Gemini for those. Off: nothing changes.
+DEMO_MODE = os.environ.get("DEMO_MODE", "0") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
 PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", BASE_DIR.parent / "prompts"))  # docker: ./prompts -> /prompts
 

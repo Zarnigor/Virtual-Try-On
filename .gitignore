@@ -15,3 +15,5 @@ tools/tryon_check/out/
 
 # real avatar photos (never committed)
 /avatars/
+# demo garment folder (cleaned garment PNGs + landmarks)
+/demo_garments/
