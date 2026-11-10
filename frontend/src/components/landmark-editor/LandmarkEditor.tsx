@@ -25,6 +25,8 @@ interface Props {
   subheading?: string
   saving?: boolean
   onSave: (landmarks: Record<string, unknown>) => void
+  /** Called with the current landmarks after every change (e.g. live cm widths beside the editor). */
+  onChange?: (landmarks: Record<string, unknown>) => void
 }
 
 const LOUPE_ZOOM = 3
@@ -41,7 +43,7 @@ function hexA(hex: string, a: number) {
 }
 
 export default function LandmarkEditor({
-  imageUrl, imageAlt, bounds, groups, rules = NO_RULES, landmarks, heading, subheading, saving, onSave,
+  imageUrl, imageAlt, bounds, groups, rules = NO_RULES, landmarks, heading, subheading, saving, onSave, onChange,
 }: Props) {
   const { w, h } = bounds
   const initial = useMemo(() => fromLandmarks(landmarks, groups, { w, h }), [landmarks, groups, w, h])
@@ -62,6 +64,10 @@ export default function LandmarkEditor({
     setState(initial.state)
     setPlaced(new Set(initial.loaded))
   }, [initial])
+
+  useEffect(() => {
+    onChange?.(toLandmarks(landmarks, state, groups))
+  }, [state, landmarks, groups, onChange])
 
   // Track the on-screen scale so dots, labels and the loupe keep a constant screen size.
   useEffect(() => {
