@@ -36,6 +36,8 @@ _(none blocking P0)_
 - **shoulder_slope pair + alignment tweak is a benchmark proposal (2026-11-11, not a decision):** docs/06 round 4.
   V3 (both) closes most of the bare-shoulder triangle on #44 at the cost of 73-187 px of garment above the shoulder;
   male plus is not closed. Whether to use it, the 50 % point, the 1.05 scale and the raise rule are NOT decided.
+  Round 5 (2026-11-11, re-marked shoulder_* at the sleeve seam): plain preset A already closes the gap (0-3 px);
+  the slope pair (V1) halves the garment-above-shoulder excess. Still a proposal; the method choice stays with the owner.
 
 ## Decided 2026-11-07
 12. **Body AI validation (prompt 02): P0.** Confirmed by owner.

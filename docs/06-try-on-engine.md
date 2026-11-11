@@ -409,3 +409,32 @@ Results (#44 on the 6 avatars; **#45 skipped: still no `collar` landmark**; "che
   keeps 85-89 px. The price is the garment sitting above the shoulder over the background (excess): V3 about half of
   V2 (the slope pair holds the edge on the body instead of letting the whole garment rise).
 Sheet `out/sheet_shoulder_slope.png` (#44: A | V1 | V2 | V3 x male slim, male plus, female slim).
+
+### MLS keep_shape benchmark, round 5: re-marked oversized landmarks (2026-11-11, NOT production)
+Same code as round 4 (`run_shoulder_slope.py`, now re-exporting #44/#45 from the DB first and adding uniform k 1.0 /
+0.5 references; `out/results4.json` overwritten). Re-marked: shoulder_* at the sleeve seam on both, #45 has collar
+points, #45 chest at armpit height (486 vs 483: chest used); #44 chest 309 still above armpit 374: chest not used.
+| garment / variant | bare-shoulder px | excess px | fold | local scale p1..p99 | print distortion |
+|---|---|---|---|---|---|
+| #44 k 1.0 | 0-2 | 1658-3840 | 2.2-3.5 % | 0.19-0.25 .. 3.0-4.7 | 0.087-0.185 |
+| #44 A (V0) | 0-2 | 1679-3719 | 0 % | 0.36-0.46 .. 0.85-0.97 | 0.021-0.029 |
+| #44 V1 slope pair | 0-2 | 818-2023 | 0 % | 0.35-0.44 .. 0.84-0.97 | 0.021-0.029 |
+| #44 V2 align tweak | 0 | 2403-4822 | 0 % | 0.37-0.48 .. 0.80-0.92 | 0.023-0.031 |
+| #44 V3 both | 0 | 1270-2735 | 0 % | 0.37-0.45 .. 0.80-0.96 | 0.023-0.030 |
+| #44 k 0.5 | 0-2 | 1653-3719 | 0.02-0.62 % | 0.28-0.38 .. 1.08-1.45 | 0.028-0.046 |
+| #45 k 1.0 | 0-6 | 1152-3067 | 0.44-1.30 % | 0.15-0.20 .. 1.5-2.8 | - |
+| #45 A (V0) | 0-3 | 1047-2744 | 0-0.07 % | 0.26-0.35 .. 0.51-0.59 | - |
+| #45 V1 | 0-5 | 489-1533 | 0-0.07 % | 0.26-0.33 .. 0.51-0.59 | - |
+| #45 V2 | 0 | 1659-3704 | 0-0.06 % | 0.28-0.36 .. 0.49-0.60 | - |
+| #45 V3 | 0 | 894-2199 | 0-0.06 % | 0.27-0.34 .. 0.49-0.63 | - |
+| #45 k 0.5 | 0-6 | 1069-2802 | 0-0.29 % | 0.22-0.29 .. 0.56-0.72 | - |
+Floating 0 everywhere; runtime 0.06-0.08 s. Local scale min mostly on the sleeve near the waist rows; V1/V3 on #45 at the
+torso near the shoulder (0.24-0.30). Scale < 1 = the large garment photos are shrunk.
+- **The re-marking closes the bare-shoulder gap by itself** (A: 0-3 px; was 81-192 in round 4). Worst A/V1-V3: #45 V1
+  male slim, 5 px (`out/crop_shoulder_slope_worst.png`, a sliver at the outer shoulder edge).
+- The cost is excess: the garment's own sloped top now sits above the body's shoulder line over the background
+  (rounded, raised shoulders). V1 halves it (the slope pair pins the top edge to the body), V2 raises it, V3 is between.
+  None is 0. Visually A/V1 look like a natural dropped shoulder; V1/V3 on male plus pull the top edge up towards the jaw.
+- Specks (violet/grey dots at the old shoulder-gap edges on #44): garment edge pixels with partial alpha 87-173 left by
+  the 2 px edge fix, blended over skin/white. Not alpha holes (#44 has none) and not the avatar's photo edge.
+Sheet `out/sheet_shoulder_slope.png` (rows #44, #45; k1.0 | A | V1 | V2 | V3 x male slim, male plus, female slim).
