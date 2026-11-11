@@ -98,11 +98,11 @@ describe('sanity checks (same rules and messages as the server)', () => {
     fails(set(FULL, 'collar_bottom.x', 199), CHECK_MESSAGES.center(N.collar_bottom))
   })
 
-  it('armpit below the shoulder, not below the chest', () => {
+  it('armpit below the shoulder; oversized: may be below the chest (docs/09 #94)', () => {
     ok(set(FULL, 'armpit.y', 199))
     fails(set(FULL, 'armpit.y', 198), CHECK_MESSAGES.y_order(N.armpit, N.shoulder))
     ok(set(FULL, 'armpit.y', 326))
-    fails(set(FULL, 'armpit.y', 327), CHECK_MESSAGES.y_not_above(N.chest, N.armpit))
+    ok(set(FULL, 'armpit.y', 360))
   })
 
   it('chest < waist < hem', () => {

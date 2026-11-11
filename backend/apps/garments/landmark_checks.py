@@ -2,8 +2,8 @@
 
 Used by PATCH garments/{id}/landmarks/ (write), build_demo / export_demo_garments (read) and the try-on task
 (`engine_landmarks`). The frontend mirrors the same rules in landmark-editor/garmentRules.ts.
-Coordinates are pixels of the cleaned PNG; left/right = image left/right. Order checks use a strict "<"
-(armpit <= chest allows equality); the editor keeps an extra 4 px gap.
+Coordinates are pixels of the cleaned PNG; left/right = image left/right. Order checks use a strict "<";
+the editor keeps an extra 4 px gap. The armpit may lie below the chest line (oversized garments, docs/09 #94).
 
 T-shirt set (docs/03, docs/09 #92). Required (write): shoulder, chest, waist, hem {y, left_x, right_x} and the four
 sleeve cuff corners `sleeve_cuff_outer|sleeve_cuff_inner .left|.right {x, y}`, which replace `sleeve_end`.
@@ -62,7 +62,6 @@ MESSAGES = {
     "center": "«{g}»: markaz nuqtasi chap va oʻng nuqtalar orasida boʻlsin.",
     "center_hip": "«{g}»: markaz nuqtasi «{other}» chizigʻining ichida boʻlsin.",
     "y_order": "«{g}» chizigʻi «{other}» chizigʻidan pastda boʻlsin.",
-    "y_not_above": "«{g}» chizigʻi «{other}» chizigʻidan yuqorida boʻlmasin.",
     "cuff_side": "«{g}»: chap yeng nuqtasi rasmning chap yarmida, oʻngi oʻng yarmida boʻlsin.",
     "cuff_order": "«{g}»: tashqi nuqta yengning tashqi (yelka) tomonida, ichki nuqta qoʻltiq tomonida boʻlsin.",
 }
@@ -170,9 +169,7 @@ def _tshirt_order(v, lt, fail):
     for upper, lower in (("shoulder", "chest"), ("chest", "waist"), ("waist", "hem")):
         lt(f"{upper}.y", f"{lower}.y", "y_order", lower, upper)
     if has("armpit"):
-        lt("shoulder.y", "armpit.y", "y_order", "armpit", "shoulder")
-        if not v["armpit.y"] <= v["chest.y"]:
-            fail("y_not_above", "chest", "armpit")
+        lt("shoulder.y", "armpit.y", "y_order", "armpit", "shoulder")  # no armpit <= chest rule (docs/09 #94)
     if has("collar_bottom"):
         if has("collar"):
             lt("collar.y", "collar_bottom.y", "y_order", "collar_bottom", "collar")

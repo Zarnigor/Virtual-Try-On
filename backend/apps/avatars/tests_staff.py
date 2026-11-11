@@ -52,6 +52,14 @@ class BodyLandmarkCheckTests(SimpleTestCase):
         lm["chest"]["y"] = lm["armpit"]["y"]
         validate_body_landmarks(lm)
 
+    def test_armpit_below_chest_still_fails_for_a_body(self):
+        # same data that passes for a garment (docs/09 #94): the body rule is unchanged
+        lm = full_landmarks()
+        lm["armpit"]["y"] = lm["chest"]["y"] + 1
+        with self.assertRaises(BodyLandmarksInvalid) as e:
+            validate_body_landmarks(lm)
+        self.assertEqual(e.exception.line, "chest")
+
     def test_complete_recomputes_widths(self):
         lm = full_landmarks()
         lm["waist"]["width"] = 999

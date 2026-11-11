@@ -355,3 +355,10 @@ _(none blocking P0)_
     for now (TODO): **engine behaviour for keep_shape is pending the MLS benchmark** (docs/06 "MLS single-field
     benchmark"). Existing garments got the defaults (adapt, unisex) by migration 0005.
 
+## Decided 2026-11-11: garment armpit <= chest rule removed
+94. **2026-11-11: Garment armpit<=chest rule removed (oversized garments); body rule unchanged.** Client
+    (`garmentChecks.ts`, editor clamp in `garmentGroups.ts`) and server (`apps/garments/landmark_checks.py`). Other
+    garment checks stay. MLS benchmark pairing: a chest pair with garment chest <= armpit, or with a garment/body
+    vertical order that differs from any other row pair, is dropped from the control points (never fed crossing).
+    Production scanline engine does not pair the garment armpit, so it is unchanged (pixel-identical test).
+

@@ -119,7 +119,6 @@ export const TSHIRT_RULES: Rules = {
   y: [
     { a: 'collar', b: 'collar_bottom', gap: MIN_GAP },
     { a: 'shoulder', b: 'armpit', gap: MIN_GAP },
-    { a: 'armpit', b: 'chest', gap: 0 }, // armpit <= chest
     ...chain('shoulder', 'chest', 'waist', 'hem'),
     { a: 'shoulder', b: 'sleeve_cuff_outer', gap: MIN_GAP },
     { a: 'shoulder', b: 'sleeve_cuff_inner', gap: MIN_GAP },

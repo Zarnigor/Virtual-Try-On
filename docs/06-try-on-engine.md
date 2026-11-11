@@ -287,7 +287,10 @@ torso/sleeve/cap parts, no fills. Pairs: neck (collar edges + bottom centre, aut
 scale), shoulder seam -> shoulder, armpit (auto: deepest outline convexity defect) -> armpit, chest/waist edges, hem
 (rule in docs/09 "Still open"), 2 cuff corners per sleeve (auto) -> along the arm direction (shoulder -> arm centre
 at armpit + 10 % of the figure height), length and width by the torso ratios. Pairs breaking the row or left/right
-order are rejected. Then the edge fix once on the outer contour and the production neck/head and hands overlays.
+order are rejected. A chest pair whose garment chest is at or above the garment armpit (marked `armpit.y` or the
+detected corner), or whose vertical order against another row pair differs between garment and body, is dropped
+(`drop_crossing_chest`, docs/09 #94): never a crossing pair, never a rejected garment. Tests: `test_mls.py`.
+Then the edge fix once on the outer contour and the production neck/head and hands overlays.
 Run: `tools/warp-benchmark/run.py` (sheets `out/sheet_mls.png`, `out/sheet_production.png`, `out/results.json`).
 
 Results (6 avatars):

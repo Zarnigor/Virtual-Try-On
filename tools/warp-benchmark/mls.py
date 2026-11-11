@@ -218,8 +218,35 @@ def control_points(gimg, glm, blm, mask):
             perp = -perp
         pairs["cuff_out" + sx] = (tuple(out), tuple(c + perp * w / 2), 1.0)
         pairs["cuff_in" + sx] = (tuple(inn), tuple(c - perp * w / 2), 1.0)
+    rejected += drop_crossing_chest(pairs, glm)
     rejected += validate(pairs)
     return pairs, auto, rejected, s
+
+
+def drop_crossing_chest(pairs, glm):
+    """Removes (in place) and returns the chest pairs that would cross (docs/09 #94). Oversized garments may have
+    the chest line at or above the armpit (marked `armpit.y` or the detected underarm corner) while on the body
+    the chest is below the armpit: such a chest pair, or one whose vertical order against any other row pair of
+    its side differs between garment and body, is dropped instead of rejecting the garment."""
+    marked = glm.get("armpit", {}).get("y") if isinstance(glm.get("armpit"), dict) else None
+    bad = []
+    for sx in ("_l", "_r"):
+        k = "chest" + sx
+        if k not in pairs:
+            continue
+        q, p, _ = pairs[k]
+        pits = [_f(marked)] if marked is not None else []
+        if "armpit" + sx in pairs:
+            pits.append(pairs["armpit" + sx][0][1])
+        crossed = any(q[1] <= y for y in pits)
+        for r in ROWS:
+            o = pairs.get(r + sx)
+            if r != "chest" and o is not None and (q[1] > o[0][1]) != (p[1] > o[1][1]):
+                crossed = True
+        if crossed:
+            bad.append(k)
+            del pairs[k]
+    return bad
 
 
 def validate(pairs):

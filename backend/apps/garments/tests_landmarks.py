@@ -257,9 +257,11 @@ class TshirtSetTests(SimpleTestCase):
         self.check(with_value(FULL, "armpit.y", 199))
         self.invalid(with_value(FULL, "armpit.y", 198), "y_order", "Qoʻltiq")
 
-    def test_armpit_not_below_the_chest(self):
-        self.check(with_value(FULL, "armpit.y", 326))  # equal is allowed
-        self.invalid(with_value(FULL, "armpit.y", 327), "y_not_above", "Koʻkrak")
+    def test_oversized_armpit_below_the_chest_passes(self):
+        # docs/09 #94: oversized T-shirts have the underarm below the chest line
+        self.check(with_value(FULL, "armpit.y", 326))
+        self.check(with_value(FULL, "armpit.y", 360))
+        self.check(with_value(FULL, "armpit.y", 415))  # still above the waist: no rule ties it to the chest
         self.invalid(with_value(FULL, "armpit.left_x", 360), "x_order", "Qoʻltiq")
 
     def test_chest_waist_hem_order(self):

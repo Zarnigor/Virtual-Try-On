@@ -28,7 +28,6 @@ export const CHECK_MESSAGES = {
   x_order: (g: string) => `${q(g)}: chap nuqta oʻng nuqtadan chapda boʻlsin.`,
   center: (g: string) => `${q(g)}: markaz nuqtasi chap va oʻng nuqtalar orasida boʻlsin.`,
   y_order: (g: string, other: string) => `${q(g)} chizigʻi ${q(other)} chizigʻidan pastda boʻlsin.`,
-  y_not_above: (g: string, other: string) => `${q(g)} chizigʻi ${q(other)} chizigʻidan yuqorida boʻlmasin.`,
   cuff_side: (g: string) => `${q(g)}: chap yeng nuqtasi rasmning chap yarmida, oʻngi oʻng yarmida boʻlsin.`,
   cuff_order: (g: string) =>
     `${q(g)}: tashqi nuqta yengning tashqi (yelka) tomonida, ichki nuqta qoʻltiq tomonida boʻlsin.`,

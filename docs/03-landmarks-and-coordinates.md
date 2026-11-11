@@ -79,8 +79,10 @@ Rules (backend strict `<`; the editor keeps a 4 px gap and stops a drag at the n
 - pants: `waist.left_x < waist.center_x < waist.right_x` and `hip.left_x + 5 < waist.center_x < hip.right_x - 5`
   (warp.py uses `center_x ± 5` as the inner crotch edges).
 - vertical: tshirt `shoulder < chest < waist < hem`, each cuff corner `y > shoulder.y` (legacy: each `sleeve_end.y`);
-  with the optional points `shoulder < armpit <= chest`, `collar < collar_bottom` and
+  with the optional points `shoulder < armpit`, `collar < collar_bottom` and
   `collar.left_x < collar_bottom.x < collar.right_x`; pants `waist < hip < crotch < knee < max(hem leg y)`.
+  **No `armpit <= chest` rule for garments** (2026-11-11, docs/09 #94): oversized T-shirts have the underarm below the
+  chest line. Body landmarks keep `armpit <= chest`. The MLS benchmark then drops the chest pair instead (docs/06).
 - tshirt cuffs: both left corners left of the shoulder centre, both right corners right of it; the outer corner lies
   on the side of the line shoulder point -> cuff midpoint away from the torso centre (centre x, chest y).
 - warnings (saved anyway, returned as `landmark_warnings`): collar edges more than 15 % of the shoulder span from the

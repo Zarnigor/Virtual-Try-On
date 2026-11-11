@@ -37,8 +37,7 @@ export function checkTshirt(lm: unknown, bbox?: BBox | null): CheckResult {
   lt('chest.y', 'waist.y', CHECK_MESSAGES.y_order(N.waist, N.chest))
   lt('waist.y', 'hem.y', CHECK_MESSAGES.y_order(N.hem, N.waist))
   if (has(lm, 'armpit')) {
-    lt('shoulder.y', 'armpit.y', CHECK_MESSAGES.y_order(N.armpit, N.shoulder))
-    if (!(v('armpit.y') <= v('chest.y'))) errors.push(CHECK_MESSAGES.y_not_above(N.chest, N.armpit))
+    lt('shoulder.y', 'armpit.y', CHECK_MESSAGES.y_order(N.armpit, N.shoulder)) // no armpit <= chest rule (docs/09 #94)
   }
   if (has(lm, 'collar_bottom') && has(lm, 'collar')) {
     lt('collar.y', 'collar_bottom.y', CHECK_MESSAGES.y_order(N.collar_bottom, N.collar))
