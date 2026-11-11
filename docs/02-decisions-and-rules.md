@@ -7,7 +7,8 @@ These come from the product owner. Do not change them without asking. Log: `09-o
    no edit, no replace. Enforce in the backend: unique constraint on `user_id`, no PUT/PATCH for the photo/landmarks,
    upload returns an error if a confirmed body exists. Hiding a button in the frontend is NOT enough.
 2. **Body measurements** (height and optional measurements) may be changed **once per 365 days**
-   (`measurements_changed_at`). Nothing else on the body changes.
+   (`measurements_changed_at`). Nothing else on the body changes. Exception: `Body.sex` is chosen at upload; for bodies
+   created before it existed it can be set once afterwards (`PATCH body/sex/`), then it is locked (docs/09 #97).
 3. **Body deletion is allowed**: deletes the body, all its photos and the outfits made with it. After that the user can create a new body.
 4. **Garment images**: cannot be edited, only deleted. No PUT/PATCH for the image. (Landmarks and visibility are data and may be adjusted.)
 5. Deleting a garment: hard delete of files. Outfits keep their saved result images.
@@ -41,11 +42,14 @@ These come from the product owner. Do not change them without asking. Log: `09-o
 21. **Garment real size is NOT entered.** Fit is set per garment (`fit_mode`, docs/09 #93, decided 2026-11-11):
     `adapt` (default) = the garment is fully deformed to the body's landmarks; `keep_shape` = the garment keeps its own
     proportions (oversized, wide-leg) and only its anchors fit the body. There is no tight/fits/loose label.
-    The engine treats `keep_shape` like `adapt` until the MLS benchmark decides the method (docs/06).
+    `keep_shape` = MLS per-point k preset A (docs/09 #96); engine wiring is pending behind TRYON_WARP.
+21a. **Garment gender is enforced in try-on** (docs/09 #97): a male body/avatar sees `male` and `unisex` garments, a
+    female one `female` and `unisex`; the backend refuses a mismatch (`GENDER_MISMATCH`). Garment size classes are
+    NOT decided.
 
 ## Try-on result rules
 22. The result shows the garment fitted to the body landmarks according to its `fit_mode`: fully deformed (`adapt`),
-    or anchored at the landmarks with its own proportions kept (`keep_shape`, engine pending).
+    or anchored at the landmarks with its own proportions kept (`keep_shape`).
 23. Realistic render is optional, paid AI, only on user request. It must not change the person's face/body or how the garment sits.
 24. The user can save an outfit with the plain result and/or the realistic result; the realistic one is saved with the outfit.
 
