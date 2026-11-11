@@ -130,4 +130,7 @@ def start_tryon(request):
     )
     run_tryon.delay(job.pk)
 
-    return Response({"job_id": job.pk, "outfit_id": outfit.pk}, status=202)
+    # engine (debug, docs/09 #98): the T-shirt engine this try-on asks for; the job result has the one actually used
+    # ("parts" after an MLS fallback, with quality_warnings ["mls_fallback"]).
+    engine = settings.TRYON_WARP if any(g.type == "tshirt" for g in garments) else "parts"
+    return Response({"job_id": job.pk, "outfit_id": outfit.pk, "engine": engine}, status=202)

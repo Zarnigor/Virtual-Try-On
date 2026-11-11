@@ -5,7 +5,8 @@ This is a proposal; confirm the approach with the owner before building.
 **MVP scope: T-shirt (short sleeve) + pants.** The body photo is taken in a short-sleeved or sleeveless top and
 shorts/tight leggings, so no old sleeves or trouser legs show around the new garment.
 **The garment adapts to the body** per its `fit_mode` (docs/09 #93): `adapt` is what the engine does; `keep_shape`
-is accepted (`render_tryon(fit_modes=...)`) but warped like `adapt` until the engine wiring lands. **Decided
+is used by the MLS engine (setting `TRYON_WARP=mls`, see "MLS engine" at the end); the default `parts` engine warps
+it like `adapt`. **Decided
 2026-11-11 (docs/09 #96): `keep_shape` = MLS preset A** (see "keep_shape decision" at the end of this file). There
 is no size-mismatch display and no fit label.
 
@@ -542,3 +543,20 @@ Floating 0 except one 1 px piece. Local scale extremes at the armpit / chest row
 - k stays the owner's choice: k 0.7 has the smaller gap (#43 354 vs 1208) and fewer folds; k 1.0 follows the body.
 Sheets: `out/sheet_fitted7_k1_before_after.png` (left 6 columns round 6, right 6 round 7, k 1.0),
 `out/sheet_fitted7_k.png` (k 1.0 | 0.7 x male slim, male plus, female plus).
+
+### MLS engine in the try-on service (2026-11-11, docs/09 #98, flag `TRYON_WARP`, default `parts`)
+`apps/tryon_engine/mls.py` (ported from `tools/warp-benchmark/` at c3f6883; no imports from tools/). Setting
+`TRYON_WARP = parts | mls` from env (default `parts`; any other value stops startup with ImproperlyConfigured),
+passed through docker-compose to the backend and the Celery worker. T-shirt only; pants and the body flow unchanged.
+- `mls`: the T-shirt is one rigid MLS field from its landmarks (collar_*, collar_bottom, shoulder_*, armpit_*, chest,
+  waist, hem, sleeve_cuff_*). fit_mode mapping: **keep_shape -> preset A** (per-point k_map; chest pair not used when
+  chest.y < armpit.y); **adapt -> the fitted-garment MLS (round 7) at k 1.0** (known gaps beside the torso on the plus
+  avatars, not fixed here). Edge fix once, inner back collar cleared, head/neck and hands on top; no shoulder cap and
+  no neck-gap fill (as in the benchmark).
+- **Fallback to `parts`** with `quality_warnings: ["mls_fallback"]` when `landmarks_complete` is false (the task does
+  not try MLS), or when a core pair (neck, shoulder, waist, hem) fails validation or the body landmarks cannot be
+  used (render_tryon catches `MlsUnavailable`).
+- Output unchanged: 600x1200 result image, same endpoint. `POST tryon/` adds `engine` (the engine asked for); the
+  job result adds `engine` (actually used) and `quality_warnings`.
+- Hem row: hip + 0.35 x (crotch - hip), at most crotch - 10 px (`TRYON_HEM_HIP_FRACTION` / `TRYON_HEM_CROTCH_MARGIN`),
+  still the benchmark assumption (docs/09 "Still open").

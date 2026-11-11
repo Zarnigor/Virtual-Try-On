@@ -161,6 +161,20 @@ TRYON_DROPPED_SHOULDER_SINGLE = os.environ.get("TRYON_DROPPED_SHOULDER_SINGLE", 
 TRYON_HEM_RULE = os.environ.get("TRYON_HEM_RULE", "1") == "1"
 TRYON_HEM_HIP_FRACTION = float(os.environ.get("TRYON_HEM_HIP_FRACTION", "0.35"))
 TRYON_HEM_CROTCH_MARGIN = float(os.environ.get("TRYON_HEM_CROTCH_MARGIN", "10"))
+# T-shirt warp engine (docs/09 #98): "parts" (default, torso row warp + rigid sleeves) or "mls" (one rigid MLS field,
+# apps/tryon_engine/mls.py; keep_shape -> preset A, adapt -> fitted). An invalid value stops startup.
+TRYON_WARP_CHOICES = ("parts", "mls")
+
+
+def parse_tryon_warp(value):
+    value = (value or "parts").strip().lower()
+    if value not in TRYON_WARP_CHOICES:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(f"TRYON_WARP must be one of {', '.join(TRYON_WARP_CHOICES)}, got {value!r}")
+    return value
+
+
+TRYON_WARP = parse_tryon_warp(os.environ.get("TRYON_WARP"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

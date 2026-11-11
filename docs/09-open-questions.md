@@ -394,3 +394,10 @@ _(none blocking P0)_
     takes `for_sex=male|female|all`; the catalog defaults to the avatar's / body's sex. Screen 10 lists only matching
     garments, with a "Barcha kiyimlarni koʻrsatish" toggle (mismatched ones then show "Boshqa jins uchun" and the
     try-on button explains why). **Garment size classes are NOT decided**: the stretch quality guard stays as is.
+
+## Decided 2026-11-11: MLS engine behind a flag (method not yet decided)
+98. **2026-11-11: flag `TRYON_WARP` added** (`parts` | `mls`, **default unchanged: `parts`**). `mls` runs the
+    single-field MLS T-shirt warp (`apps/tryon_engine/mls.py`): keep_shape -> preset A (#96), adapt -> fitted MLS at
+    k 1.0; it falls back to `parts` with quality warning `mls_fallback` when landmarks are incomplete or pair
+    validation fails. **The warp method is NOT decided** (parts vs MLS stays the owner's choice); the hem rule is still
+    the benchmark assumption ("Still open"). `POST tryon/` and the job result report the engine for debugging.

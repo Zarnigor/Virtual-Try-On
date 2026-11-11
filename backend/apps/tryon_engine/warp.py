@@ -1493,7 +1493,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True,
                  source: str = "body", dropped_shoulder_single: bool = False, hem_rule: bool = False,
                  hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0,
-                 fit_modes: dict | None = None):
+                 fit_modes: dict | None = None, warp_engine: str = "parts"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1512,18 +1512,23 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     hem_rule (TRYON_HEM_RULE, default 1 in settings, False here so direct calls keep the garment's own length): the
     T-shirt hem lands on hip + hem_hip_fraction x (crotch - hip), at most crotch - hem_crotch_margin (docs/09 #91).
 
-    fit_modes: {garment type: "adapt" | "keep_shape"} (Garment.fit_mode, docs/09 #93). Accepted and ignored:
-    every garment is warped as `adapt` (the current behaviour).
-    TODO(docs/09 #93): keep_shape (own proportions, only anchors fit) once the MLS benchmark decides the method.
+    fit_modes: {garment type: "adapt" | "keep_shape"} (Garment.fit_mode, docs/09 #93). Used only by the MLS engine.
+    warp_engine (setting TRYON_WARP, docs/09 #98): "parts" (default: torso row warp + rigid sleeves, fit_modes
+    ignored) or "mls" for the T-shirt (apps/tryon_engine/mls.py: keep_shape -> preset A, adapt -> fitted at k 1.0).
+    When MLS cannot run (missing landmarks, failed core pairs) the T-shirt falls back to "parts" and
+    debug["quality_warnings"] gets "mls_fallback". Pants always use their own warp. debug["engine"] = the engine
+    the T-shirt actually used ("parts" when there is no T-shirt).
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
-    del fit_modes  # ignored for now (see the TODO above): output is identical for every fit mode
+    if warp_engine not in ("parts", "mls"):
+        raise ValueError(f"unknown warp engine: {warp_engine!r}")
+    fit_modes = fit_modes or {}
     base = cv2.resize(_bgra(base), (W, H))
     mask = figure_mask(base)
     canvas = base.copy()  # base alpha kept as is: forcing 255 inside the mask showed a grey halo at soft edges
     arms = find_arms(mask, body_lm)
-    warnings, info = [], {}
+    warnings, info = [], {"engine": "parts", "quality_warnings": []}
     by_type = {t: (img, lm) for t, img, lm in garments if t in ("tshirt", "pants")}
     layers = []
     if "pants" in by_type:
@@ -1532,7 +1537,24 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         warnings += [f"pants: {w}" for w in warns]
         layers.append(("pants", warped))
     opening = None
-    if "tshirt" in by_type:
+    mls_layer = None
+    if "tshirt" in by_type and warp_engine == "mls":
+        from . import mls as mls_engine
+        try:
+            mls_layer, mls_info = mls_engine.tshirt_layer(
+                *by_type["tshirt"], body_lm, mask, fit_modes.get("tshirt", "adapt"), H, W,
+                (hem_hip_fraction, hem_crotch_margin))
+            info.update(engine="mls", mls=mls_info, sleeve_hems=mls_info["sleeve_hems"])
+            warnings += [f"tshirt: mls dropped {r}" for r in mls_info["rejected"]]
+        except mls_engine.MlsUnavailable as e:
+            info["quality_warnings"].append("mls_fallback")
+            warnings.append(f"tshirt: mls fallback to parts: {e}")
+    if mls_layer is not None:
+        opening = info["mls"].get("neck_opening") if neck_fix else None
+        head = head_neck_overlay(mask, body_lm, NECK_FEATHER_FIX if neck_fix else NECK_FEATHER, opening)
+        info["tshirt_layer"] = mls_layer
+        layers.append(("tshirt", mls_layer))
+    elif "tshirt" in by_type:
         hem_over, under = None, None
         if "pants" in by_type:
             under = layers[0][1][:, :, 3] > 128
@@ -1566,7 +1588,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
             dark = contact_shadow(warped[:, :, 3], mask, _crotch_x(body_lm))
             canvas[:, :, :3] = (canvas[:, :, :3].astype(np.float32) * (1 - dark[:, :, None])).astype(np.uint8)
         canvas = _alpha_composite(canvas, warped)
-    if neck_gap_fill and source == "avatar" and "tshirt_layer" in info:
+    if neck_gap_fill and source == "avatar" and "tshirt_layer" in info and info["engine"] == "parts":
         canvas, info["neck_gap"] = neck_gap_fill_fn(canvas, base, mask, body_lm, head,
                                                     info["tshirt_layer"][:, :, 3], opening)
     info["head_overlay"] = head

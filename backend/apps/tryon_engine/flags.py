@@ -1,7 +1,8 @@
 """Flags for render_tryon from settings. Realism effects (default 0): TRYON_SHADING, TRYON_CONTACT_SHADOW,
 TRYON_EDGE_FEATHER. Structural steps (default 1): TRYON_SHOULDER_CAP, TRYON_HEM_SNAP, TRYON_HALO_REMOVAL,
 TRYON_NECK_FIX, TRYON_NECK_GAP_FILL. TRYON_DROPPED_SHOULDER_SINGLE (default 0, docs/09 #90).
-T-shirt hem rule: TRYON_HEM_RULE (default 1), TRYON_HEM_HIP_FRACTION, TRYON_HEM_CROTCH_MARGIN (docs/09 #91)."""
+T-shirt hem rule: TRYON_HEM_RULE (default 1), TRYON_HEM_HIP_FRACTION, TRYON_HEM_CROTCH_MARGIN (docs/09 #91).
+TRYON_WARP: "parts" (default) | "mls" for the T-shirt (docs/09 #98)."""
 from django.conf import settings
 
 
@@ -16,4 +17,4 @@ def render_flags(source: str = "body") -> dict:
             "neck_fix": settings.TRYON_NECK_FIX, "neck_gap_fill": settings.TRYON_NECK_GAP_FILL,
             "dropped_shoulder_single": settings.TRYON_DROPPED_SHOULDER_SINGLE,
             "hem_rule": settings.TRYON_HEM_RULE, "hem_hip_fraction": settings.TRYON_HEM_HIP_FRACTION,
-            "hem_crotch_margin": settings.TRYON_HEM_CROTCH_MARGIN}
+            "hem_crotch_margin": settings.TRYON_HEM_CROTCH_MARGIN, "warp_engine": settings.TRYON_WARP}

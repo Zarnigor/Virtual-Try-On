@@ -224,7 +224,7 @@ export interface NearestAvatarQuery {
 
 export type GarmentType = 'tshirt' | 'pants'
 export type Visibility = 'private' | 'public'
-/** docs/09 #93: adapt = deformed to the body landmarks; keep_shape = keeps its own proportions (engine pending). */
+/** docs/09 #93: adapt = deformed to the body landmarks; keep_shape = keeps its own proportions (MLS preset A when TRYON_WARP=mls, docs/09 #96, #98). */
 export type FitMode = 'adapt' | 'keep_shape'
 export type GarmentGender = 'female' | 'male' | 'unisex'
 /** PATCH garments/{id}/: only these fields are editable (never the image). */
@@ -286,6 +286,8 @@ export interface AppConfig {
 export interface TryOnResponse {
   job_id: number
   outfit_id: number
+  /** Debug (docs/09 #98): the T-shirt engine asked for; the job result has the one used + quality_warnings. */
+  engine: 'parts' | 'mls'
 }
 
 export interface Outfit {

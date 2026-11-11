@@ -61,7 +61,7 @@ General rules
 | PATCH | garments/{id}/landmarks/ | `{landmarks}` | `Garment + landmark_warnings[{code, group, detail}]` (range warnings, saved anyway; 409 `GARMENT_NOT_READY` until cleaned; 400 `LANDMARKS_INVALID` `{code, detail}` with a short Uzbek message naming the group, rules in docs/03; legacy `sleeve_end` is never stored) |
 | PATCH | garments/{id}/visibility/ | `{visibility: private\|public}` | `Garment` |
 | GET | jobs/{id}/ | | `Job {id, kind, status, result, error_code, error_message, ...}` |
-| POST | tryon/ | `{base: body\|avatar, avatar_id?, garment_ids[]}` | 202 `{job_id, outfit_id}`; 400 `GENDER_MISMATCH` `{garment_id, garment_gender, base_sex}` when a garment's gender is not the base's sex (unisex always passes); 400 `BODY_SEX_REQUIRED` for a body without sex |
+| POST | tryon/ | `{base: body\|avatar, avatar_id?, garment_ids[]}` | 202 `{job_id, outfit_id, engine}` (`engine`: debug, the T-shirt engine asked for, `parts`\|`mls`, docs/09 #98; the job `result` adds `engine` actually used and `quality_warnings`, e.g. `["mls_fallback"]`); 400 `GENDER_MISMATCH` `{garment_id, garment_gender, base_sex}` when a garment's gender is not the base's sex (unisex always passes); 400 `BODY_SEX_REQUIRED` for a body without sex |
 | GET | config/ | (public, no auth) | `AppConfig {demo_mode}` |
 | GET | outfits/ | | `Outfit[]` |
 | GET | outfits/{id}/ | | `Outfit` |
