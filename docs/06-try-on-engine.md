@@ -502,3 +502,43 @@ chest rows; p99 drops with k (#28 2.2-4.4 at k 1.0 -> 1.3-1.8 at k 0.5).
   hem but uncovers more of a larger body.
 Sheets: `out/sheet_fitted_k1_before_after.png` (left 6 columns before, right 6 after, k 1.0), `out/sheet_fitted_k.png`
 (k 1.0 | 0.7 | 0.5 x male slim, male plus, female slim).
+
+### MLS benchmark, round 7: torso side ease, underarm notch, mid-sleeve pairs (2026-11-11, NOT production)
+`mls_fitted.warp(..., round7=True)` (round7=False reproduces round 6), runner `run_fitted7.py` (`out/results7.json`).
+#28, #43, #40 x 6 avatars, k 1.0 and 0.7. Before = round 6 at k 1.0.
+- **Ease + side floor:** armpit/chest/waist/hem x targets = torso silhouette edge at that body row (mask run through the
+  axis; landmark span when merged with the arms) pushed out by 1.5 % of the body width there; k moves only their y,
+  the x never comes inside edge + ease.
+- **#43 armpit notch, cause:** the inner cuff target crossed the armpit target in x (garment: inner cuff outward of the
+  armpit; body: inward of it, e.g. 213 vs 199 on male slim), a crossing pair that folds the underarm. Two parts to the
+  fix: the armpit target is now the torso edge at the first row where the arm is separate in the mask (at the armpit
+  row the arms are still merged, so the landmark span put it outward of the arm's inner edge), and an inner cuff target
+  that still crosses is clamped 2 px outward of the armpit target (inner mid point recomputed). The armpit pair is
+  dropped only if something still crosses: 1 of 54 runs (#28 male slim, right side).
+- **Mid-sleeve pairs** `smid_out|in`: outer = arm centre line halfway between the shoulder point and the cuff centre +
+  arm width x 1.1 / 2; inner = halfway along the sleeve underside (armpit -> inner cuff) on both garment and body
+  (the arm's inner side is still joined to the torso at that height, a perpendicular target would land on the torso).
+
+Means over 6 avatars:
+| garment | run | uncovered | excess | gap | hem curve px | fold | runtime |
+|---|---|---|---|---|---|---|---|
+| #28 | round 6 k 1.0 | 6149 | 186 | 334 | 4.0-12.8 | 0-0.56 % | 0.08-0.10 s |
+| #28 | round 7 k 1.0 | 6384 | 119 | 473 | 4.0-13.2 | 0-0.28 % | 0.08-0.09 s |
+| #28 | round 7 k 0.7 | 5779 | 107 | 300 | 3.0-9.8 | 0-0.03 % | 0.08-0.10 s |
+| #43 | round 6 k 1.0 | 9523 | 52 | 1224 | 7.5-17.8 | 0.03-0.64 % | 0.08-0.09 s |
+| #43 | round 7 k 1.0 | 9492 | 2 | 1208 | 7.5-18.7 | 0.01-0.36 % | 0.09 s |
+| #43 | round 7 k 0.7 | 7983 | 15 | 354 | 7.0-12.8 | 0-0.10 % | 0.09 s |
+| #40 | round 6 k 1.0 | 5824 | 1288 | 493 | 4.0-10.0 | 0.42-1.43 % | 0.08-0.09 s |
+| #40 | round 7 k 1.0 | 5610 | 725 | 658 | 4.0-9.8 | 0.31-0.68 % | 0.09-0.10 s |
+| #40 | round 7 k 0.7 | 4613 | 1013 | 82 | 3.0-8.0 | 0.07-0.23 % | 0.09-0.10 s |
+Floating 0 except one 1 px piece. Local scale extremes at the armpit / chest rows (sleeve and torso).
+- Better: the #43 notch is gone (the underarm no longer folds); folds halve; #40 sleeve tops are flatter; excess down.
+- **Not fixed / new:** uncovered barely moves at k 1.0. The avatar's grey top still shows at the sides from the waist
+  to the hip on the plus avatars: the rigid field only has side points at the armpit, chest, waist and hem rows and
+  does not widen the garment between them (worst `out/crop_fitted7_worst.png`, #43 k 1.0 female plus, 17239 px).
+  The mid-sleeve pair opens a window of skin under the shoulder on the upper sleeve (gap and uncovered higher with it:
+  #43 female plus gap 637 vs 337 without, uncovered 17239 vs 15194; #28 female slim 609 vs 301), while it lowers the
+  fold (0.20 % vs 0.45 %). Its outer target (extrapolated arm centre line + half width) sits inside the deltoid.
+- k stays the owner's choice: k 0.7 has the smaller gap (#43 354 vs 1208) and fewer folds; k 1.0 follows the body.
+Sheets: `out/sheet_fitted7_k1_before_after.png` (left 6 columns round 6, right 6 round 7, k 1.0),
+`out/sheet_fitted7_k.png` (k 1.0 | 0.7 x male slim, male plus, female plus).

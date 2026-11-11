@@ -254,5 +254,40 @@ class FittedTests(unittest.TestCase):
         self.assertLess(m["hem_curve_px"], before["hem_curve_px"] / 2)  # 3 hem points: about half the sag
 
 
+class FittedRound7Tests(unittest.TestCase):
+    """Round 7: side floor, inner-cuff clamp at the armpit (the #43 notch), mid-sleeve pairs."""
+    full = LandmarkMlsTests.full
+
+    def test_side_x_is_never_inside_edge_plus_ease(self):
+        import mls_fitted as mf
+        self.assertEqual(mf._floor_x((215.0, 380.0), 207.0, "left"), (207.0, 380.0))
+        self.assertEqual(mf._floor_x((200.0, 380.0), 207.0, "left"), (200.0, 380.0))
+        self.assertEqual(mf._floor_x((385.0, 380.0), 393.0, "right"), (393.0, 380.0))
+
+    def test_inner_cuff_crossing_the_armpit_is_clamped_not_dropped(self):
+        import mls_fitted as mf
+        # #43 on male slim: garment cuff_in outward of the armpit, body target inward of it (crossing)
+        pairs = {"armpit_l": ((100, 248), (209, 337), 1.0), "cuff_in_l": ((85, 265), (213, 369), 1.0),
+                 "smid_in_l": ((92, 256), (211, 353), 1.0), "smid_out_l": ((30, 140), (174, 313), 1.0),
+                 "shoulder_l": ((55, 65), (181, 259), 1.0), "cuff_out_l": ((5, 206), (165, 368), 1.0)}
+        ctx = {"rejected": []}
+        mf.validate_round7(pairs, ctx)
+        self.assertIn("armpit_l", pairs)
+        self.assertEqual(pairs["cuff_in_l"][1], (209 - mf.UNDERARM_CLAMP, 369))
+        self.assertEqual(pairs["smid_in_l"][1], ((209 + 209 - mf.UNDERARM_CLAMP) / 2, (337 + 369) / 2))
+        self.assertFalse(mf._order_flips(pairs, "armpit_l", "cuff_in_l"))
+
+    def test_round7_warp_runs_and_round6_is_unchanged_by_default(self):
+        import mls_fitted as mf
+        base, blm = avatar()
+        img, glm = self.full()
+        i6, i7 = {}, {}
+        l6 = mf.warp(img, glm, blm, base=base, info=i6)
+        l7 = mf.warp(img, glm, blm, base=base, info=i7, round7=True)
+        self.assertEqual(l7.shape, (1200, 600, 4))
+        self.assertFalse(any(n.startswith("smid") for n in i6["pairs"]))
+        self.assertFalse((l6 == l7).all())
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,16 @@ Reuses mls_landmarks.warp (alignment, rigid MLS, validation, edge fix, neck hand
    shoulder line) when that edge is further out.
 5. Edge fix: after the 2 px erosion (mls_landmarks), partial-alpha pixels below HARD_EDGE are removed (no soft specks).
 Per-point k: neck and shoulder 1.0 (anchors); armpit, chest, waist, hem, cuff = the run's k.
+
+Round 7 (`round7=True`, docs/06; round7=False reproduces round 6 for the before/after sheets):
+6. Ease + side floor: torso side x targets (armpit, chest, waist, hem) = the torso silhouette edge at that body row
+   pushed out by SIDE_EASE of the body width there; k moves only their y (and the sleeve points): x never comes
+   inside edge + ease, whatever k is.
+7. Underarm: the armpit target is the torso edge where the arms first separate (at the armpit row they are still
+   merged). An inner cuff target crossing it in x (the #43 notch) is clamped UNDERARM_CLAMP px outward of it and the
+   inner mid point recomputed; the armpit pair is dropped only if a pair still crosses.
+8. Mid-sleeve pairs `smid_out|in`: garment = midpoints shoulder -> outer cuff and armpit -> inner cuff; body = the arm
+   centre line halfway between the shoulder point and the cuff centre, +/- arm width x CUFF_ARM_EASE / 2 across the arm.
 """
 import numpy as np
 
@@ -23,6 +33,8 @@ from apps.tryon_engine import warp as prod
 
 CUFF_ARM_EASE = 1.1
 HEM_EASE = 0.02
+SIDE_EASE = 0.015  # round 7: torso side targets = silhouette edge + this x the body width at that row
+UNDERARM_CLAMP = 2.0  # round 7: an inner cuff target crossing the armpit target is moved this far outward of it
 HARD_EDGE = int(0.9 * 255)
 ACROMION_ROWS = 4  # px below the shoulder line where the outer silhouette edge is read
 _f = float
@@ -53,7 +65,50 @@ def _torso_run(mask, y, axis):
     return next((q for q in prod._runs(mask[yi]) if q[0] <= axis <= q[1]), None)
 
 
-def retarget(pairs, ctx):
+def _side_edges(mask, blm, row, y, axis):
+    """(left, right) torso silhouette edges at body row y: the mask run through the axis, or the landmark span when
+    that run is merged with the arms (wider than 1.3 x the landmark span) or missing."""
+    if row in blm and "left_x" in blm[row]:
+        bl, br = _f(blm[row]["left_x"]), _f(blm[row]["right_x"])
+    else:
+        bl, br = prod.body_span(blm, y)
+    run = _torso_run(mask, y, axis) if mask.any() else None
+    if run and run[1] - run[0] <= 1.3 * (br - bl):
+        return float(run[0]), float(run[1] + 1)
+    return bl, br
+
+
+def _underarm_edges(mask, arms, axis, fallback):
+    """(left, right) torso edges at the first row where each arm is separate (find_arms' first row): the junction
+    the garment's underarm belongs to. At the armpit row itself the arms are still merged with the torso."""
+    out = list(fallback)
+    for i, side in enumerate(("left", "right")):
+        rows = (arms.get(side) or {}).get("rows") or []
+        if rows:
+            run = _torso_run(mask, rows[0][0], axis)
+            if run:
+                out[i] = float(run[0]) if side == "left" else float(run[1] + 1)
+    return tuple(out)
+
+
+def _floor_x(p, bx, side):
+    """Target p with its x never inside bx (left side: x <= bx; right side: x >= bx)."""
+    x = min(p[0], bx) if side == "left" else max(p[0], bx)
+    return (x, p[1])
+
+
+def _order_flips(pairs, a, b):
+    """True when the x order of pairs a and b differs between garment (q) and body (p)."""
+    qa, pa = pairs[a][0], pairs[a][1]
+    qb, pb = pairs[b][0], pairs[b][1]
+    return (qa[0] < qb[0]) != (pa[0] < pb[0])
+
+
+def retarget7(pairs, ctx):
+    retarget(pairs, ctx, round7=True)
+
+
+def retarget(pairs, ctx, round7=False):
     glm, blm, mask, fit, hem_y = ctx["glm"], ctx["blm"], ctx["mask"], ctx["fit"], ctx["hem_y"]
     arms = prod.find_arms(mask, blm) if mask.any() else {}
     a_sy = _f(blm["shoulder"]["y"])
@@ -75,11 +130,23 @@ def retarget(pairs, ctx):
     run = _torso_run(mask, hem_y, axis) if mask.any() else None
     if run and run[1] - run[0] <= 1.3 * (br - bl):
         bl, br = float(run[0]), float(run[1] + 1)
-    e = HEM_EASE * (br - bl)
+    e = (SIDE_EASE if round7 else HEM_EASE) * (br - bl)
     g_hy = _f(glm["hem"]["y"])
     for side, sx, bx in (("left", "_l", bl - e), ("right", "_r", br + e)):
         q = (_f(glm["hem"][f"{side}_x"]), g_hy)
-        pairs["hem" + sx] = (q, fit(q, (bx, hem_y), "hem"), 1.0)
+        p = fit(q, (bx, hem_y), "hem")
+        pairs["hem" + sx] = (q, _floor_x(p, bx, side) if round7 else p, 1.0)
+    if round7:  # 6. armpit / chest / waist: silhouette edge + ease, x floored
+        for row in ("armpit", "chest", "waist"):
+            y = _f(blm[row]["y"])
+            l, r = _side_edges(mask, blm, row, y, axis)
+            if row == "armpit":  # 7. the underarm junction: torso edge where the arms first separate
+                l, r = _underarm_edges(mask, arms, axis, (l, r))
+            e = SIDE_EASE * (r - l)
+            for side, sx, bx in (("left", "_l", l - e), ("right", "_r", r + e)):
+                if row + sx in pairs:
+                    q = pairs[row + sx][0]
+                    pairs[row + sx] = (q, _floor_x(fit(q, (bx, y), row), bx, side), 1.0)
     q = ((_f(glm["hem"]["left_x"]) + _f(glm["hem"]["right_x"])) / 2, g_hy)
     pairs["hem_c"] = (q, fit(q, ((bl + br) / 2, hem_y), "hem"), 1.0)
     # 1 + 2. cuffs on the arm
@@ -108,6 +175,26 @@ def retarget(pairs, ctx):
             perp = -perp
         pairs["cuff_out" + sx] = (out_q, fit(out_q, c + perp * w / 2, "cuff"), 1.0)
         pairs["cuff_in" + sx] = (in_q, fit(in_q, c - perp * w / 2, "cuff"), 1.0)
+        if round7:  # 8. mid-sleeve pairs on the arm
+            S_b = np.array(pairs["shoulder" + sx][1])
+            m = (S_b + c) / 2
+            at_m = _arm_at(arms, side, m[1])
+            if at_m is not None:
+                m = np.array([at_m[0], m[1]])
+                wm = at_m[1] * abs(d[1]) * CUFF_ARM_EASE
+                q_out = tuple((np.array(pairs["shoulder" + sx][0]) + np.array(out_q)) / 2)
+                q_in = tuple((np.array([_f(glm["armpit"][f"{side}_x"]), _f(glm["armpit"]["y"])]) + np.array(in_q)) / 2)
+                pairs["smid_out" + sx] = (q_out, fit(q_out, m + perp * wm / 2, "cuff"), 1.0)
+                # inner: halfway along the sleeve underside (armpit -> inner cuff) on both garment and body; at
+                # mid-sleeve height the arm's inner side is still joined to the torso, so m - perp * wm / 2 would
+                # land on the torso above the armpit (a crossing pair)
+                if "armpit" + sx in pairs:
+                    p_in = (np.array(pairs["armpit" + sx][1]) + np.array(pairs["cuff_in" + sx][1])) / 2
+                    pairs["smid_in" + sx] = (q_in, tuple(p_in), 1.0)
+                else:
+                    del pairs["smid_out" + sx]
+    if round7:
+        validate_round7(pairs, ctx)
     # hem centre must stay between the hem corners on both sides (never a crossing pair)
     hl, hr, hc = pairs["hem_l"], pairs["hem_r"], pairs["hem_c"]
     if not all(hl[i][0] < hc[i][0] < hr[i][0] for i in (0, 1)):
@@ -115,9 +202,42 @@ def retarget(pairs, ctx):
         ctx["rejected"].append("hem_c")
 
 
-def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), k=1.0, base=None, info=None):
+def validate_round7(pairs, ctx):
+    """Mid-sleeve pairs and the underarm order (round 7): never feed a crossing pair."""
+    for sx in ("_l", "_r"):
+        # mid-sleeve pairs: between shoulder and cuff along the sleeve on both sides, inner/outer kept
+        if "smid_out" + sx in pairs:
+            ok = True
+            for i in (0, 1):  # outer mid between the shoulder and the outer cuff along the sleeve's top edge
+                S, C = np.array(pairs["shoulder" + sx][i]), np.array(pairs["cuff_out" + sx][i])
+                u = (C - S) / max(np.linalg.norm(C - S), 1e-6)
+                t = (np.array(pairs["smid_out" + sx][i]) - S) @ u
+                ok &= 0 < t < (C - S) @ u
+            if not ok or _order_flips(pairs, "smid_out" + sx, "smid_in" + sx):
+                for n in ("smid_out" + sx, "smid_in" + sx):
+                    del pairs[n]
+                ctx["rejected"].append("smid" + sx)
+        # 7. underarm: the inner cuff target crossing the armpit target in x is the #43 notch. Clamp it to
+        # UNDERARM_CLAMP px outward of the armpit target (the garment's order), recompute the inner mid point,
+        # and drop the armpit pair only if something still crosses.
+        a, c = "armpit" + sx, "cuff_in" + sx
+        if a in pairs and c in pairs and _order_flips(pairs, a, c):
+            out = -1.0 if sx == "_l" else 1.0
+            q, p, w = pairs[c]
+            pairs[c] = (q, (pairs[a][1][0] + out * UNDERARM_CLAMP, p[1]), w)
+            ctx["rejected"].append(f"cuff_in{sx} (clamped {UNDERARM_CLAMP:g} px outside the armpit)")
+            if "smid_in" + sx in pairs:
+                qm, _, wm = pairs["smid_in" + sx]
+                pairs["smid_in" + sx] = (qm, tuple((np.array(pairs[a][1]) + np.array(pairs[c][1])) / 2), wm)
+        if "armpit" + sx in pairs and any(n in pairs and _order_flips(pairs, "armpit" + sx, n)
+                                          for n in ("cuff_in" + sx, "smid_in" + sx)):
+            del pairs["armpit" + sx]
+            ctx["rejected"].append(f"armpit{sx} (x order vs the inner sleeve differs: crossing)")
+
+
+def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), k=1.0, base=None, info=None, round7=False):
     layer = ml.warp(garment_rgba, garment_lm, body_lm, out_size, k=k, k_map=k_map_for(k), base=base, info=info,
-                    retarget=retarget)
+                    retarget=retarget7 if round7 else retarget)
     if layer is not None:
         layer = layer.copy()
         a = layer[:, :, 3]
