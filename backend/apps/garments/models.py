@@ -9,6 +9,10 @@ class Garment(models.Model):
         ("pending", "Pending"), ("approved", "Approved"),
         ("review", "Review"), ("hidden", "Hidden"),
     ]
+    # docs/09 #93: garment fit is per garment. adapt = fully deformed to the body landmarks (current engine);
+    # keep_shape = keeps its own proportions (oversized, wide-leg), only anchors fit the body (engine: pending).
+    FIT_CHOICES = [("adapt", "Adapt to body"), ("keep_shape", "Keep own shape")]
+    GENDER_CHOICES = [("female", "Female"), ("male", "Male"), ("unisex", "Unisex")]
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -23,6 +27,8 @@ class Garment(models.Model):
     landmarks = models.JSONField(default=dict)
     visibility = models.CharField(max_length=10, choices=VIS_CHOICES, default="private")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    fit_mode = models.CharField(max_length=12, choices=FIT_CHOICES, default="adapt")
+    gender = models.CharField(max_length=8, choices=GENDER_CHOICES, default="unisex")
     # True = the AI check was skipped (AI_DEV_BYPASS, local dev only): this garment was NOT validated.
     ai_skipped = models.BooleanField(default=False)
     # The stored PNG had its photo lighting flattened (apps/garments/lighting.py); never flatten twice.

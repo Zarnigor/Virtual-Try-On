@@ -222,6 +222,11 @@ export interface NearestAvatarQuery {
 
 export type GarmentType = 'tshirt' | 'pants'
 export type Visibility = 'private' | 'public'
+/** docs/09 #93: adapt = deformed to the body landmarks; keep_shape = keeps its own proportions (engine pending). */
+export type FitMode = 'adapt' | 'keep_shape'
+export type GarmentGender = 'female' | 'male' | 'unisex'
+/** PATCH garments/{id}/: only these fields are editable (never the image). */
+export interface GarmentSettings { fit_mode?: FitMode; gender?: GarmentGender }
 export type GarmentStatus = 'pending' | 'approved' | 'review' | 'hidden'
 export type GarmentScope = 'mine' | 'catalog' | 'all'
 
@@ -240,6 +245,8 @@ export interface Garment {
   /** True when every point of the current set exists; false: ask the user to add the missing points. */
   landmarks_complete: boolean
   visibility: Visibility
+  fit_mode: FitMode
+  gender: GarmentGender
   status: GarmentStatus
   owned_by_me: boolean
   /** True = the AI check was skipped (AI_DEV_BYPASS, local dev only): NOT validated. Show a dev warning. */

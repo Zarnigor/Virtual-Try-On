@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { listGarments, deleteGarment, type Garment } from '../api/garments'
 import Spinner from '../components/Spinner'
 import DevAiWarning from '../components/DevAiWarning'
+import { GenderBadge } from '../components/GarmentSettingsPanel'
 import StatusChip from '../components/StatusChip'
 
 export default function Wardrobe() {
@@ -106,6 +107,7 @@ export default function Wardrobe() {
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {g.ai_skipped && <DevAiWarning compact />}
                 <StatusChip status={g.type} />
+                <GenderBadge gender={g.gender} />
                 {/* Moderation status only matters for public garments (private ones stay "pending"). */}
                 <StatusChip status={g.visibility === 'public' ? g.status : g.visibility} />
                 {!g.image_url ? (

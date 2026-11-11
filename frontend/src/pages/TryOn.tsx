@@ -8,12 +8,19 @@ import { usePoll } from '../components/usePoll'
 import Spinner from '../components/Spinner'
 import DevAiWarning from '../components/DevAiWarning'
 import StatusChip from '../components/StatusChip'
+import { GenderBadge, Segmented } from '../components/GarmentSettingsPanel'
+import type { GarmentGender } from '../api/types'
+import { GARMENT_SETTINGS } from '../locale/uz'
+
+const GENDER_FILTER = { all: GARMENT_SETTINGS.genderFilterAll, ...GARMENT_SETTINGS.gender }
 
 export default function TryOn() {
   const [base, setBase] = useState<'body' | 'avatar'>('avatar')
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null)
   const [garments, setGarments] = useState<Garment[]>([])
+  const [scope, setScope] = useState<'all' | 'mine' | null>(null)
+  const [gender, setGender] = useState<GarmentGender | 'all'>('all')
   const [selectedGarments, setSelectedGarments] = useState<number[]>([])
   const [jobId, setJobId] = useState<number | null>(null)
   const [outfitId, setOutfitId] = useState<number | null>(null)
@@ -26,10 +33,16 @@ export default function TryOn() {
   useEffect(() => {
     listAvatars().then(({ data }) => setAvatars(data)).catch(() => {})
     // Demo mode also lists the catalog (the demo garments); otherwise only the user's own garments, as before.
-    getConfig().then((c) =>
-      listGarments(c.demo_mode ? 'all' : 'mine').then(({ data }) => setGarments(data)).catch(() => {}),
-    )
+    getConfig().then((c) => setScope(c.demo_mode ? 'all' : 'mine')).catch(() => setScope('mine'))
   }, [])
+
+  // Gender filter: Ayollar / Erkaklar also list unisex garments (the backend includes them).
+  useEffect(() => {
+    if (!scope) return
+    listGarments(scope, undefined, gender === 'all' ? undefined : gender)
+      .then(({ data }) => setGarments(data))
+      .catch(() => {})
+  }, [scope, gender])
 
   useEffect(() => {
     if (job?.status === 'done' && outfitId) {
@@ -177,7 +190,12 @@ export default function TryOn() {
           {/* Garment picker */}
           <div className="card">
             <h2 style={{ fontSize: 16, marginBottom: 12 }}>Kiyimlar</h2>
-            {garments.length === 0 ? (
+            <div style={{ marginBottom: 12 }}>
+              <Segmented title={GARMENT_SETTINGS.genderTitle} value={gender} options={GENDER_FILTER} onChange={setGender} />
+            </div>
+            {garments.length === 0 && gender !== 'all' ? (
+              <p style={{ color: 'var(--muted)', fontSize: 13 }}>Bu tanlov boʻyicha kiyim yoʻq.</p>
+            ) : garments.length === 0 ? (
               <p style={{ color: 'var(--muted)', fontSize: 13 }}>
                 Hali kiyim yuklanmagan.{' '}
                 <a href="/garments/upload">Yuklash</a>
@@ -218,7 +236,8 @@ export default function TryOn() {
                       )}
                       <div style={{ flex: 1 }}>
                         {g.ai_skipped && <DevAiWarning compact />}
-                        <StatusChip status={g.type} />
+                        <StatusChip status={g.type} />{' '}
+                        <GenderBadge gender={g.gender} />
                         {!hasLandmarks && (
                           <span style={{ fontSize: 11, color: 'var(--warning)', marginLeft: 6 }}>
                             Belgilar kerak

@@ -4,7 +4,9 @@ This is a proposal; confirm the approach with the owner before building.
 
 **MVP scope: T-shirt (short sleeve) + pants.** The body photo is taken in a short-sleeved or sleeveless top and
 shorts/tight leggings, so no old sleeves or trouser legs show around the new garment.
-**The garment always adapts to the body** (decision): there is no size-mismatch display and no fit label.
+**The garment adapts to the body** per its `fit_mode` (docs/09 #93): `adapt` is what the engine does; `keep_shape`
+is accepted (`render_tryon(fit_modes=...)`) but warped like `adapt` until the MLS benchmark decides the method. There
+is no size-mismatch display and no fit label.
 
 Inputs: body (image + landmarks + optional height_cm) or avatar (image + landmarks + required measurements),
 garment (transparent PNG + landmarks by type).

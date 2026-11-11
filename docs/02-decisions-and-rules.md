@@ -38,11 +38,14 @@ These come from the product owner. Do not change them without asking. Log: `09-o
 ## Measurements and fit
 19. Own body: marked landmarks on the photo are the required input; numeric measurements and height are optional.
 20. **Model path (avatar): numeric measurements are required.**
-21. **Garment real size is NOT entered.** The garment always adapts to the body (deformed to the body's landmarks).
-    There is no tight/fits/loose label.
+21. **Garment real size is NOT entered.** Fit is set per garment (`fit_mode`, docs/09 #93, decided 2026-11-11):
+    `adapt` (default) = the garment is fully deformed to the body's landmarks; `keep_shape` = the garment keeps its own
+    proportions (oversized, wide-leg) and only its anchors fit the body. There is no tight/fits/loose label.
+    The engine treats `keep_shape` like `adapt` until the MLS benchmark decides the method (docs/06).
 
 ## Try-on result rules
-22. The result shows the garment fitted to the body landmarks.
+22. The result shows the garment fitted to the body landmarks according to its `fit_mode`: fully deformed (`adapt`),
+    or anchored at the landmarks with its own proportions kept (`keep_shape`, engine pending).
 23. Realistic render is optional, paid AI, only on user request. It must not change the person's face/body or how the garment sits.
 24. The user can save an outfit with the plain result and/or the realistic result; the realistic one is saved with the outfit.
 

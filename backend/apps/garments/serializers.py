@@ -14,7 +14,8 @@ class GarmentSerializer(serializers.ModelSerializer):
         model = Garment
         fields = (
             "id", "name", "type", "image_url", "thumb_url", "original_preview_url",
-            "width", "height", "landmarks", "landmarks_complete", "visibility", "status", "owned_by_me", "ai_skipped",
+            "width", "height", "landmarks", "landmarks_complete", "visibility", "fit_mode", "gender", "status",
+            "owned_by_me", "ai_skipped",
             "created_at",
         )
         read_only_fields = fields

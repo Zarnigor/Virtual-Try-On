@@ -1492,7 +1492,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
                  halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True,
                  source: str = "body", dropped_shoulder_single: bool = False, hem_rule: bool = False,
-                 hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0):
+                 hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0,
+                 fit_modes: dict | None = None):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1511,8 +1512,13 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     hem_rule (TRYON_HEM_RULE, default 1 in settings, False here so direct calls keep the garment's own length): the
     T-shirt hem lands on hip + hem_hip_fraction x (crotch - hip), at most crotch - hem_crotch_margin (docs/09 #91).
 
+    fit_modes: {garment type: "adapt" | "keep_shape"} (Garment.fit_mode, docs/09 #93). Accepted and ignored:
+    every garment is warped as `adapt` (the current behaviour).
+    TODO(docs/09 #93): keep_shape (own proportions, only anchors fit) once the MLS benchmark decides the method.
+
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
+    del fit_modes  # ignored for now (see the TODO above): output is identical for every fit mode
     base = cv2.resize(_bgra(base), (W, H))
     mask = figure_mask(base)
     canvas = base.copy()  # base alpha kept as is: forcing 255 inside the mask showed a grey halo at soft edges

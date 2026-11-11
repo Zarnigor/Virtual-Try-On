@@ -47,3 +47,19 @@ export const LANDMARK_EDITOR = {
   checksTitle: 'Tekshiruv',
   warningsTitle: 'Eslatma',
 }
+
+/** Garment settings (screen 9) and list badges/filters (docs/09 #93). */
+export const GARMENT_SETTINGS = {
+  fitTitle: 'Moslashish',
+  fit: { adapt: 'Tanaga moslash', keep_shape: 'Kiyim shaklini saqlash' },
+  fitHelp: {
+    adapt: 'Kiyim tananing nuqtalariga toʻliq moslashadi.',
+    keep_shape: 'Kiyim oʻz shaklini saqlaydi (keng, oversize). Hozircha natija «Tanaga moslash» bilan bir xil.',
+  },
+  genderTitle: 'Kim uchun',
+  gender: { female: 'Ayollar', male: 'Erkaklar', unisex: 'Uniseks' },
+  genderFilterAll: 'Hammasi',
+  saved: 'Saqlandi',
+  saveError: 'Saqlab boʻlmadi. Qayta urinib koʻring.',
+} as const
+

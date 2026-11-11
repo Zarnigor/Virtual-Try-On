@@ -52,10 +52,19 @@ class GarmentRulesTests(MediaTestCase):
 
     def test_no_image_update_endpoint(self):
         g = self._garment()
+        before = (g.image.name, g.image.read())
         self.login(self.owner)
-        for method in ("put", "patch"):
-            r = getattr(self.client, method)(f"/api/garments/{g.id}/", {"name": "x"}, format="json")
-            self.assertEqual(r.status_code, 405, method)
+        self.assertEqual(self.client.put(f"/api/garments/{g.id}/", {"name": "x"}, format="json").status_code, 405)
+        # PATCH only edits fit_mode / gender: anything else, the image above all, is rejected and nothing is saved
+        for payload in ({"name": "x"}, {"landmarks": {}}, {"fit_mode": "keep_shape", "image": "x.png"}):
+            r = self.client.patch(f"/api/garments/{g.id}/", payload, format="json")
+            self.assertEqual((r.status_code, r.data["code"]), (400, "FIELD_NOT_EDITABLE"), payload)
+        r = self.client.patch(f"/api/garments/{g.id}/", {"image": ContentFile(png_bytes(10, 10), name="n.png")},
+                              format="multipart")
+        self.assertEqual(r.status_code, 400)
+        g.refresh_from_db()
+        self.assertEqual((g.image.name, g.image.read()), before)
+        self.assertEqual((g.name, g.fit_mode), ("", "adapt"))
 
     def test_delete_removes_files(self):
         g = self._garment()
@@ -165,3 +174,85 @@ class GarmentCleaningStateTests(MediaTestCase):
         r = self.client.patch(f"/api/garments/{gid}/landmarks/", {"landmarks": TSHIRT_LM}, format="json")
         self.assertEqual((r.status_code, r.data["code"]), (409, "GARMENT_NOT_READY"))
         self.assertEqual(Garment.objects.get(pk=gid).landmarks, {})
+
+
+class GarmentFitAndGenderTests(MediaTestCase):
+    """Per-garment fit_mode (adapt | keep_shape) and gender (female | male | unisex), docs/09 #93."""
+
+    def setUp(self):
+        super().setUp()
+        self.owner = self.make_user()
+        self.other = self.make_user("b@test.uz")
+        self.login(self.owner)
+
+    def _garment(self, owner=None, **kw):
+        return GarmentRulesTests._garment(self, owner, **kw)
+
+    def test_defaults_on_existing_and_new_garments(self):
+        g = self._garment()
+        g.refresh_from_db()
+        self.assertEqual((g.fit_mode, g.gender), ("adapt", "unisex"))
+        data = self.client.get(f"/api/garments/{g.id}/").data
+        self.assertEqual((data["fit_mode"], data["gender"]), ("adapt", "unisex"))
+        # existing rows: the migration adds both columns with these defaults
+        import importlib
+        m = importlib.import_module("apps.garments.migrations.0005_garment_fit_mode_gender")
+        defaults = {op.name: op.field.default for op in m.Migration.operations}
+        self.assertEqual(defaults, {"fit_mode": "adapt", "gender": "unisex"})
+
+    def test_patch_both_fields(self):
+        g = self._garment()
+        r = self.client.patch(f"/api/garments/{g.id}/", {"fit_mode": "keep_shape"}, format="json")
+        self.assertEqual((r.status_code, r.data["fit_mode"], r.data["gender"]), (200, "keep_shape", "unisex"))
+        r = self.client.patch(f"/api/garments/{g.id}/", {"fit_mode": "adapt", "gender": "female"}, format="json")
+        self.assertEqual((r.status_code, r.data["fit_mode"], r.data["gender"]), (200, "adapt", "female"))
+        g.refresh_from_db()
+        self.assertEqual((g.fit_mode, g.gender), ("adapt", "female"))
+
+    def test_invalid_values_rejected(self):
+        g = self._garment()
+        for payload, code in (({"fit_mode": "tight"}, "BAD_FIT_MODE"), ({"gender": "kids"}, "BAD_GENDER"),
+                              ({"gender": None}, "BAD_GENDER"), ({"fit_mode": "keep_shape", "gender": "x"}, "BAD_GENDER"),
+                              ({}, "FIELD_NOT_EDITABLE")):
+            r = self.client.patch(f"/api/garments/{g.id}/", payload, format="json")
+            self.assertEqual((r.status_code, r.data["code"]), (400, code), payload)
+        g.refresh_from_db()
+        self.assertEqual((g.fit_mode, g.gender), ("adapt", "unisex"))  # nothing saved, not even the valid half
+
+    def test_only_the_owner_can_patch(self):
+        g = self._garment()
+        self.login(self.other)
+        r = self.client.patch(f"/api/garments/{g.id}/", {"gender": "male"}, format="json")
+        self.assertEqual(r.status_code, 404)
+
+    def test_gender_filter_includes_unisex(self):
+        f = self._garment(gender="female")
+        m = self._garment(gender="male")
+        u = self._garment()
+        ids = lambda q: sorted(x["id"] for x in self.client.get(f"/api/garments/?scope=mine{q}").data)  # noqa: E731
+        self.assertEqual(ids("&gender=female"), sorted([f.id, u.id]))
+        self.assertEqual(ids("&gender=male"), sorted([m.id, u.id]))
+        self.assertEqual(ids("&gender=unisex"), [u.id])
+        self.assertEqual(ids(""), sorted([f.id, m.id, u.id]))
+        self.assertEqual(ids("&gender=other"), sorted([f.id, m.id, u.id]))  # unknown filter value: ignored
+
+    def test_fit_mode_is_passed_to_the_engine_and_ignored(self):
+        import numpy as np
+        from apps.tryon_engine import warp
+        from apps.tryon_engine.tests import avatar, tshirt
+        base, lm = avatar()
+        g, glm = tshirt()
+        a = warp.render_tryon(base, lm, [("tshirt", g, glm)])[0]
+        for mode in ("adapt", "keep_shape"):
+            b = warp.render_tryon(base, lm, [("tshirt", g, glm)], fit_modes={"tshirt": mode})[0]
+            np.testing.assert_array_equal(a, b)
+        # the try-on task hands each garment's fit_mode to the engine
+        from unittest import mock
+        from apps.tryon_engine import tasks
+        with mock.patch("apps.tryon_engine.warp.render_tryon", return_value=(a, [], {})) as rt:
+            outfit = mock.Mock(body=None)
+            outfit.avatar.image.path = self._garment().image.path
+            outfit.avatar.landmarks = lm
+            outfit.garments.all.return_value = [self._garment(fit_mode="keep_shape")]
+            tasks._do_warp(outfit)
+        self.assertEqual(rt.call_args.kwargs["fit_modes"], {"tshirt": "keep_shape"})

@@ -2,6 +2,7 @@
 
 ## Decided by the owner (do not ask again)
 1. **Garment real size: NOT entered.** The garment always adapts (is deformed) to the body. No size-mismatch display.
+   (Changed 2026-11-11, #93: fit is per garment, `adapt` | `keep_shape`.)
 2. **Realistic result is saved** with the outfit (plain result is kept too; UI shows the realistic one first).
 3. **MVP garments = T-shirt + pants.** Body photo: short-sleeved/sleeveless top and shorts or tight leggings.
 4. **Model path (avatar): measurements are REQUIRED** if the user wants to use an avatar.
@@ -343,4 +344,14 @@ _(none blocking P0)_
     Pants and body sets unchanged. Garments marked before this change must be re-marked to save again (cuffs).
     Still open (not decided by this change): the hem rule (#91 proposed, "Still open" benchmark note) and the
     measurement-to-width conversion.
+
+## Decided 2026-11-11: per-garment fit mode and gender (owner decision)
+93. **Garment fit is now per garment**: `Garment.fit_mode` = `adapt` (default, fully deformed to the body landmarks,
+    the current engine) | `keep_shape` (keeps its own proportions, e.g. oversized or wide-leg; only anchors fit the
+    body). Plus `Garment.gender` = `female` | `male` | `unisex` (default); the list filter `gender=` returns unisex
+    garments for female and male too. Both editable with PATCH garments/{id}/ (owner only, nothing else editable,
+    never the image), shown on screen 9 and as list badges. This changes docs/02 rules 21-22 (updated) and replaces
+    decision 1's "the garment always adapts". The try-on task passes `fit_modes` to `render_tryon`, which ignores it
+    for now (TODO): **engine behaviour for keep_shape is pending the MLS benchmark** (docs/06 "MLS single-field
+    benchmark"). Existing garments got the defaults (adapt, unisex) by migration 0005.
 

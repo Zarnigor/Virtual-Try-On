@@ -26,6 +26,7 @@ def garments_root(request):
 
     scope = request.query_params.get("scope", "mine")
     gtype = request.query_params.get("type")
+    gender = request.query_params.get("gender")
 
     if scope == "mine":
         qs = Garment.objects.filter(owner=request.user)
@@ -36,6 +37,10 @@ def garments_root(request):
 
     if gtype:
         qs = qs.filter(type=gtype)
+    if gender in ("female", "male"):  # unisex garments match every gender filter
+        qs = qs.filter(gender__in=[gender, "unisex"])
+    elif gender == "unisex":
+        qs = qs.filter(gender="unisex")
 
     qs = qs.order_by("-created_at")
     return Response(GarmentSerializer(qs, many=True, context={"request": request}).data)
@@ -69,10 +74,17 @@ def _upload_garment(request):
     }, status=201)
 
 
-@api_view(["GET", "DELETE"])
+# Fields PATCH garments/{id}/ may change (owner only). Nothing else is editable here: the image never is.
+EDITABLE_CHOICES = {"fit_mode": dict(Garment.FIT_CHOICES), "gender": dict(Garment.GENDER_CHOICES)}
+
+
+@api_view(["GET", "PATCH", "DELETE"])
 @permission_classes([IsAuthenticated])
 def garment_detail(request, pk):
-    """GET /api/garments/{id}/ (owner or public+approved)  |  DELETE (owner only)."""
+    """GET /api/garments/{id}/ (owner or public+approved)  |  PATCH {fit_mode?, gender?} (owner only)  |
+    DELETE (owner only)."""
+    if request.method == "PATCH":
+        return _update_settings(request, pk)
     if request.method == "DELETE":
         try:
             g = Garment.objects.get(pk=pk, owner=request.user)
@@ -124,6 +136,27 @@ def _alpha_bbox(g):
     except Exception:
         return None
     return (box[0], box[1], box[2] - 1, box[3] - 1) if box else None
+
+
+def _update_settings(request, pk):
+    """PATCH /api/garments/{id}/ {fit_mode?, gender?}: same style as visibility. Any other key (image, name,
+    landmarks, ...) is rejected and nothing is saved; the garment image is never updatable."""
+    try:
+        g = Garment.objects.get(pk=pk, owner=request.user)
+    except Garment.DoesNotExist:
+        return Response(status=404)
+    data = request.data
+    keys = set(data.keys()) if hasattr(data, "keys") else set()
+    if not keys or keys - set(EDITABLE_CHOICES):
+        return Response({"code": "FIELD_NOT_EDITABLE",
+                         "detail": "Faqat moslashish va kim uchun ekanini oʻzgartirish mumkin."}, status=400)
+    for field, choices in EDITABLE_CHOICES.items():
+        if field in keys and data.get(field) not in choices:
+            return Response({"code": f"BAD_{field.upper()}", "detail": f"{field}: {' | '.join(choices)}."}, status=400)
+    for field in keys:
+        setattr(g, field, data.get(field))
+    g.save(update_fields=sorted(keys))
+    return Response(GarmentSerializer(g, context={"request": request}).data)
 
 
 @api_view(["PATCH"])

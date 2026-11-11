@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { getGarment, updateLandmarks, type Garment } from '../api/garments'
 import type { GarmentLandmarks } from '../api/types'
 import DevAiWarning from '../components/DevAiWarning'
+import GarmentSettingsPanel from '../components/GarmentSettingsPanel'
 import Spinner from '../components/Spinner'
 import LandmarkEditor from '../components/landmark-editor/LandmarkEditor'
 import { groupsFor, rulesFor } from '../components/landmark-editor/garmentGroups'
@@ -133,6 +134,7 @@ export default function GarmentLandmarksPage() {
       </div>
 
       {garment?.ai_skipped && <DevAiWarning />}
+      {garment?.owned_by_me && <GarmentSettingsPanel garment={garment} onSaved={setGarment} />}
       {missing.length > 0 && (
         <div className="banner banner-warning" role="status" style={{ marginBottom: 12 }}>
           {LANDMARK_EDITOR.incompleteBanner(missing)}

@@ -43,14 +43,17 @@ def _do_warp(outfit):
     if base_img is None:
         raise ValueError(f"Cannot read base image: {base_path}")
 
-    garments = []
+    garments, fit_modes = [], {}
     for garment in outfit.garments.all():
         g_img = cv2.imread(garment.image.path, cv2.IMREAD_UNCHANGED)
         if g_img is None:
             raise ValueError(f"Cannot read garment image {garment.pk}")
         garments.append((garment.type, g_img, engine_landmarks(garment.type, garment.landmarks)))
+        fit_modes[garment.type] = garment.fit_mode
 
-    final_bgr, warns, _ = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W, **render_flags("body" if outfit.body else "avatar"))
+    final_bgr, warns, _ = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W,
+                                       fit_modes=fit_modes,  # passed through; ignored by the engine for now
+                                       **render_flags("body" if outfit.body else "avatar"))
     if warns:
         logger.warning("Warp warnings for outfit %d: %s", outfit.pk, warns)
 

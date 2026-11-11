@@ -12,7 +12,8 @@ behind signed URLs (assumption; S3-compatible later).
 - **Avatar**: sex, build (slim|average|plus), image, landmarks (JSON), measurements (JSON, circumference cm), height_cm
   (nominal, nullable), landmarks_confirmed_at (null = auto-detected; set by the staff editor). Seeded by command or uploaded by staff.
 - **Garment**: owner (FK, null for admin catalog), type (`tshirt` | `pants`), image (cleaned transparent PNG),
-  landmarks (JSON), visibility (private|public), status (pending|approved|review|hidden), created_at.
+  landmarks (JSON), visibility (private|public), status (pending|approved|review|hidden),
+  fit_mode (adapt|keep_shape, default adapt), gender (female|male|unisex, default unisex), created_at.
   No image update. The original upload is deleted after cleaning. No garment real-size field.
 - **Outfit**: owner, body (FK) or avatar (FK), garments (M2M), result_image, realistic_image (nullable), created_at
 - **Report**: garment, reporter, reason; unique (garment, reporter)
@@ -47,9 +48,10 @@ General rules
 | GET | staff/avatars/{id}/ | (staff only) | `StaffAvatar`; landmarks not yet confirmed get edge points from the mask (GET never writes) |
 | POST | staff/avatars/ | multipart `sex, build, photo, height_cm, shoulder, chest, waist, hip` (staff only) | 201 `StaffAvatar + warnings[]` (200 when it replaced that sex+build; landmarks reset to auto); 400 `{code, detail}` (`NO_PERSON`, `HEAD_OR_FEET_CUT`, `FIGURE_CLIPPED`, upload codes) |
 | PATCH | staff/avatars/{id}/landmarks/ | `{landmarks, height_cm?, measurements?}` (staff only) | `StaffAvatar`, sets `landmarks_confirmed_at`; 400 `LANDMARKS_INVALID` (rules in docs/03) |
-| GET | garments/ | `?scope=mine\|catalog\|all&type=tshirt\|pants` | `Garment[]` |
+| GET | garments/ | `?scope=mine\|catalog\|all&type=tshirt\|pants&gender=female\|male\|unisex` (female/male also return unisex; unknown values ignored) | `Garment[]` |
 | POST | garments/ | multipart `photo`, `type`, `name?` | 201 `{garment, job_id}` |
 | GET | garments/{id}/ | | `Garment` (owner, or public+approved) |
+| PATCH | garments/{id}/ | `{fit_mode?, gender?}` (owner only; same style as visibility) | `Garment`; 400 `BAD_FIT_MODE` / `BAD_GENDER` / `FIELD_NOT_EDITABLE` (any other key, e.g. image, name, landmarks: nothing saved; the image is never updatable); 404 for others |
 | DELETE | garments/{id}/ | | 204 (owner only) |
 | PATCH | garments/{id}/landmarks/ | `{landmarks}` | `Garment + landmark_warnings[{code, group, detail}]` (range warnings, saved anyway; 409 `GARMENT_NOT_READY` until cleaned; 400 `LANDMARKS_INVALID` `{code, detail}` with a short Uzbek message naming the group, rules in docs/03; legacy `sleeve_end` is never stored) |
 | PATCH | garments/{id}/visibility/ | `{visibility: private\|public}` | `Garment` |
@@ -64,7 +66,7 @@ Notes
 - There is **no** endpoint to edit body photo/landmarks or a garment image. Body landmarks are sent once, in `body/confirm/`.
 - `measurements` = circumferences in cm: `{shoulder?, chest?, waist?, hip?}` (decision 13). Values given at confirm do not start the yearly lock; each `PATCH body/measurements/` does.
 - Body fields: `id, image_url, landmarks, height_cm, measurements, confirmed_at, measurements_unlock_at, can_change_measurements, created_at`.
-- Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, landmarks_complete, visibility, status, owned_by_me, ai_skipped, created_at`. `landmarks_complete` = every point of the current set exists (T-shirt: incl. the optional new points; docs/09 #92).
+- Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, landmarks_complete, visibility, fit_mode, gender, status, owned_by_me, ai_skipped, created_at`. `landmarks_complete` = every point of the current set exists (T-shirt: incl. the optional new points; docs/09 #92).
   `ai_skipped` (read-only) = the AI check was skipped by `AI_DEV_BYPASS` (local dev only): the frontend shows a dev warning.
 - `User` fields: `id, email, is_adult_confirmed, is_staff, created_at` (`is_staff` read-only).
 - Outfit fields: `id, body, avatar, garments[], result_url, realistic_url, created_at`.

@@ -1,7 +1,7 @@
 import client from './client'
 import type {
-  Garment, GarmentLandmarks, GarmentLandmarksResponse, GarmentScope, GarmentType, GarmentUploadResponse,
-  Visibility,
+  Garment, GarmentGender, GarmentLandmarks, GarmentLandmarksResponse, GarmentScope, GarmentSettings, GarmentType,
+  GarmentUploadResponse, Visibility,
 } from './types'
 
 export type { Garment } from './types'
@@ -16,8 +16,9 @@ export const uploadGarment = (photo: File, type: GarmentType, name = '') => {
   })
 }
 
-export const listGarments = (scope: GarmentScope = 'mine', type?: GarmentType) =>
-  client.get<Garment[]>('/api/garments/', { params: { scope, type } })
+/** gender: female / male also return unisex garments. */
+export const listGarments = (scope: GarmentScope = 'mine', type?: GarmentType, gender?: GarmentGender) =>
+  client.get<Garment[]>('/api/garments/', { params: { scope, type, gender } })
 
 export const getGarment = (id: number) => client.get<Garment>(`/api/garments/${id}/`)
 
@@ -26,5 +27,9 @@ export const updateLandmarks = (id: number, landmarks: GarmentLandmarks) =>
 
 export const updateVisibility = (id: number, visibility: Visibility) =>
   client.patch<Garment>(`/api/garments/${id}/visibility/`, { visibility })
+
+/** fit_mode / gender, same style as visibility. */
+export const updateGarmentSettings = (id: number, settings: GarmentSettings) =>
+  client.patch<Garment>(`/api/garments/${id}/`, settings)
 
 export const deleteGarment = (id: number) => client.delete(`/api/garments/${id}/`)
