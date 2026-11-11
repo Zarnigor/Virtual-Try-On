@@ -68,6 +68,7 @@ MESSAGES = {
 WARNINGS = {
     "collar_far": "«{g}» nuqtalari yelka chizigʻidan uzoq. Yoqa chetlarini yelka chizigʻida belgilang.",
     "outside_garment": "«{g}» nuqtasi kiyimdan tashqarida. Nuqtani kiyim ustiga qoʻying.",
+    "chest_above_armpit": "«{g}» chizigʻi «{other}» chizigʻidan yuqorida. Keng (oversize) kiyimda bu odatiy holat, aks holda nuqtalarni tekshiring.",
 }
 
 
@@ -206,6 +207,9 @@ def _tshirt_warnings(v, bbox, names):
         if abs(v["collar.y"] - v["shoulder.y"]) > COLLAR_NEAR_SHOULDER * span:
             out.append({"code": "collar_far", "group": "collar",
                         "detail": WARNINGS["collar_far"].format(g=names["collar"])})
+    if "armpit.y" in v and v["chest.y"] < v["armpit.y"]:  # oversized: allowed, warning only (docs/09 #94, #95)
+        out.append({"code": "chest_above_armpit", "group": "chest",
+                    "detail": WARNINGS["chest_above_armpit"].format(g=names["chest"], other=names["armpit"])})
     return out + _bbox_warnings(v, bbox, names)
 
 

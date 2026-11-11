@@ -31,7 +31,8 @@ _(none blocking P0)_
   Round 2 (marked landmarks + fit strength k, docs/06) uses the same hem assumption; still not a decision.
 - **`keep_shape` = per-point fit strength is a benchmark proposal (2026-11-11, not a decision):** docs/06 round 3,
   presets A and B. How the engine maps `fit_mode` (#93) to k, and the exact k values, are NOT decided; the method and
-  preset choice stay with the owner. Not yet measured: both oversized inputs (#44, #45) were skipped by the input gate.
+  preset choice stay with the owner. Measured on #44 only (#45 has no collar): A/B fix the hourglass and the squeezed
+  print but not the bare shoulders (docs/06 round 3).
 
 ## Decided 2026-11-07
 12. **Body AI validation (prompt 02): P0.** Confirmed by owner.
@@ -365,4 +366,9 @@ _(none blocking P0)_
     garment checks stay. MLS benchmark pairing: a chest pair with garment chest <= armpit, or with a garment/body
     vertical order that differs from any other row pair, is dropped from the control points (never fed crossing).
     Production scanline engine does not pair the garment armpit, so it is unchanged (pixel-identical test).
+
+## Decided 2026-11-11: chest above armpit is a warning, and the benchmark runs it
+95. **2026-11-11:** T-shirt order rule is `shoulder < armpit` and `shoulder < chest < waist < hem`; chest above the
+    armpit gives the warning `chest_above_armpit` (client + server), never an error. The keep_shape benchmark
+    (`run_keep_shape.py`) no longer refuses such garments: the chest pair is not used, reported as "chest not used".
 

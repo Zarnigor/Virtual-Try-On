@@ -259,9 +259,11 @@ class TshirtSetTests(SimpleTestCase):
 
     def test_oversized_armpit_below_the_chest_passes(self):
         # docs/09 #94: oversized T-shirts have the underarm below the chest line
-        self.check(with_value(FULL, "armpit.y", 326))
-        self.check(with_value(FULL, "armpit.y", 360))
-        self.check(with_value(FULL, "armpit.y", 415))  # still above the waist: no rule ties it to the chest
+        self.assertEqual(self.check(with_value(FULL, "armpit.y", 326)), [])  # equal: no warning
+        for y in (360, 415):  # still above the waist: never an error, a warning only (#95)
+            w = self.check(with_value(FULL, "armpit.y", y))
+            self.assertEqual([x["code"] for x in w], ["chest_above_armpit"])
+            self.assertIn("«Koʻkrak»", w[0]["detail"])
         self.invalid(with_value(FULL, "armpit.left_x", 360), "x_order", "Qoʻltiq")
 
     def test_chest_waist_hem_order(self):

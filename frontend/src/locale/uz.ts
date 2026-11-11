@@ -36,6 +36,8 @@ export const CHECK_MESSAGES = {
 export const CHECK_WARNINGS = {
   collar_far: (g: string) => `${q(g)} nuqtalari yelka chizigʻidan uzoq. Yoqa chetlarini yelka chizigʻida belgilang.`,
   outside_garment: (g: string) => `${q(g)} nuqtasi kiyimdan tashqarida. Nuqtani kiyim ustiga qoʻying.`,
+  chest_above_armpit: (g: string, other: string) =>
+    `${q(g)} chizigʻi ${q(other)} chizigʻidan yuqorida. Keng (oversize) kiyimda bu odatiy holat, aks holda nuqtalarni tekshiring.`,
 }
 
 export const LANDMARK_EDITOR = {

@@ -102,7 +102,9 @@ describe('sanity checks (same rules and messages as the server)', () => {
     ok(set(FULL, 'armpit.y', 199))
     fails(set(FULL, 'armpit.y', 198), CHECK_MESSAGES.y_order(N.armpit, N.shoulder))
     ok(set(FULL, 'armpit.y', 326))
-    ok(set(FULL, 'armpit.y', 360))
+    expect(checkTshirt(set(FULL, 'armpit.y', 326)).warnings).toEqual([])
+    ok(set(FULL, 'armpit.y', 360)) // never an error: a warning only (#95)
+    expect(checkTshirt(set(FULL, 'armpit.y', 360)).warnings).toEqual([CHECK_WARNINGS.chest_above_armpit(N.chest, N.armpit)])
   })
 
   it('chest < waist < hem', () => {

@@ -5,8 +5,10 @@
     docker compose cp backend:/tmp/warp_benchmark/. tools/warp-benchmark/out/
 
 Inputs: the round-2 export (tools/warp-benchmark/data/<id>.png + .json, run_landmarks.py) for the oversized
-garments. Gate (never invented): a garment missing any required landmark, or with its chest marked above its armpit,
-is skipped and listed. Runs on all avatars: k 1.0 | uniform k 0.5 | preset A | preset B (mls_landmarks.PRESETS).
+garments. Gate (never invented): only a garment missing a required landmark is skipped and listed. A chest marked above the
+armpit (oversized, docs/09 #94) runs: the chest pair is not used (`drop_crossing_chest`, never moved or swapped), the
+torso is driven by armpit, waist and hem; the record says "chest not used".
+Runs on all avatars: k 1.0 | uniform k 0.5 | preset A | preset B (mls_landmarks.PRESETS).
 Writes out/results3.json; out/sheet_keep_shape.png (rows = garments, columns = the 4 variants x 3 avatars) and
 out/crop_keep_shape_worst.png (worst fold among A/B, shoulders/armpits 600x400) only when a garment ran.
 """
@@ -45,8 +47,6 @@ def gate(glm):
     miss = ml.missing_landmarks(glm)
     if miss:
         return f"missing {miss}"
-    if float(glm["chest"]["y"]) <= float(glm["armpit"]["y"]):
-        return f"chest y {glm['chest']['y']} above armpit y {glm['armpit']['y']}"
     return None
 
 
@@ -76,6 +76,7 @@ for gid in GARMENTS:
             m = mls.metrics(layer, info, av.landmarks)
             rec = {"garment": gid, "avatar": av.pk, "variant": name, "runtime": round(info["runtime"], 2),
                    "rejected": info["rejected"], **m,
+                   "chest": "used" if "chest_l" in info["pairs"] and "chest_r" in info["pairs"] else "chest not used",
                    "bare_shoulder_px": ml.bare_shoulder_px(layer, masks[av.pk], info, av.landmarks),
                    "print_distortion": ml.print_distortion(layer, info, pbox) if pbox else None,
                    "scale_at": ml.scale_at(info, ("armpit_l", "armpit_r", "cuff_in_l", "cuff_in_r"))}

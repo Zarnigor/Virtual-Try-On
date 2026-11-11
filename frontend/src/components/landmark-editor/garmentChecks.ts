@@ -67,6 +67,8 @@ export function checkTshirt(lm: unknown, bbox?: BBox | null): CheckResult {
     const span = v('shoulder.right_x') - v('shoulder.left_x')
     if (Math.abs(v('collar.y') - v('shoulder.y')) > COLLAR_NEAR_SHOULDER * span) warnings.push(CHECK_WARNINGS.collar_far(N.collar))
   }
+  // oversized: chest above the armpit is allowed, a warning only (docs/09 #94, #95)
+  if (has(lm, 'armpit') && v('chest.y') < v('armpit.y')) warnings.push(CHECK_WARNINGS.chest_above_armpit(N.chest, N.armpit))
   return { errors: [...new Set(errors)], warnings: [...warnings, ...bboxWarnings(lm, bbox, 'tshirt')] }
 }
 

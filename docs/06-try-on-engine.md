@@ -360,9 +360,25 @@ New metrics: `bare_shoulder_px` (figure pixels not covered by the garment in the
 over the pixels sampled from the detected print box; #44 only). Runner `run_keep_shape.py` (k 1.0 | k 0.5 | A | B on
 all avatars, sheet `out/sheet_keep_shape.png`, crop `out/crop_keep_shape_worst.png`, `out/results3.json`).
 
-**Results: not run.** The input gate skipped both oversized garments (values are never invented):
-- #44: chest marked at y 205, above the armpit (y 318).
-- #45: no `collar` landmark; also chest y 322 above armpit y 476.
-Note: the gate "chest above armpit -> skip" conflicts with docs/09 #94 (oversized garments may have the armpit below the
-chest line; the warp drops the chest pair). With that gate, an oversized garment marked as #94 allows is never run.
-The method code and metrics are tested on synthetic data (`test_mls.py`).
+**Gate (fixed 2026-11-11, docs/09 #95):** only a missing required landmark skips a garment. A chest above the armpit
+runs with the chest pair not used ("chest not used" in `results3.json`; never moved or swapped): the torso is driven by
+armpit, waist and hem. The first run of 0f2d35f wrongly refused that case.
+
+Results (#44 on the 6 avatars; **#45 skipped: no `collar` landmark**; #44 "chest not used" in every run):
+| variant | fold ratio | local scale p1..p99 | bare-shoulder px | print distortion | runtime |
+|---|---|---|---|---|---|
+| k 1.0 | 2.2-3.3 % | 0.16-0.22 .. 4.7-5.4 | 39-125 | 0.17-0.28 | 0.06-0.07 s |
+| k 0.5 | 0-0.11 % | 0.33-0.40 .. 1.9-2.4 | 67-175 | 0.06-0.08 | 0.06-0.07 s |
+| A | 0 % | 0.44-0.53 .. 1.1-1.3 | 81-192 | 0.035-0.043 | 0.06-0.07 s |
+| B | 0-0.11 % | 0.33-0.40 .. 1.9-2.3 | 67-175 | 0.06-0.09 | 0.06 s |
+- Floating components 0 and pixels above the shoulder slope line 0 in every run. Local scale at the armpit / inner
+  cuff targets (not moved or merged): A 0.61-0.83, B 0.54-0.86, k 1.0 down to 0.31.
+- Looks: A and B keep the boxy oversized shape, no balloon sleeves, no S-folds, print not squeezed (A is the least
+  distorted). k 1.0 is the hourglass of round 2. **Bare shoulders remain in every variant** (A even slightly more than
+  k 1.0): a skin triangle between the collar and the sleeve top, clearest on male plus and female slim (worst A/B case
+  `out/crop_keep_shape_worst.png`: B, female slim, fold 0.11 %).
+- Why the presets do not fix it: the alignment already puts the garment shoulder line on the body's, so the shoulder
+  y k has no effect, and B differs from uniform k 0.5 only by shoulder x 0.8 (nearly identical results). The gap is the
+  garment's own top edge sloping down from the collar faster than the body's shoulder (#44 shoulder points are marked
+  inside the chest width). Not tested here: a control pair on the shoulder slope (collar edge -> shoulder midpoint).
+Sheet `out/sheet_keep_shape.png` (#44 only: k 1.0 | k 0.5 | A | B x male slim, male plus, female average).
