@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MIN_GAP, fromLandmarks, movePoint, nudgePoint, saveState, snapCenters, toLandmarks,
+  MIN_GAP, activeRules, fromLandmarks, movePoint, nudgePoint, saveState, snapCenters, toLandmarks,
   type Bounds, type EditorState, type Rules,
 } from './geometry'
 import { PANTS_GROUPS, PANTS_RULES, TSHIRT_GROUPS, TSHIRT_RULES, rulesFor } from './garmentGroups'
@@ -12,7 +12,8 @@ const TSHIRT = {
   chest: { y: 326, left_x: 140, right_x: 340, width: 200 },
   waist: { y: 416, left_x: 150, right_x: 330 },
   hem: { y: 488, left_x: 142, right_x: 338 },
-  sleeve_end: { left: { x: 20, y: 290 }, right: { x: 460, y: 290 } },
+  sleeve_cuff_outer: { left: { x: 20, y: 270 }, right: { x: 460, y: 270 } },
+  sleeve_cuff_inner: { left: { x: 60, y: 310 }, right: { x: 420, y: 310 } },
 }
 
 const PANTS = {
@@ -32,6 +33,8 @@ const PANTS = {
 
 const pants = () => fromLandmarks(PANTS, PANTS_GROUPS, B).state
 const tshirt = () => fromLandmarks(TSHIRT, TSHIRT_GROUPS, B).state
+/** The rules the editor applies to the sample record (its optional groups are not placed). */
+const T_RULES = activeRules(TSHIRT_RULES, TSHIRT_GROUPS, new Set(fromLandmarks(TSHIRT, TSHIRT_GROUPS, B).loaded))
 const withX = (s: EditorState, xs: Record<string, number>): EditorState => ({ ...s, xs: { ...s.xs, ...xs } })
 
 /** Rules a state breaks (empty = all kept with the editor gap). */
@@ -58,7 +61,7 @@ describe('rule tables', () => {
   })
 
   it('the sample records and the defaults keep every rule', () => {
-    expect(broken(tshirt(), TSHIRT_RULES)).toEqual([])
+    expect(broken(tshirt(), T_RULES)).toEqual([])
     expect(broken(pants(), PANTS_RULES)).toEqual([])
     expect(broken(fromLandmarks({}, TSHIRT_GROUPS, B).state, TSHIRT_RULES)).toEqual([])
     expect(broken(fromLandmarks({}, PANTS_GROUPS, B).state, PANTS_RULES)).toEqual([])
@@ -127,12 +130,13 @@ describe('vertical order', () => {
   })
 
   it('tshirt chain and sleeves below the shoulder', () => {
-    const t = (id: string, x: number, y: number) => movePoint(tshirt(), TSHIRT_GROUPS, id, x, y, B, false, TSHIRT_RULES)
+    const t = (id: string, x: number, y: number) => movePoint(tshirt(), TSHIRT_GROUPS, id, x, y, B, false, T_RULES)
     expect(t('chest.left_x', 140, 100).ys.chest).toBe(198 + MIN_GAP)
     expect(t('waist.left_x', 150, 640).ys.waist).toBe(488 - MIN_GAP)
-    expect(t('sleeve_end.left.x', 20, 0).ys.sleeve_end).toBe(198 + MIN_GAP)
-    // the shoulder is held by the chest and the sleeves (sleeves at 290, chest at 326)
-    expect(t('shoulder.left_x', 124, 640).ys.shoulder).toBe(290 - MIN_GAP)
+    expect(t('sleeve_cuff_outer.left.x', 20, 0).ys.sleeve_cuff_outer).toBe(198 + MIN_GAP)
+    expect(t('sleeve_cuff_inner.left.x', 60, 0).ys.sleeve_cuff_inner).toBe(198 + MIN_GAP)
+    // the shoulder is held by the chest and the cuffs (outer cuff at 270, chest at 326)
+    expect(t('shoulder.left_x', 124, 640).ys.shoulder).toBe(270 - MIN_GAP)
   })
 
   it('a blocked y does not block the x of the same move', () => {
@@ -174,7 +178,8 @@ describe('old records with a 1-3 px gap', () => {
     const r = structuredClone(TSHIRT)
     r.shoulder.right_x = r.shoulder.left_x + 2 // 2 px gap (the backend accepts it)
     r.chest.y = r.shoulder.y + 1
-    r.sleeve_end.left.y = r.sleeve_end.right.y = r.shoulder.y + 3
+    r.sleeve_cuff_outer.left.y = r.sleeve_cuff_outer.right.y = r.shoulder.y + 3
+    r.sleeve_cuff_inner.left.y = r.sleeve_cuff_inner.right.y = r.shoulder.y + 3
     return r
   }
 

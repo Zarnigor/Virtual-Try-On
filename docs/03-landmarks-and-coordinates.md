@@ -42,13 +42,16 @@ Optional later: `bust` (fullest chest, armpit + 5-8%) separate from `chest` (und
 MVP types:
 | Garment type | Landmarks |
 |---|---|
-| tshirt | shoulder, chest, waist, hem (etak), sleeve_end (left and right) |
+| tshirt | collar_left/right, shoulder_left/right, collar_bottom, armpit_left/right, sleeve_cuff_outer_left/right, sleeve_cuff_inner_left/right, chest, waist, hem (etak). Optional for now: collar_*, collar_bottom, armpit_*. Legacy `sleeve_end` read only (docs/09 #92) |
 | pants | waist, hip, crotch, knee (per leg), hem (per leg) |
 Later (not MVP): skirt, dress, outerwear, long sleeves.
 Deformation pairs garment and body landmarks by identical names.
 **Same definition on body and garment** (editor hint per line, `components/landmark-editor/lineHints.ts`): chest = fullest
 point, waist = narrowest, hip = widest point of the hips, crotch = where the legs split, knee = centre of the knee joint;
-hem = lowest edge of the garment, sleeve_end = outermost point of the sleeve.
+hem = lowest edge of the garment. T-shirt only: shoulder = the shoulder seam where the sleeve starts; armpit = the
+underarm corner where sleeve and torso meet; collar_left/right = the collar edges at the shoulder line;
+collar_bottom = the lowest centre point of the neckline; sleeve_cuff_outer = the cuff corner on the sleeve's outer
+(shoulder) side, sleeve_cuff_inner = the one on the underarm side. Left/right = image left/right.
 
 ## Sanity checks (frontend AND backend)
 - Vertical order: head_top < neck < shoulder < armpit <= chest < waist < hip < crotch < knee < ankle < foot_bottom
@@ -59,18 +62,29 @@ hem = lowest edge of the garment, sleeve_end = outermost point of the sleeve.
 
 ### Garment landmark checks (backend `apps/garments/landmark_checks.py`, editor `garmentGroups.ts` rules)
 Required keys = what `tryon_engine/warp.py` reads:
-- tshirt: `shoulder|chest|waist|hem {y, left_x, right_x}`, `sleeve_end.left|right {x, y}`.
+- tshirt (docs/09 #92, `TSHIRT_GROUPS` in `landmark_checks.py` is the single source): required
+  `shoulder|chest|waist|hem {y, left_x, right_x}`, `sleeve_cuff_outer|sleeve_cuff_inner .left|.right {x, y}`;
+  optional `armpit {y, left_x, right_x}`, `collar {y, left_x, right_x}`, `collar_bottom {x, y}` (a group is all or
+  nothing). Point names map to storage: `shoulder_left` = `shoulder.left_x` at `shoulder.y`, `collar_left` =
+  `collar.left_x`, `sleeve_cuff_outer_left` = `sleeve_cuff_outer.left`, etc. Legacy `sleeve_end.left|right {x, y}`
+  is accepted on read in place of the cuffs and never written (PATCH drops it). The try-on engine still reads
+  `sleeve_end`: for new records it gets the cuff midpoint per side (`engine_landmarks`, not stored).
 - pants: `waist {y, left_x, right_x, center_x}`, `hip {y, left_x, right_x}`, `crotch {y, center_x}`,
   `knee {y, left_leg|right_leg {left_x, right_x}}`, `hem.left_leg|right_leg {y, left_x, right_x}`.
 
 Rules (backend strict `<`; the editor keeps a 4 px gap and stops a drag at the neighbour, but never clamps on load):
 - finite numbers only; x in [0, width], y in [0, height] of the cleaned PNG.
-- `left_x < right_x` for every pair (also `sleeve_end.left.x < sleeve_end.right.x`); pants knee and hem:
+- `left_x < right_x` for every pair (legacy: `sleeve_end.left.x < sleeve_end.right.x`); pants knee and hem:
   `left_leg.right_x < right_leg.left_x`.
 - pants: `waist.left_x < waist.center_x < waist.right_x` and `hip.left_x + 5 < waist.center_x < hip.right_x - 5`
   (warp.py uses `center_x ± 5` as the inner crotch edges).
-- vertical: tshirt `shoulder < chest < waist < hem` and each `sleeve_end.y > shoulder.y`;
-  pants `waist < hip < crotch < knee < max(hem leg y)`.
+- vertical: tshirt `shoulder < chest < waist < hem`, each cuff corner `y > shoulder.y` (legacy: each `sleeve_end.y`);
+  with the optional points `shoulder < armpit <= chest`, `collar < collar_bottom` and
+  `collar.left_x < collar_bottom.x < collar.right_x`; pants `waist < hip < crotch < knee < max(hem leg y)`.
+- tshirt cuffs: both left corners left of the shoulder centre, both right corners right of it; the outer corner lies
+  on the side of the line shoulder point -> cuff midpoint away from the torso centre (centre x, chest y).
+- warnings (saved anyway, returned as `landmark_warnings`): collar edges more than 15 % of the shoulder span from the
+  shoulder line; any point more than 2 px outside the bounding box of the garment's visible (alpha > 0) pixels.
 - unknown extra keys are kept untouched. Failure: 400 `LANDMARKS_INVALID`.
 
 ## Previous bugs to never reintroduce

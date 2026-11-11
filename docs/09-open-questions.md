@@ -329,3 +329,18 @@ _(none blocking P0)_
     avatars: rendered hem 0-2 px above hem_y, never below the crotch. `TRYON_HEM_RULE=0` restores the garment's own
     length (crop tops stay short).
 
+## Decided 2026-11-11: extended T-shirt landmark set (owner asked, built autonomously)
+92. **T-shirt garment landmarks** (docs/03): `shoulder` (seam where the sleeve starts), `armpit` (new), `chest`, `waist`,
+    `hem`, `collar` left/right (new, collar edges at the shoulder line), `collar_bottom` (new, lowest centre point of
+    the neckline), `sleeve_cuff_outer` / `sleeve_cuff_inner` left/right (new, replace `sleeve_end`). Single source:
+    `apps/garments/landmark_checks.py` (frontend mirror: `garmentGroups.ts` + `garmentChecks.ts`, names in
+    `src/locale/uz.ts`). Optional in the API for now: armpit, collar, collar_bottom. The cuff corners are required on
+    write because they replace the required `sleeve_end`; legacy `sleeve_end` is accepted on read and never written.
+    The production warp is unchanged: it gets `sleeve_end` = cuff midpoint from `engine_landmarks` (not stored).
+    Sanity checks: errors for order (collar_bottom below the collar, shoulder < armpit <= chest < waist < hem, cuffs on
+    their own side, outer/inner not swapped); warnings for ranges (collar near the shoulder line, points inside the
+    garment's alpha bounding box). `landmarks_complete` on the garment response; the editor shows a banner when false.
+    Pants and body sets unchanged. Garments marked before this change must be re-marked to save again (cuffs).
+    Still open (not decided by this change): the hem rule (#91 proposed, "Still open" benchmark note) and the
+    measurement-to-width conversion.
+

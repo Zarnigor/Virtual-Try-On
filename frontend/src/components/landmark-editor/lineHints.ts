@@ -15,7 +15,10 @@ export const LINE_HINTS: Record<string, string> = {
   ankle: 'Toʻpiq: oyoqning eng ingichka joyi, poyabzaldan yuqorida.',
   foot_bottom: 'Oyoq tagi: gavdaning eng pastki qatori.',
   hem: 'Pastki chet: kiyimning eng pastki cheti.',
-  sleeve_end: 'Yeng uchi: yengning eng chetki nuqtasi.',
+  collar: 'Yoqa: yoqaning chap va oʻng cheti, yelka chizigʻi balandligida.',
+  collar_bottom: 'Yoqa pasti: old yoqa oʻymasining eng pastki markaziy nuqtasi.',
+  sleeve_cuff_outer: 'Yeng uchi (tashqi): yeng etagining yelka tomondagi burchagi.',
+  sleeve_cuff_inner: 'Yeng uchi (ichki): yeng etagining qoʻltiq tomondagi burchagi.',
 }
 
 export const hintFor = (lineId: string): string => LINE_HINTS[lineId] ?? ''

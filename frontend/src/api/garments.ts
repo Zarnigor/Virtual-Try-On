@@ -1,6 +1,7 @@
 import client from './client'
 import type {
-  Garment, GarmentLandmarks, GarmentScope, GarmentType, GarmentUploadResponse, Visibility,
+  Garment, GarmentLandmarks, GarmentLandmarksResponse, GarmentScope, GarmentType, GarmentUploadResponse,
+  Visibility,
 } from './types'
 
 export type { Garment } from './types'
@@ -21,7 +22,7 @@ export const listGarments = (scope: GarmentScope = 'mine', type?: GarmentType) =
 export const getGarment = (id: number) => client.get<Garment>(`/api/garments/${id}/`)
 
 export const updateLandmarks = (id: number, landmarks: GarmentLandmarks) =>
-  client.patch<Garment>(`/api/garments/${id}/landmarks/`, { landmarks })
+  client.patch<GarmentLandmarksResponse>(`/api/garments/${id}/landmarks/`, { landmarks })
 
 export const updateVisibility = (id: number, visibility: Visibility) =>
   client.patch<Garment>(`/api/garments/${id}/visibility/`, { visibility })

@@ -38,6 +38,8 @@ export interface GroupDef {
   /** Default y as a fraction of the image height. */
   defY: number
   points: PointDef[]
+  /** Optional group: not needed for Save; written only when all of its points are placed, else left out. */
+  optional?: boolean
 }
 
 export interface EditorState {
@@ -125,15 +127,48 @@ export function fromLandmarks(
   return { state: { ys, xs }, loaded }
 }
 
-/** Write editor state back into a copy of the original landmarks (same shape, unknown fields kept). */
-export function toLandmarks(original: unknown, state: EditorState, groups: GroupDef[]): Json {
+/**
+ * Write editor state back into a copy of the original landmarks (same shape, unknown fields kept).
+ * An optional group is written only when all of its points are placed (`placed`; without it: when the original
+ * record had the group); otherwise its top-level keys are left out (a default position is never saved as if the
+ * user had marked it).
+ */
+export function toLandmarks(original: unknown, state: EditorState, groups: GroupDef[], placed?: Set<string>): Json {
   const out: Json =
     original && typeof original === 'object' ? structuredClone(original as Json) : {}
   for (const g of groups) {
+    const marked = placed
+      ? g.points.every((p) => placed.has(p.id))
+      : g.points.every((p) => getPath(original, p.xPath) !== undefined)
+    if (g.optional && !marked) {
+      for (const path of [...g.yPaths, ...g.points.map((p) => p.xPath)]) delete out[path.split('.')[0]]
+      continue
+    }
     for (const p of g.yPaths) setPath(out, p, state.ys[g.id])
     for (const pt of g.points) setPath(out, pt.xPath, state.xs[pt.id])
   }
   return out
+}
+
+/** Rules that apply now: a rule touching an optional group with no placed point is skipped (its default
+ * position must not block the user's moves). */
+export function activeRules(rules: Rules, groups: GroupDef[], placed: Set<string>): Rules {
+  const idle = new Set<string>()
+  for (const g of groups) {
+    if (g.optional && !g.points.some((p) => placed.has(p.id))) {
+      idle.add(g.id)
+      g.points.forEach((p) => idle.add(p.id))
+    }
+  }
+  if (!idle.size) return rules
+  const keep = (r: { a: string; b: string }) => !idle.has(r.a) && !idle.has(r.b)
+  return { x: rules.x.filter(keep), y: rules.y.filter(keep) }
+}
+
+/** Points that count for Save: those of the required groups. */
+export function requiredCount(groups: GroupDef[], placed: Set<string>): { placed: number; total: number } {
+  const ids = groups.filter((g) => !g.optional).flatMap((g) => g.points.map((p) => p.id))
+  return { placed: ids.filter((id) => placed.has(id)).length, total: ids.length }
 }
 
 interface Range { lo: number; hi: number }

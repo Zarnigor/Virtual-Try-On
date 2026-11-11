@@ -19,7 +19,7 @@ from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.avatars.models import Avatar
-from apps.garments.landmark_checks import LandmarksInvalid, validate_garment_landmarks
+from apps.garments.landmark_checks import LandmarksInvalid, engine_landmarks, validate_garment_landmarks
 from apps.garments.models import Garment
 from apps.garments.lighting import flatten_lighting
 from apps.tryon_engine.demo import DEMO_DIR, load_manifest, manifest_path, pair_key
@@ -56,7 +56,8 @@ class Command(BaseCommand):
             if img is None or img.ndim != 3 or img.shape[2] != 4:
                 raise CommandError(f"{png.name}: must be a transparent (RGBA) PNG")
             try:
-                validate_garment_landmarks(meta["type"], meta.get("landmarks"), img.shape[1], img.shape[0])
+                validate_garment_landmarks(meta["type"], meta.get("landmarks"), img.shape[1], img.shape[0],
+                                           mode="read")
             except LandmarksInvalid as e:
                 raise CommandError(f"{meta_path.name}: {e.detail}")
             specs.append((meta_path.stem, meta, png, img, flattened))
@@ -97,7 +98,8 @@ class Command(BaseCommand):
             base = cv2.imread(av.image.path, cv2.IMREAD_UNCHANGED)
             for combo in combos:
                 ids = [garments[s][0].pk for s in combo]
-                items = [(garments[s][0].type, garments[s][1], garments[s][0].landmarks) for s in combo]
+                items = [(garments[s][0].type, garments[s][1], engine_landmarks(garments[s][0].type, garments[s][0].landmarks))
+                         for s in combo]
                 rgb, warns, _ = render_tryon(base, av.landmarks, items, settings.CANVAS_H, settings.CANVAS_W,
                                              **render_flags("avatar"))
                 rel = f"{DEMO_DIR}/avatar{av.pk}_{'_'.join(str(i) for i in sorted(ids))}.png"

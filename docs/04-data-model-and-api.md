@@ -51,7 +51,7 @@ General rules
 | POST | garments/ | multipart `photo`, `type`, `name?` | 201 `{garment, job_id}` |
 | GET | garments/{id}/ | | `Garment` (owner, or public+approved) |
 | DELETE | garments/{id}/ | | 204 (owner only) |
-| PATCH | garments/{id}/landmarks/ | `{landmarks}` | `Garment` (409 `GARMENT_NOT_READY` until cleaned; 400 `LANDMARKS_INVALID` `{code, detail}` with a short Uzbek message naming the group, rules in docs/03) |
+| PATCH | garments/{id}/landmarks/ | `{landmarks}` | `Garment + landmark_warnings[{code, group, detail}]` (range warnings, saved anyway; 409 `GARMENT_NOT_READY` until cleaned; 400 `LANDMARKS_INVALID` `{code, detail}` with a short Uzbek message naming the group, rules in docs/03; legacy `sleeve_end` is never stored) |
 | PATCH | garments/{id}/visibility/ | `{visibility: private\|public}` | `Garment` |
 | GET | jobs/{id}/ | | `Job {id, kind, status, result, error_code, error_message, ...}` |
 | POST | tryon/ | `{base: body\|avatar, avatar_id?, garment_ids[]}` | 202 `{job_id, outfit_id}` |
@@ -64,7 +64,7 @@ Notes
 - There is **no** endpoint to edit body photo/landmarks or a garment image. Body landmarks are sent once, in `body/confirm/`.
 - `measurements` = circumferences in cm: `{shoulder?, chest?, waist?, hip?}` (decision 13). Values given at confirm do not start the yearly lock; each `PATCH body/measurements/` does.
 - Body fields: `id, image_url, landmarks, height_cm, measurements, confirmed_at, measurements_unlock_at, can_change_measurements, created_at`.
-- Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, visibility, status, owned_by_me, ai_skipped, created_at`.
+- Garment fields: `id, name, type, image_url, thumb_url, original_preview_url, width, height, landmarks, landmarks_complete, visibility, status, owned_by_me, ai_skipped, created_at`. `landmarks_complete` = every point of the current set exists (T-shirt: incl. the optional new points; docs/09 #92).
   `ai_skipped` (read-only) = the AI check was skipped by `AI_DEV_BYPASS` (local dev only): the frontend shows a dev warning.
 - `User` fields: `id, email, is_adult_confirmed, is_staff, created_at` (`is_staff` read-only).
 - Outfit fields: `id, body, avatar, garments[], result_url, realistic_url, created_at`.

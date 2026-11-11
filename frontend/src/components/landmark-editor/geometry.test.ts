@@ -11,7 +11,8 @@ const TSHIRT = {
   chest: { y: 326, left_x: 140, right_x: 340, width: 200 },
   waist: { y: 416, left_x: 150, right_x: 330 },
   hem: { y: 488, left_x: 142, right_x: 338 },
-  sleeve_end: { left: { x: 20, y: 290 }, right: { x: 460, y: 290 } },
+  sleeve_cuff_outer: { left: { x: 20, y: 270 }, right: { x: 460, y: 270 } },
+  sleeve_cuff_inner: { left: { x: 60, y: 310 }, right: { x: 420, y: 310 } },
 }
 
 const PANTS = {
@@ -74,13 +75,13 @@ describe('old and empty records', () => {
 
   it('sides with different y in old data load with their average, then save equal', () => {
     const old = structuredClone(TSHIRT)
-    old.sleeve_end.left.y = 280
-    old.sleeve_end.right.y = 301
+    old.sleeve_cuff_outer.left.y = 260
+    old.sleeve_cuff_outer.right.y = 281
     const { state } = fromLandmarks(old, TSHIRT_GROUPS, B)
-    expect(state.ys.sleeve_end).toBe(291)
+    expect(state.ys.sleeve_cuff_outer).toBe(271)
     const out = toLandmarks(old, state, TSHIRT_GROUPS) as typeof TSHIRT
-    expect(out.sleeve_end.left.y).toBe(291)
-    expect(out.sleeve_end.right.y).toBe(291)
+    expect(out.sleeve_cuff_outer.left.y).toBe(271)
+    expect(out.sleeve_cuff_outer.right.y).toBe(271)
   })
 })
 

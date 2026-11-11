@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from .landmark_checks import landmarks_complete
 from .models import Garment
 from apps.users.media_views import make_signed_url
 
@@ -13,11 +14,18 @@ class GarmentSerializer(serializers.ModelSerializer):
         model = Garment
         fields = (
             "id", "name", "type", "image_url", "thumb_url", "original_preview_url",
-            "width", "height", "landmarks", "visibility", "status", "owned_by_me", "ai_skipped", "created_at",
+            "width", "height", "landmarks", "landmarks_complete", "visibility", "status", "owned_by_me", "ai_skipped",
+            "created_at",
         )
         read_only_fields = fields
 
     width = serializers.SerializerMethodField()
+    landmarks_complete = serializers.SerializerMethodField()
+
+    def get_landmarks_complete(self, obj):
+        """True when every point of the current set exists (docs/09 #92); false asks the user to add the rest."""
+        return landmarks_complete(obj.type, obj.landmarks)
+
     height = serializers.SerializerMethodField()
 
     def _dims(self, obj):

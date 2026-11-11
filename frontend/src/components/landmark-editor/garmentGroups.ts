@@ -1,4 +1,5 @@
 import type { GarmentType } from '../../api/types'
+import { GARMENT_GROUP_NAMES, SIDE } from '../../locale/uz'
 import { MIN_GAP, type GroupDef, type PointDef, type Rules, type XRule, type YRule } from './geometry'
 
 /**
@@ -33,19 +34,39 @@ export const C = {
   teal: { light: '#7FE0D2', deep: '#2FB3A0' },
 }
 
+const T = GARMENT_GROUP_NAMES.tshirt
+
+/** One point per image side at a shared y (the sleeve cuff corners): `${base}.left|right.{x,y}`. */
+const sides = (name: string, base: string, l: number, r: number): PointDef[] => [
+  { id: `${base}.left.x`, label: `${name}-${SIDE.left}`, side: 'left', xPath: `${base}.left.x`, mirror: `${base}.right.x`, defX: l },
+  { id: `${base}.right.x`, label: `${name}-${SIDE.right}`, side: 'right', xPath: `${base}.right.x`, mirror: `${base}.left.x`, defX: r },
+]
+
+/**
+ * T-shirt set (docs/03, docs/09 #92), in the order the user marks them, top to bottom. Optional for now:
+ * collar, collar_bottom, armpit. The cuff corners replace the legacy `sleeve_end` (read only, never written).
+ */
 export const TSHIRT_GROUPS: GroupDef[] = [
-  { id: 'shoulder', name: 'Yelka', ...C.orange, yPaths: ['shoulder.y'], defY: 0.1, points: pair('Yelka', 'shoulder', 0.25, 0.75) },
+  { id: 'collar', name: T.collar, ...C.teal, yPaths: ['collar.y'], defY: 0.08, optional: true, points: pair(T.collar, 'collar', 0.4, 0.6) },
+  { id: 'shoulder', name: T.shoulder, ...C.orange, yPaths: ['shoulder.y'], defY: 0.1, points: pair(T.shoulder, 'shoulder', 0.25, 0.75) },
   {
-    id: 'sleeve_end', name: 'Yeng', ...C.purple,
-    yPaths: ['sleeve_end.left.y', 'sleeve_end.right.y'], defY: 0.3,
-    points: [
-      { id: 'sleeve_end.left.x', label: 'Yeng-Sol', side: 'left', xPath: 'sleeve_end.left.x', mirror: 'sleeve_end.right.x', defX: 0.05 },
-      { id: 'sleeve_end.right.x', label: 'Yeng-Oʻng', side: 'right', xPath: 'sleeve_end.right.x', mirror: 'sleeve_end.left.x', defX: 0.95 },
-    ],
+    id: 'collar_bottom', name: T.collar_bottom, ...C.cyan, yPaths: ['collar_bottom.y'], defY: 0.16, optional: true,
+    points: [{ id: 'collar_bottom.x', label: `${T.collar_bottom}-${SIDE.center}`, side: 'center', xPath: 'collar_bottom.x', defX: 0.5 }],
   },
-  { id: 'chest', name: 'Koʻkrak', ...C.pink, yPaths: ['chest.y'], defY: 0.25, points: pair('Koʻkrak', 'chest', 0.3, 0.7) },
-  { id: 'waist', name: 'Bel', ...C.green, yPaths: ['waist.y'], defY: 0.5, points: pair('Bel', 'waist', 0.325, 0.675) },
-  { id: 'hem', name: 'Pastki', ...C.blue, yPaths: ['hem.y'], defY: 0.9, points: pair('Pastki', 'hem', 0.325, 0.675) },
+  { id: 'armpit', name: T.armpit, ...C.blue, yPaths: ['armpit.y'], defY: 0.22, optional: true, points: pair(T.armpit, 'armpit', 0.28, 0.72) },
+  {
+    id: 'sleeve_cuff_outer', name: T.sleeve_cuff_outer, ...C.purple,
+    yPaths: ['sleeve_cuff_outer.left.y', 'sleeve_cuff_outer.right.y'], defY: 0.28,
+    points: sides(T.sleeve_cuff_outer, 'sleeve_cuff_outer', 0.04, 0.96),
+  },
+  {
+    id: 'sleeve_cuff_inner', name: T.sleeve_cuff_inner, ...C.purple,
+    yPaths: ['sleeve_cuff_inner.left.y', 'sleeve_cuff_inner.right.y'], defY: 0.33,
+    points: sides(T.sleeve_cuff_inner, 'sleeve_cuff_inner', 0.12, 0.88),
+  },
+  { id: 'chest', name: T.chest, ...C.pink, yPaths: ['chest.y'], defY: 0.25, points: pair(T.chest, 'chest', 0.3, 0.7) },
+  { id: 'waist', name: T.waist, ...C.green, yPaths: ['waist.y'], defY: 0.5, points: pair(T.waist, 'waist', 0.325, 0.675) },
+  { id: 'hem', name: T.hem, ...C.blue, yPaths: ['hem.y'], defY: 0.9, points: pair(T.hem, 'hem', 0.325, 0.675) },
 ]
 
 export const PANTS_GROUPS: GroupDef[] = [
@@ -88,8 +109,21 @@ export const legChain = (base: string): XRule[] => {
 export const CENTER_HIP_MARGIN = 5
 
 export const TSHIRT_RULES: Rules = {
-  x: [lr('shoulder'), lr('chest'), lr('waist'), lr('hem'), { a: 'sleeve_end.left.x', b: 'sleeve_end.right.x', gap: MIN_GAP }],
-  y: [...chain('shoulder', 'chest', 'waist', 'hem'), { a: 'shoulder', b: 'sleeve_end', gap: MIN_GAP }],
+  x: [
+    lr('collar'), lr('shoulder'), lr('armpit'), lr('chest'), lr('waist'), lr('hem'),
+    { a: 'collar.left_x', b: 'collar_bottom.x', gap: MIN_GAP },
+    { a: 'collar_bottom.x', b: 'collar.right_x', gap: MIN_GAP },
+    { a: 'sleeve_cuff_outer.left.x', b: 'sleeve_cuff_outer.right.x', gap: MIN_GAP },
+    { a: 'sleeve_cuff_inner.left.x', b: 'sleeve_cuff_inner.right.x', gap: MIN_GAP },
+  ],
+  y: [
+    { a: 'collar', b: 'collar_bottom', gap: MIN_GAP },
+    { a: 'shoulder', b: 'armpit', gap: MIN_GAP },
+    { a: 'armpit', b: 'chest', gap: 0 }, // armpit <= chest
+    ...chain('shoulder', 'chest', 'waist', 'hem'),
+    { a: 'shoulder', b: 'sleeve_cuff_outer', gap: MIN_GAP },
+    { a: 'shoulder', b: 'sleeve_cuff_inner', gap: MIN_GAP },
+  ],
 }
 
 export const PANTS_RULES: Rules = {

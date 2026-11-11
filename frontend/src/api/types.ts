@@ -98,13 +98,25 @@ export interface BodyLandmarks {
   foot_bottom: { y: number; left_x?: number; right_x?: number }
 }
 
-/** T-shirt landmarks, pixels on the garment's own tight-cropped PNG. */
+/**
+ * T-shirt landmarks, pixels on the garment's own tight-cropped PNG (docs/03, docs/09 #92). left/right = image
+ * left/right. armpit, collar, collar_bottom are optional for now. The cuff corners replace `sleeve_end`, which
+ * old records still carry (read only: the server never writes it).
+ */
 export interface TshirtLandmarks {
   shoulder: Span
   chest: Span
   waist: Span
   hem: Span
-  sleeve_end: { left: Point; right: Point }
+  sleeve_cuff_outer: { left: Point; right: Point }
+  sleeve_cuff_inner: { left: Point; right: Point }
+  armpit?: Span
+  /** Collar edges at the shoulder line. */
+  collar?: Span
+  /** Lowest centre point of the neckline. */
+  collar_bottom?: Point
+  /** Legacy (before 2026-11-11), read only. */
+  sleeve_end?: { left: Point; right: Point }
 }
 
 /** Pants landmarks, pixels on the garment's own tight-cropped PNG. */
@@ -225,6 +237,8 @@ export interface Garment {
   width: number | null
   height: number | null
   landmarks: GarmentLandmarks
+  /** True when every point of the current set exists; false: ask the user to add the missing points. */
+  landmarks_complete: boolean
   visibility: Visibility
   status: GarmentStatus
   owned_by_me: boolean
@@ -232,6 +246,12 @@ export interface Garment {
   ai_skipped: boolean
   created_at: string
 }
+
+/** A range warning from PATCH garments/{id}/landmarks/ (saved anyway). */
+export interface LandmarkWarning { code: 'collar_far' | 'outside_garment'; group: string; detail: string }
+
+/** PATCH garments/{id}/landmarks/ response. */
+export type GarmentLandmarksResponse = Garment & { landmark_warnings: LandmarkWarning[] }
 
 /** POST garments/ is multipart: photo (File) + type + name?. */
 export interface GarmentUploadResponse {

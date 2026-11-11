@@ -29,7 +29,7 @@ class Command(BaseCommand):
                 raise CommandError(f"garment {gid}: not found or not cleaned")
             img = cv2.imread(g.image.path, cv2.IMREAD_UNCHANGED)
             try:
-                validate_garment_landmarks(g.type, g.landmarks, img.shape[1], img.shape[0])
+                validate_garment_landmarks(g.type, g.landmarks, img.shape[1], img.shape[0], mode="read")
             except LandmarksInvalid as e:
                 raise CommandError(f"garment {gid}: {e.detail}")
             stem = f"{g.type}_{g.pk}"

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import {
-  NO_RULES, axisX, findPoint, fromLandmarks, movePoint, nudgePoint, saveState, snapCenters, toLandmarks,
-  type Bounds, type EditorState, type GroupDef, type Rules,
+  NO_RULES, activeRules, axisX, findPoint, fromLandmarks, movePoint, nudgePoint, requiredCount, saveState,
+  snapCenters, toLandmarks, type Bounds, type EditorState, type GroupDef, type Rules,
 } from './geometry'
 import { hintFor } from './lineHints'
+import { LANDMARK_EDITOR } from '../../locale/uz'
 import './landmarkEditor.css'
 
 /**
@@ -27,6 +28,8 @@ interface Props {
   onSave: (landmarks: Record<string, unknown>) => void
   /** Called with the current landmarks after every change (e.g. live cm widths beside the editor). */
   onChange?: (landmarks: Record<string, unknown>) => void
+  /** Sanity checks on the current landmarks: errors block Save, warnings are only shown. */
+  check?: (landmarks: Record<string, unknown>) => { errors: string[]; warnings: string[] }
 }
 
 const LOUPE_ZOOM = 3
@@ -43,7 +46,8 @@ function hexA(hex: string, a: number) {
 }
 
 export default function LandmarkEditor({
-  imageUrl, imageAlt, bounds, groups, rules = NO_RULES, landmarks, heading, subheading, saving, onSave, onChange,
+  imageUrl, imageAlt, bounds, groups, rules: allRules = NO_RULES, landmarks, heading, subheading, saving, onSave,
+  onChange, check,
 }: Props) {
   const { w, h } = bounds
   const initial = useMemo(() => fromLandmarks(landmarks, groups, { w, h }), [landmarks, groups, w, h])
@@ -65,9 +69,14 @@ export default function LandmarkEditor({
     setPlaced(new Set(initial.loaded))
   }, [initial])
 
+  // optional groups nobody has placed yet do not constrain moves, and are not saved
+  const rules = useMemo(() => activeRules(allRules, groups, placed), [allRules, groups, placed])
+  const current = useMemo(() => toLandmarks(landmarks, state, groups, placed), [landmarks, state, groups, placed])
+  const checks = useMemo(() => (check ? check(current) : { errors: [], warnings: [] }), [check, current])
+
   useEffect(() => {
-    onChange?.(toLandmarks(landmarks, state, groups))
-  }, [state, landmarks, groups, onChange])
+    onChange?.(current)
+  }, [current, onChange])
 
   // Track the on-screen scale so dots, labels and the loupe keep a constant screen size.
   useEffect(() => {
@@ -86,8 +95,11 @@ export default function LandmarkEditor({
   }, [])
 
   const b = { w, h }
-  const total = groups.reduce((n, g) => n + g.points.length, 0)
-  const save = saveState(placed.size, total)
+  const req = requiredCount(groups, placed)
+  const optTotal = groups.reduce((n, g) => n + (g.optional ? g.points.length : 0), 0)
+  const optPlaced = placed.size - req.placed
+  const save = saveState(req.placed, req.total)
+  const canSave = save.canSave && checks.errors.length === 0
   const active = findPoint(groups, activeId) ?? { group: groups[0], point: groups[0].points[0] }
   const ax = state.xs[active.point.id]
   const ay = state.ys[active.group.id]
@@ -184,8 +196,9 @@ export default function LandmarkEditor({
           <h1 className="le-title">{heading}</h1>
           {subheading && <p className="le-subtitle">{subheading}</p>}
         </div>
-        <div className={`le-count ${placed.size === total ? 'is-done' : ''}`}>
-          {placed.size} / {total} nuqta
+        <div className={`le-count ${req.placed === req.total ? 'is-done' : ''}`}>
+          {req.placed} / {req.total} nuqta
+          {optTotal > 0 && <span className="le-count-opt"> {LANDMARK_EDITOR.optionalCount(optPlaced, optTotal)}</span>}
         </div>
       </div>
 
@@ -356,6 +369,18 @@ export default function LandmarkEditor({
           </div>
           <p className="le-hint">Klaviatura: strelkalar 1 px, Shift bilan 5 px.</p>
           {!save.canSave && <p className="le-hint" role="status">{save.hint}</p>}
+          {checks.errors.length > 0 && (
+            <div className="le-checks is-error" role="alert">
+              <strong>{LANDMARK_EDITOR.checksTitle}</strong>
+              <ul>{checks.errors.map((m) => <li key={m}>{m}</li>)}</ul>
+            </div>
+          )}
+          {checks.warnings.length > 0 && (
+            <div className="le-checks is-warning" role="status">
+              <strong>{LANDMARK_EDITOR.warningsTitle}</strong>
+              <ul>{checks.warnings.map((m) => <li key={m}>{m}</li>)}</ul>
+            </div>
+          )}
 
           <div className="le-actions">
             <button type="button" className="btn btn-secondary" onClick={reset} disabled={saving}>
@@ -364,9 +389,9 @@ export default function LandmarkEditor({
             <button
               type="button"
               className="btn btn-primary"
-              disabled={saving || !save.canSave}
-              title={save.hint || undefined}
-              onClick={() => onSave(toLandmarks(landmarks, state, groups))}
+              disabled={saving || !canSave}
+              title={save.hint || checks.errors[0] || undefined}
+              onClick={() => onSave(current)}
             >
               {saving ? 'Saqlanmoqda…' : 'Saqlash'}
             </button>

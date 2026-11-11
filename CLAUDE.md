@@ -135,6 +135,8 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `LANDMARKS_INVALID`), editor clamps moves to the order rules (4 px gap), Save needs every point placed. 35 vitest tests.
       Body groups + body checks done for the staff editor (docs/09 #72). Still to do: BodyConfirm wiring + checks at confirm. No ESLint config exists yet (`npm run lint` fails).
       Body confirm page must send the edited landmarks to `POST body/confirm/` (BodyConfirm.tsx has a TODO).
+      **2026-11-11 (docs/09 #92):** extended T-shirt set (armpit, collar, collar_bottom, cuff corners replace
+      sleeve_end), `landmarks_complete`, client + server checks; locale file `frontend/src/locale/uz.ts`.
 - [ ] 6. Garment pipeline: prompts 01 + 04, quality check, Save/Cancel preview (screen 8), delete original, visibility (screen 9).
       **Prompt 01 done (2026-11-09, docs/09 #45-51, uncommitted):** garment AI check in `run_garment_cleaning` (httpx client
       `apps/jobs/gemini.py`, cache `ai_cache.py`, race-safe daily slot `limits.py`, `WRONG_GARMENT_TYPE`, `Garment.ai_skipped`
