@@ -382,3 +382,30 @@ Results (#44 on the 6 avatars; **#45 skipped: no `collar` landmark**; #44 "chest
   garment's own top edge sloping down from the collar faster than the body's shoulder (#44 shoulder points are marked
   inside the chest width). Not tested here: a control pair on the shoulder slope (collar edge -> shoulder midpoint).
 Sheet `out/sheet_keep_shape.png` (#44 only: k 1.0 | k 0.5 | A | B x male slim, male plus, female average).
+
+### MLS keep_shape benchmark, round 4: bare-shoulder triangle (2026-11-11, NOT production)
+Base preset A (`mls_landmarks.py`, runner `run_shoulder_slope.py`, `out/results4.json`). Variants:
+- **V1 = A + shoulder_slope pair** (`slope_l|r`, k 1.0): garment point = the garment's top edge (first alpha row) at
+  50 % between collar_* and shoulder_* in x (measured, never entered); body point = 50 % along the slope line neck
+  edge @ neck.y -> shoulder point, raised (never lowered) to the figure's own top edge at that x, plus 3 px for the edge
+  fix. `validate_slope`: between collar and shoulder in x, above armpit and cuffs, on both sides, else dropped.
+- **V2 = A + alignment tweak**: uniform scale x 1.05, then the alignment moves up (never down) until the aligned garment
+  top edge at the slope x is not below that body point. The neck opening follows the same alignment.
+- **V3 = V1 + V2.**
+New metric `excess_px`: garment pixels over the background above the slope line (garment floating above the shoulder).
+
+Results (#44 on the 6 avatars; **#45 skipped: still no `collar` landmark**; "chest not used" in every run):
+| variant | bare-shoulder px | excess px | fold | local scale p1..p99 | print distortion | runtime |
+|---|---|---|---|---|---|---|
+| A | 81-192 | 0 | 0 % | 0.44-0.53 .. 1.11-1.29 | 0.035-0.043 | 0.06-0.07 s |
+| V1 | 56-166 | 0 | 0 % | 0.44-0.53 .. 1.11-1.30 | 0.035-0.043 | 0.06-0.07 s |
+| V2 | 0-89 | 133-340 | 0 % | 0.46-0.56 .. 1.13-1.31 | 0.037-0.045 | 0.06-0.07 s |
+| V3 | 0-85 | 73-187 | 0 % | 0.46-0.55 .. 1.13-1.31 | 0.037-0.046 | 0.06-0.07 s |
+- Local scale min/max is at the sleeve near the waist/hip rows in every variant (V3 min on 2 avatars at the torso near
+  the shoulder, 0.44-0.48). Floating 0, pixels above the shoulder line outside the shoulder 0 everywhere.
+- V1 helps only 15-30 %: one point at 50 % pulls the edge up there, but the outer half (slope point -> deltoid) still
+  shows a skin triangle (worst V1-V3: V1 on male plus, 166 px, `out/crop_shoulder_slope_worst.png`).
+- V2/V3 close the gap on male average, female average/plus (0-13 px) and halve it on the slim avatars, but male plus
+  keeps 85-89 px. The price is the garment sitting above the shoulder over the background (excess): V3 about half of
+  V2 (the slope pair holds the edge on the body instead of letting the whole garment rise).
+Sheet `out/sheet_shoulder_slope.png` (#44: A | V1 | V2 | V3 x male slim, male plus, female slim).

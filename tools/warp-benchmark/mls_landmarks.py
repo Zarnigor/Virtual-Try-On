@@ -78,14 +78,67 @@ def missing_landmarks(glm: dict) -> list[str]:
     return out
 
 
-def control_points(glm, blm, mask, k=1.0, k_map=None):
+SLOPE_AT = 0.5  # shoulder_slope point: this fraction of the way from the collar edge to the shoulder point
+ALIGN_SCALE_UP = 1.05  # alignment tweak (round 4): uniform scale x this
+SLOPE_RAISE_MAX = 0.15  # x body shoulder width: how far above the slope line the figure's top edge is searched
+
+
+def garment_top_edge(alpha, glm, side):
+    """(x, y) garment px on the garment's top edge (first alpha row) at SLOPE_AT between collar_* and shoulder_*,
+    or None. Measured from the alpha, never entered."""
+    x = _f(glm["collar"][f"{side}_x"]) + SLOPE_AT * (_f(glm["shoulder"][f"{side}_x"]) - _f(glm["collar"][f"{side}_x"]))
+    xi = int(round(x))
+    if alpha is None or not 0 <= xi < alpha.shape[1]:
+        return None
+    rows = np.nonzero(alpha[:, xi])[0]
+    return (float(xi), float(rows[0])) if len(rows) else None
+
+
+def body_slope_point(mask, blm, side):
+    """(x, y) on the body shoulder slope line (neck edge at neck.y -> shoulder point) at SLOPE_AT, raised (never
+    lowered) to the figure's own top edge at that x (the shoulder bulges above the straight line), plus
+    prod.HALO_ERODE + 1 px that the edge fix takes off the garment's outer contour."""
+    x0, y0 = _f(blm["neck"][f"{side}_x"]), _f(blm["neck"]["y"])
+    x1, y1 = _f(blm["shoulder"][f"{side}_x"]), _f(blm["shoulder"]["y"])
+    x, y = x0 + SLOPE_AT * (x1 - x0), y0 + SLOPE_AT * (y1 - y0)
+    xi, top = int(round(x)), y
+    span = _f(blm["shoulder"]["right_x"]) - _f(blm["shoulder"]["left_x"])
+    yi = int(round(y))
+    if mask is not None and 0 <= xi < mask.shape[1] and 0 <= yi < mask.shape[0] and mask[yi, xi]:
+        stop = max(int(y0), int(y - SLOPE_RAISE_MAX * span))
+        while yi - 1 >= stop and mask[yi - 1, xi]:  # walk up the figure above the line
+            yi -= 1
+        top = min(y, float(yi))
+    return x, top - prod.HALO_ERODE - 1
+
+
+def control_points(glm, blm, mask, k=1.0, k_map=None, alpha=None, slope_pair=False, align_tweak=False,
+                   align_out=None):
     """(pairs {name: (q garment, p target, weight)}, rejected [names], s). k_map: per-point, per-axis k
-    (`k_of`); k is the default for every group k_map does not name."""
+    (`k_of`); k is the default for every group k_map does not name.
+    Round 4 (bare-shoulder fix, docs/06), both need `alpha` (garment alpha > 128):
+    slope_pair: one extra pair per side `slope_l|r`: garment top edge at SLOPE_AT collar -> shoulder ->
+    `body_slope_point`, k 1.0. align_tweak: uniform scale x ALIGN_SCALE_UP, then the alignment moves up (never
+    down) until the aligned garment top edge at the slope point is not below `body_slope_point` (both sides).
+    align_out: dict that receives {"s", "dy"} of the alignment (the neck opening uses it)."""
     g_sl, g_sr, g_sy = _f(glm["shoulder"]["left_x"]), _f(glm["shoulder"]["right_x"]), _f(glm["shoulder"]["y"])
     a_sl, a_sr, a_sy = _f(blm["shoulder"]["left_x"]), _f(blm["shoulder"]["right_x"]), _f(blm["shoulder"]["y"])
     s = (a_sr - a_sl) / (g_sr - g_sl)
     g_cx, a_cx = (g_sl + g_sr) / 2, (a_sl + a_sr) / 2
-    aligned = lambda q: np.array([a_cx + (q[0] - g_cx) * s, a_sy + (q[1] - g_sy) * s])  # noqa: E731
+    slope = {}
+    if (slope_pair or align_tweak) and alpha is not None:
+        for side in ("left", "right"):
+            q = garment_top_edge(alpha, glm, side)
+            if q is not None:
+                slope[side] = (q, body_slope_point(mask, blm, side))
+    dy = 0.0
+    if align_tweak:
+        s = max(s, ALIGN_SCALE_UP * s)
+        below = [a_sy + (q[1] - g_sy) * s - b[1] for q, b in slope.values()]
+        dy = -max([0.0] + below)
+    if align_out is not None:
+        align_out.update({"s": s, "dy": dy})
+    aligned = lambda q: np.array([a_cx + (q[0] - g_cx) * s, a_sy + dy + (q[1] - g_sy) * s])  # noqa: E731
     def fit(q, b, group):
         kx, ky = k_of(k_map, group, k)
         a = aligned(q)
@@ -132,13 +185,42 @@ def control_points(glm, blm, mask, k=1.0, k_map=None):
             perp = -perp
         pairs["cuff_out" + sx] = (tuple(out), fit(out, c + perp * w / 2, "cuff"), 1.0)
         pairs["cuff_in" + sx] = (tuple(inn), fit(inn, c - perp * w / 2, "cuff"), 1.0)
+    if slope_pair:
+        for side, sx in (("left", "_l"), ("right", "_r")):
+            if side in slope:
+                q, b = slope[side]
+                pairs["slope" + sx] = (q, tuple(b), 1.0)  # k 1.0 always: the target IS the body point
     rejected += mls.drop_crossing_chest(pairs, glm)
     rejected += mls.validate(pairs)
+    rejected += validate_slope(pairs)
     return pairs, rejected, s
 
 
+def validate_slope(pairs):
+    """Removes (in place) and returns the slope pairs that would cross: on both garment and body the slope point must
+    lie between the collar edge and the shoulder point in x and above the armpit (and the cuffs) in y."""
+    bad = []
+    for sx in ("_l", "_r"):
+        k = "slope" + sx
+        if k not in pairs:
+            continue
+        ok = True
+        for i in (0, 1):  # 0 garment, 1 body
+            pt = pairs[k][i]
+            n, sh = pairs.get("neck" + sx), pairs.get("shoulder" + sx)
+            if n is None or sh is None or not min(n[i][0], sh[i][0]) < pt[0] < max(n[i][0], sh[i][0]):
+                ok = False
+            for r in ("armpit" + sx, "cuff_out" + sx, "cuff_in" + sx):
+                if r in pairs and not pt[1] < pairs[r][i][1]:
+                    ok = False
+        if not ok:
+            bad.append(k)
+            del pairs[k]
+    return bad
+
+
 def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1.0, base=None, info=None,
-         k_map=None):
+         k_map=None, slope_pair=False, align_tweak=False):
     t0 = time.perf_counter()
     info = {} if info is None else info
     W, H = out_size
@@ -148,7 +230,9 @@ def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1
     if miss:
         info.update({"skipped": True, "missing": miss})
         return None
-    pairs, rejected, s = control_points(garment_lm, body_lm, mask, k, k_map)
+    al = {}
+    pairs, rejected, s = control_points(garment_lm, body_lm, mask, k, k_map, alpha=img[:, :, 3] > 128,
+                                        slope_pair=slope_pair, align_tweak=align_tweak, align_out=al)
     names = list(pairs)
     q = np.array([pairs[n][0] for n in names], float) * s
     p = np.array([pairs[n][1] for n in names], float)
@@ -173,7 +257,7 @@ def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1
         a_cx = (_f(body_lm["shoulder"]["left_x"]) + _f(body_lm["shoulder"]["right_x"])) / 2
         g_sy, a_sy = _f(garment_lm["shoulder"]["y"]), _f(body_lm["shoulder"]["y"])
         info["neck_opening"] = {"cx": a_cx + (geo["cx"] - g_cx) * s, "hw": geo["hw"] * s,
-                                "y0": a_sy + (geo["y0"] - g_sy) * s, "depth": geo["depth"] * s}
+                                "y0": a_sy + al["dy"] + (geo["y0"] - g_sy) * s, "depth": geo["depth"] * s}
         layer = prod.clear_back_collar(layer, info["neck_opening"], body_lm)
     info.update({"pairs": pairs, "rejected": rejected, "s": s, "map": (mx, my),
                  "runtime": time.perf_counter() - t0})
@@ -252,3 +336,22 @@ def print_distortion(layer, info, bbox):
         return None
     sc = 1.0 / np.abs(det[on])
     return round(float(sc.std() / sc.mean()), 3)
+
+
+def excess_px(layer, base_mask, body_lm):
+    """Garment pixels (alpha >= 128) drawn over the background ABOVE the body in the shoulder band: per side between
+    the neck edge and the shoulder point, above the slope line neck edge @ neck.y -> shoulder point by more than 1 px,
+    where the avatar mask is empty (must stay small: the garment must not float above the shoulder)."""
+    cover = layer[:, :, 3] >= 128
+    H, W = cover.shape
+    ys, xs = np.mgrid[0:H, 0:W]
+    total = 0
+    for side in ("left", "right"):
+        x0, y0 = _f(body_lm["neck"][f"{side}_x"]), _f(body_lm["neck"]["y"])
+        x1, y1 = _f(body_lm["shoulder"][f"{side}_x"]), _f(body_lm["shoulder"]["y"])
+        if abs(x1 - x0) < 1:
+            continue
+        line = y0 + (y1 - y0) / (x1 - x0) * (xs + 0.5 - x0)
+        inside = (xs >= min(x0, x1)) & (xs <= max(x0, x1)) & (ys + 0.5 < line - 1)
+        total += int((inside & cover & ~base_mask).sum())
+    return total

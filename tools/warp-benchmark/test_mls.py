@@ -166,5 +166,47 @@ class KeepShapeTests(unittest.TestCase):
         self.assertGreater(ml.print_distortion(layer, {"map": (xx ** 1.3 / 6, yy / 1.5)}, box), 0.05)
 
 
+class ShoulderSlopeTests(unittest.TestCase):
+    """Round 4: shoulder_slope pair, alignment tweak, excess metric."""
+    full = LandmarkMlsTests.full
+
+    def test_body_slope_point_is_raised_to_the_figure_never_lowered(self):
+        import mls_landmarks as ml
+        base, blm = avatar()
+        mask = prod.figure_mask(base)
+        x, y = ml.body_slope_point(mask, blm, "left")
+        line_y = blm["neck"]["y"] + 0.5 * (blm["shoulder"]["y"] - blm["neck"]["y"])
+        self.assertAlmostEqual(x, 235.0)
+        self.assertLessEqual(y, line_y - prod.HALO_ERODE - 1)
+        empty = np.zeros_like(mask)
+        self.assertAlmostEqual(ml.body_slope_point(empty, blm, "left")[1], line_y - prod.HALO_ERODE - 1)
+
+    def test_slope_pair_and_alignment_tweak(self):
+        import mls_landmarks as ml
+        base, blm = avatar()
+        img, glm = self.full()
+        mask = prod.figure_mask(base)
+        alpha = img[:, :, 3] > 128
+        self.assertEqual(ml.garment_top_edge(alpha, glm, "left"), (148.0, 30.0))
+        p, _, s0 = ml.control_points(glm, blm, mask, k_map=ml.PRESETS["A"], alpha=alpha, slope_pair=True)
+        self.assertEqual(p["slope_l"][1], ml.body_slope_point(mask, blm, "left"))  # k 1.0
+        al = {}
+        _, _, s1 = ml.control_points(glm, blm, mask, alpha=alpha, align_tweak=True, align_out=al)
+        self.assertAlmostEqual(s1, ml.ALIGN_SCALE_UP * s0)
+        self.assertLessEqual(al["dy"], 0.0)  # only ever moved up
+        bad = {"neck_l": ((175, 30), (270, 220), 5.0), "shoulder_l": ((120, 30), (200, 260), 1.0),
+               "slope_l": ((100, 30), (235, 238), 1.0)}  # garment slope x outside collar..shoulder
+        self.assertEqual(ml.validate_slope(bad), ["slope_l"])
+
+    def test_excess_counts_garment_over_background_above_the_shoulder(self):
+        import mls_landmarks as ml
+        base, blm = avatar()
+        mask = prod.figure_mask(base)
+        layer = np.zeros((1200, 600, 4), np.uint8)
+        self.assertEqual(ml.excess_px(layer, mask, blm), 0)
+        layer[200:262, 200:400, 3] = 255
+        self.assertGreater(ml.excess_px(layer, mask, blm), 100)
+
+
 if __name__ == "__main__":
     unittest.main()

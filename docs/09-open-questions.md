@@ -33,6 +33,9 @@ _(none blocking P0)_
   presets A and B. How the engine maps `fit_mode` (#93) to k, and the exact k values, are NOT decided; the method and
   preset choice stay with the owner. Measured on #44 only (#45 has no collar): A/B fix the hourglass and the squeezed
   print but not the bare shoulders (docs/06 round 3).
+- **shoulder_slope pair + alignment tweak is a benchmark proposal (2026-11-11, not a decision):** docs/06 round 4.
+  V3 (both) closes most of the bare-shoulder triangle on #44 at the cost of 73-187 px of garment above the shoulder;
+  male plus is not closed. Whether to use it, the 50 % point, the 1.05 scale and the raise rule are NOT decided.
 
 ## Decided 2026-11-07
 12. **Body AI validation (prompt 02): P0.** Confirmed by owner.
