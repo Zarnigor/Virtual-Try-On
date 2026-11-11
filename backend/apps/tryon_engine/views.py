@@ -12,6 +12,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+GENDER_MISMATCH_DETAIL = "Bu kiyim boshqa jins uchun moʻljallangan. Mos kiyim yoki boshqa asos tanlang."
+BODY_SEX_REQUIRED_DETAIL = "Avval tanangiz jinsini tanlang."
+
+
+def garment_fits_sex(garment_gender: str, sex: str) -> bool:
+    """docs/09 #97: male sees male + unisex, female sees female + unisex; unisex always passes."""
+    return garment_gender == "unisex" or garment_gender == sex
+
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
@@ -68,6 +76,8 @@ def start_tryon(request):
                 return Response({"detail": "Body not confirmed yet"}, status=400)
         except Body.DoesNotExist:
             return Response({"detail": "No confirmed body found"}, status=404)
+        if body_obj.sex is None:  # bodies created before sex was required: the UI asks once, never guessed
+            return Response({"code": "BODY_SEX_REQUIRED", "detail": BODY_SEX_REQUIRED_DETAIL}, status=400)
     else:
         avatar_id = data.get("avatar_id")
         if not avatar_id:
@@ -89,6 +99,10 @@ def start_tryon(request):
             return Response(status=404)
         if not g.landmarks:
             return Response({"detail": f"Garment {gid} has no landmarks"}, status=400)
+        sex = body_obj.sex if body_obj is not None else avatar_obj.sex
+        if not garment_fits_sex(g.gender, sex):
+            return Response({"code": "GENDER_MISMATCH", "detail": GENDER_MISMATCH_DETAIL, "garment_id": g.pk,
+                             "garment_gender": g.gender, "base_sex": sex}, status=400)
         garments.append(g)
 
     # prevent duplicate garment types

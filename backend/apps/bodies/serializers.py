@@ -13,7 +13,7 @@ class BodySerializer(serializers.ModelSerializer):
     class Meta:
         model = Body
         fields = (
-            "id", "image_url", "landmarks", "height_cm", "measurements",
+            "id", "image_url", "sex", "landmarks", "height_cm", "measurements",
             "confirmed_at", "measurements_unlock_at", "can_change_measurements", "created_at",
         )
         read_only_fields = fields
@@ -36,6 +36,7 @@ class BodySerializer(serializers.ModelSerializer):
 class BodyUploadSerializer(serializers.Serializer):
     photo = serializers.ImageField()
     is_adult_confirmed = serializers.BooleanField()
+    sex = serializers.ChoiceField(choices=Body.SEX_CHOICES)
 
     def validate_is_adult_confirmed(self, v):
         if not v:

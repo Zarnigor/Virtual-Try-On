@@ -6,8 +6,9 @@ behind signed URLs (assumption; S3-compatible later).
 
 ## Models
 - **User**: email, password, is_adult_confirmed
-- **Body**: user (OneToOne, unique), normalized image, landmarks (JSON), height_cm (nullable), measurements (JSON, optional),
-  measurements_changed_at, confirmed_at (null until confirmed), created_at. Photo/landmarks immutable after confirmed_at.
+- **Body**: user (OneToOne, unique), normalized image, sex (male|female; required at upload, null only on bodies created
+  before 2026-11-11: the UI asks once via `PATCH body/sex/`, never guessed), landmarks (JSON), height_cm (nullable),
+  measurements (JSON, optional), measurements_changed_at, confirmed_at (null until confirmed), created_at. Photo/landmarks immutable after confirmed_at.
   The original upload is deleted after normalization.
 - **Avatar**: sex, build (slim|average|plus), image, landmarks (JSON), measurements (JSON, circumference cm), height_cm
   (nominal, nullable), landmarks_confirmed_at (null = auto-detected; set by the staff editor). Seeded by command or uploaded by staff.
@@ -41,7 +42,8 @@ General rules
 | GET | auth/me/ | | `User` |
 | DELETE | auth/me/ | | 204 (deletes the account) |
 | GET | body/ | | `Body`; 404 `BODY_NOT_FOUND` |
-| POST | body/ | multipart `photo`, `is_adult_confirmed` | 201 `{body, job_id}`; 409 `BODY_EXISTS` |
+| POST | body/ | multipart `photo`, `is_adult_confirmed`, `sex` (male\|female, required) | 201 `{body, job_id}`; 400 if sex missing/invalid; 409 `BODY_EXISTS` |
+| PATCH | body/sex/ | `{sex}` | `Body`; only while `sex` is null (older bodies); 400 `BAD_SEX`; 409 `SEX_ALREADY_SET`; 404 `BODY_NOT_FOUND` |
 | DELETE | body/ | | 204 (should cascade to its outfits: **not yet**, outfits are kept today, fix in step 3) |
 | POST | body/confirm/ | `{landmarks, height_cm?, measurements?}` | `Body` (photo + landmarks locked); 409 `BODY_CONFIRMED` |
 | PATCH | body/measurements/ | `{height_cm?, measurements?}` | `Body`; 403 `MEASUREMENTS_LOCKED` + `unlock_at` |
@@ -51,7 +53,7 @@ General rules
 | GET | staff/avatars/{id}/ | (staff only) | `StaffAvatar`; landmarks not yet confirmed get edge points from the mask (GET never writes) |
 | POST | staff/avatars/ | multipart `sex, build, photo, height_cm, shoulder, chest, waist, hip` (staff only) | 201 `StaffAvatar + warnings[]` (200 when it replaced that sex+build; landmarks reset to auto); 400 `{code, detail}` (`NO_PERSON`, `HEAD_OR_FEET_CUT`, `FIGURE_CLIPPED`, upload codes) |
 | PATCH | staff/avatars/{id}/landmarks/ | `{landmarks, height_cm?, measurements?}` (staff only) | `StaffAvatar`, sets `landmarks_confirmed_at`; 400 `LANDMARKS_INVALID` (rules in docs/03) |
-| GET | garments/ | `?scope=mine\|catalog\|all&type=tshirt\|pants&gender=female\|male\|unisex` (female/male also return unisex; unknown values ignored) | `Garment[]` |
+| GET | garments/ | `?scope=mine\|catalog\|all&type=tshirt\|pants&gender=female\|male\|unisex` (female/male also return unisex; unknown values ignored) `&for_sex=male\|female\|all&avatar_id=` (try-on rule, docs/09 #97: male -> male + unisex, female -> female + unisex, all = no filter; without `for_sex`, `scope=catalog` defaults to the sex of `avatar_id` or of the user's body when known) | `Garment[]`; 400 `BAD_SEX` for another `for_sex` |
 | POST | garments/ | multipart `photo`, `type`, `name?` | 201 `{garment, job_id}` |
 | GET | garments/{id}/ | | `Garment` (owner, or public+approved) |
 | PATCH | garments/{id}/ | `{fit_mode?, gender?}` (owner only; same style as visibility) | `Garment`; 400 `BAD_FIT_MODE` / `BAD_GENDER` / `FIELD_NOT_EDITABLE` (any other key, e.g. image, name, landmarks: nothing saved; the image is never updatable); 404 for others |
@@ -59,7 +61,7 @@ General rules
 | PATCH | garments/{id}/landmarks/ | `{landmarks}` | `Garment + landmark_warnings[{code, group, detail}]` (range warnings, saved anyway; 409 `GARMENT_NOT_READY` until cleaned; 400 `LANDMARKS_INVALID` `{code, detail}` with a short Uzbek message naming the group, rules in docs/03; legacy `sleeve_end` is never stored) |
 | PATCH | garments/{id}/visibility/ | `{visibility: private\|public}` | `Garment` |
 | GET | jobs/{id}/ | | `Job {id, kind, status, result, error_code, error_message, ...}` |
-| POST | tryon/ | `{base: body\|avatar, avatar_id?, garment_ids[]}` | 202 `{job_id, outfit_id}` |
+| POST | tryon/ | `{base: body\|avatar, avatar_id?, garment_ids[]}` | 202 `{job_id, outfit_id}`; 400 `GENDER_MISMATCH` `{garment_id, garment_gender, base_sex}` when a garment's gender is not the base's sex (unisex always passes); 400 `BODY_SEX_REQUIRED` for a body without sex |
 | GET | config/ | (public, no auth) | `AppConfig {demo_mode}` |
 | GET | outfits/ | | `Outfit[]` |
 | GET | outfits/{id}/ | | `Outfit` |

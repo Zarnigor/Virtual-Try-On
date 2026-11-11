@@ -18,8 +18,11 @@ class BodyRulesTests(MediaTestCase):
         self.user = self.make_user()
         self.login(self.user)
 
-    def _upload(self, adult="true"):
-        return self.client.post("/api/body/", {"photo": upload(), "is_adult_confirmed": adult}, format="multipart")
+    def _upload(self, adult="true", sex="female"):
+        data = {"photo": upload(), "is_adult_confirmed": adult}
+        if sex is not None:
+            data["sex"] = sex
+        return self.client.post("/api/body/", data, format="multipart")
 
     def _confirmed_body(self, **extra):
         self._upload()

@@ -385,3 +385,12 @@ _(none blocking P0)_
     sleeve seam, collar points present, chest pair not used when the chest is above the armpit (#94, #95).
     `adapt` = k 1.0 (unchanged). Rejected: shoulder_slope pair, alignment tweak and both (see "Rejected"). Engine
     wiring is a separate task (docs/04). The hem rule stays open (benchmark assumption, "Still open").
+
+## Decided 2026-11-11: garment gender enforced in try-on
+97. **2026-11-11: garment gender is enforced in try-on.** Base sex = the avatar's `sex`, or the own body's `sex` (new
+    required field, chosen at upload; bodies created earlier have null and the UI asks once via `PATCH body/sex/`,
+    never guessed; try-on refuses them with `BODY_SEX_REQUIRED`). Male base -> male + unisex garments, female base ->
+    female + unisex; unisex always passes. `POST tryon/` returns 400 `GENDER_MISMATCH` otherwise. `GET garments/`
+    takes `for_sex=male|female|all`; the catalog defaults to the avatar's / body's sex. Screen 10 lists only matching
+    garments, with a "Barcha kiyimlarni koʻrsatish" toggle (mismatched ones then show "Boshqa jins uchun" and the
+    try-on button explains why). **Garment size classes are NOT decided**: the stretch quality guard stays as is.

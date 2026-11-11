@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { listAvatars, type Avatar } from '../api/avatars'
-import { listGarments, type Garment } from '../api/garments'
+import { garmentFitsSex, listGarments, type Garment } from '../api/garments'
+import { getBody, setBodySex, type Body } from '../api/bodies'
 import { getConfig } from '../api/config'
 import { startTryon } from '../api/tryon'
 import { getOutfit } from '../api/outfits'
@@ -9,10 +10,13 @@ import Spinner from '../components/Spinner'
 import DevAiWarning from '../components/DevAiWarning'
 import StatusChip from '../components/StatusChip'
 import { GenderBadge, Segmented } from '../components/GarmentSettingsPanel'
-import type { GarmentGender } from '../api/types'
-import { GARMENT_SETTINGS } from '../locale/uz'
+import type { Sex } from '../api/types'
+import { SEX_LABELS, TRYON_GENDER } from '../locale/uz'
 
-const GENDER_FILTER = { all: GARMENT_SETTINGS.genderFilterAll, ...GARMENT_SETTINGS.gender }
+const TRYON_ERRORS: Record<string, string> = {
+  GENDER_MISMATCH: TRYON_GENDER.mismatch,
+  BODY_SEX_REQUIRED: TRYON_GENDER.bodySexRequired,
+}
 
 export default function TryOn() {
   const [base, setBase] = useState<'body' | 'avatar'>('avatar')
@@ -20,7 +24,9 @@ export default function TryOn() {
   const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null)
   const [garments, setGarments] = useState<Garment[]>([])
   const [scope, setScope] = useState<'all' | 'mine' | null>(null)
-  const [gender, setGender] = useState<GarmentGender | 'all'>('all')
+  // docs/09 #97: the list shows only garments for the base's sex (+ unisex) unless "show all" is on
+  const [showAll, setShowAll] = useState(false)
+  const [body, setBody] = useState<Body | null>(null)
   const [selectedGarments, setSelectedGarments] = useState<number[]>([])
   const [jobId, setJobId] = useState<number | null>(null)
   const [outfitId, setOutfitId] = useState<number | null>(null)
@@ -36,13 +42,28 @@ export default function TryOn() {
     getConfig().then((c) => setScope(c.demo_mode ? 'all' : 'mine')).catch(() => setScope('mine'))
   }, [])
 
-  // Gender filter: Ayollar / Erkaklar also list unisex garments (the backend includes them).
+  useEffect(() => {
+    if (base !== 'body') return
+    getBody().then(({ data }) => setBody(data)).catch(() => setBody(null))
+  }, [base])
+
+  const baseSex: Sex | null =
+    base === 'avatar' ? (avatars.find((a) => a.id === selectedAvatar)?.sex ?? null) : (body?.sex ?? null)
+  const mismatched = (g: Garment) => baseSex !== null && !garmentFitsSex(g.gender, baseSex)
+
   useEffect(() => {
     if (!scope) return
-    listGarments(scope, undefined, gender === 'all' ? undefined : gender)
-      .then(({ data }) => setGarments(data))
+    listGarments(scope, undefined, undefined, showAll || !baseSex ? 'all' : baseSex)
+      .then(({ data }) => {
+        setGarments(data)
+        setSelectedGarments((prev) => prev.filter((id) => data.some((g) => g.id === id)))
+      })
       .catch(() => {})
-  }, [scope, gender])
+  }, [scope, baseSex, showAll])
+
+  const chooseBodySex = (sex: Sex) => {
+    setBodySex(sex).then(({ data }) => setBody(data)).catch(() => setError(TRYON_GENDER.bodySexRequired))
+  }
 
   useEffect(() => {
     if (job?.status === 'done' && outfitId) {
@@ -73,6 +94,14 @@ export default function TryOn() {
       setError('Avatar tanlang')
       return
     }
+    if (base === 'body' && body && !body.sex) {
+      setError(TRYON_GENDER.bodySexRequired)
+      return
+    }
+    if (garments.some((g) => selectedGarments.includes(g.id) && mismatched(g))) {
+      setError(TRYON_GENDER.mismatch)  // the backend refuses it too (400 GENDER_MISMATCH)
+      return
+    }
     setError('')
     setStarting(true)
     setJobId(null)
@@ -86,8 +115,8 @@ export default function TryOn() {
       setJobId(data.job_id)
       setOutfitId(data.outfit_id)
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(msg || 'Xato yuz berdi')
+      const data = (err as { response?: { data?: { code?: string; detail?: string } } })?.response?.data
+      setError((data?.code && TRYON_ERRORS[data.code]) || data?.detail || 'Xato yuz berdi')
     } finally {
       setStarting(false)
     }
@@ -137,6 +166,13 @@ export default function TryOn() {
                 </label>
               ))}
             </div>
+
+            {base === 'body' && body && !body.sex && (
+              <div style={{ marginTop: 16 }}>
+                <Segmented<Sex> title={TRYON_GENDER.bodySexTitle} value="" options={SEX_LABELS} onChange={chooseBodySex} />
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>{TRYON_GENDER.bodySexHelp}</p>
+              </div>
+            )}
 
             {base === 'avatar' && (
               <div>
@@ -190,11 +226,18 @@ export default function TryOn() {
           {/* Garment picker */}
           <div className="card">
             <h2 style={{ fontSize: 16, marginBottom: 12 }}>Kiyimlar</h2>
-            <div style={{ marginBottom: 12 }}>
-              <Segmented title={GARMENT_SETTINGS.genderTitle} value={gender} options={GENDER_FILTER} onChange={setGender} />
+            <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <p style={{ fontSize: 12, color: 'var(--muted)' }}>
+                {baseSex ? TRYON_GENDER.filteredFor(SEX_LABELS[baseSex]) : TRYON_GENDER.pickBaseFirst}
+              </p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)}
+                  style={{ accentColor: 'var(--accent)' }} />
+                {TRYON_GENDER.showAll}
+              </label>
             </div>
-            {garments.length === 0 && gender !== 'all' ? (
-              <p style={{ color: 'var(--muted)', fontSize: 13 }}>Bu tanlov boʻyicha kiyim yoʻq.</p>
+            {garments.length === 0 && baseSex && !showAll ? (
+              <p style={{ color: 'var(--muted)', fontSize: 13 }}>{TRYON_GENDER.noMatching}</p>
             ) : garments.length === 0 ? (
               <p style={{ color: 'var(--muted)', fontSize: 13 }}>
                 Hali kiyim yuklanmagan.{' '}
@@ -238,6 +281,11 @@ export default function TryOn() {
                         {g.ai_skipped && <DevAiWarning compact />}
                         <StatusChip status={g.type} />{' '}
                         <GenderBadge gender={g.gender} />
+                        {mismatched(g) && (
+                          <span className="gender-badge" data-mismatch="true" style={{ marginLeft: 6, color: 'var(--warning)' }}>
+                            {TRYON_GENDER.otherGender}
+                          </span>
+                        )}
                         {!hasLandmarks && (
                           <span style={{ fontSize: 11, color: 'var(--warning)', marginLeft: 6 }}>
                             Belgilar kerak

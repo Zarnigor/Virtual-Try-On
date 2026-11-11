@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { uploadBody } from '../api/bodies'
+import type { Sex } from '../api/types'
 import PhotoPicker from '../components/PhotoPicker'
+import { Segmented } from '../components/GarmentSettingsPanel'
+import { BODY_UPLOAD, SEX_LABELS } from '../locale/uz'
 
 export default function BodyUpload() {
   const navigate = useNavigate()
@@ -10,6 +13,7 @@ export default function BodyUpload() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [adult, setAdult] = useState(false)
+  const [sex, setSex] = useState<Sex | null>(null)
 
   const handleFile = (f: File) => {
     setFile(f)
@@ -19,10 +23,14 @@ export default function BodyUpload() {
 
   const handleUpload = async () => {
     if (!file || !adult) return
+    if (!sex) {
+      setError(BODY_UPLOAD.sexRequired)
+      return
+    }
     setLoading(true)
     setError('')
     try {
-      const { data } = await uploadBody(file, adult)
+      const { data } = await uploadBody(file, adult, sex)
       navigate('/body/waiting', { state: { jobId: data.job_id } })
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -60,6 +68,11 @@ export default function BodyUpload() {
         onClear={() => { setFile(null); setPreview(null) }}
       />
 
+      <div style={{ marginTop: 16 }}>
+        <Segmented<Sex> title={BODY_UPLOAD.sexTitle} value={sex ?? ''} options={SEX_LABELS} onChange={setSex} />
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>{BODY_UPLOAD.sexHelp}</p>
+      </div>
+
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16, cursor: 'pointer' }}>
         <input
           type="checkbox"
@@ -78,7 +91,7 @@ export default function BodyUpload() {
         <button
           className="btn btn-primary"
           onClick={handleUpload}
-          disabled={!file || !adult || loading}
+          disabled={!file || !adult || !sex || loading}
           style={{ flex: 1 }}
         >
           {loading ? 'Yuklanmoqda…' : 'Yuklash'}

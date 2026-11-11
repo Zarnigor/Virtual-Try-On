@@ -18,6 +18,8 @@ ERROR_CODES = {
     "IMAGE_TOO_SMALL": "Rasm juda kichik. Kamida 600px balandlikdagi rasm yuklang.",
     "BODY_EXISTS": "Tanangiz allaqachon saqlangan. Avval uni oʻchiring.",
     "BODY_NOT_FOUND": "Tana topilmadi.",
+    "BAD_SEX": "Jinsni tanlang: erkak yoki ayol.",
+    "SEX_ALREADY_SET": "Tananing jinsi allaqachon tanlangan. Oʻzgartirish uchun tanani oʻchirib, qayta yarating.",
     "BODY_CONFIRMED": "Tasdiqlangan tanani oʻzgartirib boʻlmaydi.",
     "MEASUREMENTS_LOCKED": "Oʻlchamlarni yiliga bir marta oʻzgartirish mumkin.",
     "AI_LIMIT": "Bugunlik tekshiruv limitiga yetdingiz. Ertaga qayta urinib koʻring.",
@@ -64,7 +66,7 @@ def _upload_body(request):
     if photo.content_type not in ("image/jpeg", "image/png"):
         return _err("BAD_FILE_TYPE", 400)
 
-    body = Body.objects.create(user=request.user, image=photo, landmarks={})
+    body = Body.objects.create(user=request.user, image=photo, landmarks={}, sex=s.validated_data["sex"])
 
     job = Job.objects.create(user=request.user, kind="body_validation", target_id=body.pk)
     run_body_validation.delay(job.pk)
@@ -73,6 +75,24 @@ def _upload_body(request):
         "body": BodySerializer(body, context={"request": request}).data,
         "job_id": job.pk,
     }, status=201)
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def set_body_sex(request):
+    """PATCH /api/body/sex/ {sex}: one-time choice for a body created before sex was required (sex is null).
+    Once set it does not change (409 SEX_ALREADY_SET): delete the body and create a new one instead."""
+    body = _own_body(request)
+    if body is None:
+        return _err("BODY_NOT_FOUND", 404)
+    sex = request.data.get("sex")
+    if sex not in dict(Body.SEX_CHOICES):
+        return _err("BAD_SEX", 400)
+    if body.sex is not None:
+        return _err("SEX_ALREADY_SET", 409)
+    body.sex = sex
+    body.save(update_fields=["sex"])
+    return Response(BodySerializer(body, context={"request": request}).data)
 
 
 @api_view(["POST"])

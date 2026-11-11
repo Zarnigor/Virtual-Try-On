@@ -1,6 +1,6 @@
 import client from './client'
 import type {
-  Garment, GarmentGender, GarmentLandmarks, GarmentLandmarksResponse, GarmentScope, GarmentSettings, GarmentType,
+  ForSex, Garment, GarmentGender, GarmentLandmarks, GarmentLandmarksResponse, GarmentScope, GarmentSettings, GarmentType,
   GarmentUploadResponse, Visibility,
 } from './types'
 
@@ -16,9 +16,13 @@ export const uploadGarment = (photo: File, type: GarmentType, name = '') => {
   })
 }
 
-/** gender: female / male also return unisex garments. */
-export const listGarments = (scope: GarmentScope = 'mine', type?: GarmentType, gender?: GarmentGender) =>
-  client.get<Garment[]>('/api/garments/', { params: { scope, type, gender } })
+/** gender: female / male also return unisex garments. forSex: the try-on rule (male / female + unisex; all = off). */
+export const listGarments = (
+  scope: GarmentScope = 'mine', type?: GarmentType, gender?: GarmentGender, forSex?: ForSex,
+) => client.get<Garment[]>('/api/garments/', { params: { scope, type, gender, for_sex: forSex } })
+
+/** docs/09 #97: unisex always fits; otherwise the garment gender must equal the base sex. */
+export const garmentFitsSex = (gender: GarmentGender, sex: 'male' | 'female') => gender === 'unisex' || gender === sex
 
 export const getGarment = (id: number) => client.get<Garment>(`/api/garments/${id}/`)
 

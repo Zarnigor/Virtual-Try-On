@@ -64,3 +64,24 @@ export const GARMENT_SETTINGS = {
   saveError: 'Saqlab boʻlmadi. Qayta urinib koʻring.',
 } as const
 
+/** Garment gender in try-on (docs/09 #97): male base -> male + unisex, female base -> female + unisex. */
+export const SEX_LABELS = { male: 'Erkak', female: 'Ayol' } as const
+
+export const TRYON_GENDER = {
+  showAll: 'Barcha kiyimlarni koʻrsatish',
+  otherGender: 'Boshqa jins uchun',
+  filteredFor: (sex: string) => `${sex} uchun mos kiyimlar (va uniseks)`,
+  pickBaseFirst: 'Avval asos tanlang: kiyimlar unga mos ravishda saralanadi.',
+  mismatch: 'Tanlangan kiyim boshqa jins uchun moʻljallangan. Mos kiyim yoki boshqa asos tanlang.',
+  bodySexTitle: 'Tanangiz jinsi',
+  bodySexHelp: 'Kiyimlarni saralash uchun bir marta tanlang. Keyin oʻzgartirib boʻlmaydi.',
+  bodySexRequired: 'Avval tanangiz jinsini tanlang.',
+  noMatching: 'Bu asos uchun mos kiyim yoʻq.',
+} as const
+
+export const BODY_UPLOAD = {
+  sexTitle: 'Jinsingiz',
+  sexHelp: 'Kiyimlar shunga qarab saralanadi. Keyin oʻzgartirib boʻlmaydi.',
+  sexRequired: 'Jinsingizni tanlang.',
+} as const
+

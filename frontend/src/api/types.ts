@@ -145,6 +145,8 @@ export interface Body {
   id: number
   /** Normalized 600x1200 image. */
   image_url: string | null
+  /** Chosen at upload. null only on bodies created before it was required: ask once (PATCH body/sex/). */
+  sex: Sex | null
   /** Empty object until confirmed (or until auto-detection fills it). */
   landmarks: Partial<BodyLandmarks>
   height_cm: number | null
@@ -295,3 +297,15 @@ export interface Outfit {
   realistic_url: string | null
   created_at: string
 }
+
+/** POST tryon/ 400: garment gender does not match the base (docs/09 #97). */
+export interface GenderMismatchError {
+  code: 'GENDER_MISMATCH'
+  detail: string
+  garment_id: number
+  garment_gender: GarmentGender
+  base_sex: Sex
+}
+
+/** GET garments/?for_sex=: male / female also return unisex; all = no filter. */
+export type ForSex = Sex | 'all'

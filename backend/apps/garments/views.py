@@ -20,13 +20,17 @@ def _visible_to(user):
 @api_view(["GET", "POST"])
 @permission_classes([IsAuthenticated])
 def garments_root(request):
-    """GET /api/garments/?scope=mine|catalog&type=  |  POST /api/garments/ (multipart upload)."""
+    """GET /api/garments/?scope=mine|catalog|all&type=&gender=&for_sex=male|female|all&avatar_id=  |
+    POST /api/garments/ (multipart upload).
+    for_sex (try-on rule, docs/09 #97): male -> male + unisex, female -> female + unisex, all -> no filter. Without
+    for_sex, scope=catalog defaults to the sex of avatar_id (if given) or of the user's own body (if it has one)."""
     if request.method == "POST":
         return _upload_garment(request)
 
     scope = request.query_params.get("scope", "mine")
     gtype = request.query_params.get("type")
     gender = request.query_params.get("gender")
+    for_sex = request.query_params.get("for_sex")
 
     if scope == "mine":
         qs = Garment.objects.filter(owner=request.user)
@@ -41,9 +45,28 @@ def garments_root(request):
         qs = qs.filter(gender__in=[gender, "unisex"])
     elif gender == "unisex":
         qs = qs.filter(gender="unisex")
+    if for_sex is None and scope == "catalog":
+        for_sex = _default_sex(request)
+    if for_sex in ("female", "male"):
+        qs = qs.filter(gender__in=[for_sex, "unisex"])
+    elif for_sex not in (None, "all"):
+        return Response({"code": "BAD_SEX", "detail": "for_sex: male, female yoki all."}, status=400)
 
     qs = qs.order_by("-created_at")
     return Response(GarmentSerializer(qs, many=True, context={"request": request}).data)
+
+
+def _default_sex(request):
+    """Catalog default: the sex of ?avatar_id= if given, else of the user's own body; None when unknown."""
+    from apps.avatars.models import Avatar
+    from apps.bodies.models import Body
+    avatar_id = request.query_params.get("avatar_id")
+    if avatar_id and str(avatar_id).isdigit():
+        avatar = Avatar.objects.filter(pk=int(avatar_id)).first()
+        if avatar is not None:
+            return avatar.sex
+    body = Body.objects.filter(user=request.user).first()
+    return body.sex if body is not None else None
 
 
 def _upload_garment(request):

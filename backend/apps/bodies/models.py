@@ -10,7 +10,12 @@ class Body(models.Model):
         on_delete=models.CASCADE,
         related_name="body",
     )
+    SEX_CHOICES = [("male", "Male"), ("female", "Female")]
+
     image = models.ImageField(upload_to="bodies/")
+    # Chosen by the user at upload (required there). Null only on bodies created before 2026-11-11: the UI asks
+    # for a one-time re-choice (PATCH body/sex/), never guessed. Try-on uses it for the garment gender rule.
+    sex = models.CharField(max_length=10, choices=SEX_CHOICES, null=True, blank=True)
     landmarks = models.JSONField(default=dict)
     height_cm = models.FloatField(null=True, blank=True)
     measurements = models.JSONField(null=True, blank=True)
