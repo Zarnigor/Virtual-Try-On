@@ -458,3 +458,47 @@ With the old marking (shoulder inside the chest width) preset A leaves a bare-sh
 Evidence: `tools/warp-benchmark/out/sheet_shoulder_slope.png` (column A), round 5 table above: bare shoulders 0-3 px,
 fold 0-0.07 %, print distortion 0.021-0.029 (#44). Known cost: the garment's own sloped top sits above the body's
 shoulder line (excess 1000-3700 px, a natural dropped-shoulder look). Hem: benchmark assumption, still open (docs/09).
+
+### MLS benchmark, round 6: fitted T-shirts, sleeves/hem/coverage and fit strength k (2026-11-11, NOT production)
+`tools/warp-benchmark/mls_fitted.py` (retarget hook on `mls_landmarks.warp`), runner `run_fitted.py`
+(`out/results6.json`). #28, #43, #40 re-exported from the DB (re-marked). 6 avatars. #28 chest above armpit: chest not
+used. Before = round-2 MLS (k 1.0, no retargeting) on the same landmarks.
+Changes: (1) cuff width = min(garment cuff width x torso ratio, perpendicular arm width x 1.1), cuff centre on the arm
+centre line (fitted through the first 20 separated arm rows and extrapolated up: short sleeves end above the row where
+the arm separates from the torso in the mask), cuff line perpendicular to the arm; (2) so the inner/outer corners land
+on (or 5 % past) the arm's edges; (3) hem x = torso silhouette at hem_y + 2 % (landmark span when the run merges with
+the arms) and a hem centre pair `hem_c`; (4) shoulder target moved out to the acromion (outer silhouette edge 4 px
+below the shoulder line) when it is further out; (5) after the 2 px erosion, alpha < 0.9 is removed (no soft specks).
+Per-point k: neck and shoulder 1.0, armpit/chest/waist/hem/cuff = the run's k.
+New metrics (`coverage_metrics`): uncovered body px (shoulder line -> hem row, arms beyond the cuff excluded), excess px
+(garment outside the silhouette dilated by 2 % of the shoulder width), sleeve-torso gap px (below the armpit), hem
+curvature (max deviation of the bottom edge from a straight line, central 90 %).
+
+Means over the 6 avatars (ranges in `results6.json`):
+| garment | run | uncovered | excess | gap | hem curve px | fold | runtime |
+|---|---|---|---|---|---|---|---|
+| #28 | before k 1.0 | 6255 | 1189 | 324 | 2.7-23.5 | 0-0.27 % | 0.06-0.07 s |
+| #28 | after k 1.0 | 6149 | 186 | 334 | 4.0-12.8 | 0-0.56 % | 0.08 s |
+| #28 | after k 0.7 | 6798 | 145 | 281 | 3.0-7.0 | 0-0.01 % | 0.08 s |
+| #28 | after k 0.5 | 7297 | 151 | 250 | 3.0-4.0 | 0 % | 0.08-0.09 s |
+| #43 | before k 1.0 | 10226 | 568 | 1316 | 12.0-31.6 | 0-0.50 % | 0.06-0.07 s |
+| #43 | after k 1.0 | 9523 | 52 | 1224 | 7.5-17.8 | 0.03-0.64 % | 0.08-0.09 s |
+| #43 | after k 0.7 | 8897 | 57 | 417 | 6.9-9.0 | 0-0.22 % | 0.08-0.09 s |
+| #43 | after k 0.5 | 8542 | 95 | 211 | 6.0-7.6 | 0-0.04 % | 0.08-0.09 s |
+| #40 | before k 1.0 | 5554 | 2374 | 993 | 2.0-18.6 | 0.18-0.92 % | 0.07 s |
+| #40 | after k 1.0 | 5824 | 1288 | 493 | 4.0-10.0 | 0.42-1.43 % | 0.08-0.09 s |
+| #40 | after k 0.7 | 4819 | 1323 | 58 | 3.0-7.0 | 0.11-0.69 % | 0.08-0.09 s |
+| #40 | after k 0.5 | 4193 | 1841 | 19 | 3.0-5.8 | 0.01-0.30 % | 0.08-0.09 s |
+Floating components 0 (two runs: 2 and 9 px). Local scale extremes stay at the armpit / sleeve-torso junction and the
+chest rows; p99 drops with k (#28 2.2-4.4 at k 1.0 -> 1.3-1.8 at k 0.5).
+- Fixed: sleeves no longer flare past the arm (excess down 3-10x on #28/#43), hem much straighter (worst 31.6 -> 17.8
+  px at k 1.0, <= 9 px at k 0.7/0.5), no soft specks. Lower k closes the sleeve-torso slit (#40 gap 493 -> 19).
+- Still wrong: the body (the avatar's own grey top) shows beside the torso from the armpit to the hem on every avatar,
+  worst on the plus avatars (uncovered 14-18k px; worst crop `out/crop_fitted_worst.png`, #43 k 0.5 female plus): the
+  torso side targets sit ON the body edge (no ease) and a lower k pulls them back to the garment's own narrower width,
+  so uncovered rises as k falls on #28/#43. A notch remains at the armpit (#43). #40's puffed sleeve caps at k 1.0.
+  Synthetic check: a long hem with three hem points still waves between them (16.5 vs 38.6 px before).
+- k is NOT decided (owner picks by eye): k 1.0 follows the body but keeps the slit; k 0.5 has the cleanest sleeves and
+  hem but uncovers more of a larger body.
+Sheets: `out/sheet_fitted_k1_before_after.png` (left 6 columns before, right 6 after, k 1.0), `out/sheet_fitted_k.png`
+(k 1.0 | 0.7 | 0.5 x male slim, male plus, female slim).

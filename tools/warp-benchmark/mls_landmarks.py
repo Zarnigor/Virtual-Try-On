@@ -113,14 +113,16 @@ def body_slope_point(mask, blm, side):
 
 
 def control_points(glm, blm, mask, k=1.0, k_map=None, alpha=None, slope_pair=False, align_tweak=False,
-                   align_out=None):
+                   align_out=None, retarget=None):
     """(pairs {name: (q garment, p target, weight)}, rejected [names], s). k_map: per-point, per-axis k
     (`k_of`); k is the default for every group k_map does not name.
     Round 4 (bare-shoulder fix, docs/06), both need `alpha` (garment alpha > 128):
     slope_pair: one extra pair per side `slope_l|r`: garment top edge at SLOPE_AT collar -> shoulder ->
     `body_slope_point`, k 1.0. align_tweak: uniform scale x ALIGN_SCALE_UP, then the alignment moves up (never
     down) until the aligned garment top edge at the slope point is not below `body_slope_point` (both sides).
-    align_out: dict that receives {"s", "dy"} of the alignment (the neck opening uses it)."""
+    align_out: dict that receives {"s", "dy"} of the alignment (the neck opening uses it).
+    retarget: optional callable(pairs, ctx) that changes/adds pairs (in place) before validation (round 6,
+    mls_fitted.py); ctx = {"fit", "aligned", "s", "hem_y", "mask", "glm", "blm", "rejected"}."""
     g_sl, g_sr, g_sy = _f(glm["shoulder"]["left_x"]), _f(glm["shoulder"]["right_x"]), _f(glm["shoulder"]["y"])
     a_sl, a_sr, a_sy = _f(blm["shoulder"]["left_x"]), _f(blm["shoulder"]["right_x"]), _f(blm["shoulder"]["y"])
     s = (a_sr - a_sl) / (g_sr - g_sl)
@@ -190,6 +192,9 @@ def control_points(glm, blm, mask, k=1.0, k_map=None, alpha=None, slope_pair=Fal
             if side in slope:
                 q, b = slope[side]
                 pairs["slope" + sx] = (q, tuple(b), 1.0)  # k 1.0 always: the target IS the body point
+    if retarget is not None:
+        retarget(pairs, {"fit": fit, "aligned": aligned, "s": s, "hem_y": hem_y, "mask": mask, "glm": glm,
+                         "blm": blm, "rejected": rejected})
     rejected += mls.drop_crossing_chest(pairs, glm)
     rejected += mls.validate(pairs)
     rejected += validate_slope(pairs)
@@ -220,7 +225,7 @@ def validate_slope(pairs):
 
 
 def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1.0, base=None, info=None,
-         k_map=None, slope_pair=False, align_tweak=False):
+         k_map=None, slope_pair=False, align_tweak=False, retarget=None):
     t0 = time.perf_counter()
     info = {} if info is None else info
     W, H = out_size
@@ -232,7 +237,8 @@ def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1
         return None
     al = {}
     pairs, rejected, s = control_points(garment_lm, body_lm, mask, k, k_map, alpha=img[:, :, 3] > 128,
-                                        slope_pair=slope_pair, align_tweak=align_tweak, align_out=al)
+                                        slope_pair=slope_pair, align_tweak=align_tweak, align_out=al,
+                                        retarget=retarget)
     names = list(pairs)
     q = np.array([pairs[n][0] for n in names], float) * s
     p = np.array([pairs[n][1] for n in names], float)

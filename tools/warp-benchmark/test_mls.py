@@ -208,5 +208,51 @@ class ShoulderSlopeTests(unittest.TestCase):
         self.assertGreater(ml.excess_px(layer, mask, blm), 100)
 
 
+def ml_warp_plain(img, glm, blm, base, info):
+    import mls_landmarks as ml
+    return ml.warp(img, glm, blm, base=base, info=info)
+
+
+class FittedTests(unittest.TestCase):
+    """Round 6 (mls_fitted): cuffs on the arm, hem from the silhouette + centre, acromion, hard edge, metrics."""
+    full = LandmarkMlsTests.full
+
+    def test_k_map_anchors_neck_and_shoulder(self):
+        import mls_fitted as mf
+        km = mf.k_map_for(0.5)
+        self.assertEqual((km["neck"], km["shoulder"]), (1.0, 1.0))
+        self.assertEqual({km[g] for g in ("armpit", "chest", "waist", "hem", "cuff")}, {0.5})
+
+    def test_arm_centre_is_extrapolated_above_the_separated_rows(self):
+        import mls_fitted as mf
+        rows = [(400 + i, 150 - 0.5 * i, 180 - 0.5 * i) for i in range(20)]
+        c, w = mf._arm_at({"left": {"rows": rows}}, "left", 380)
+        self.assertAlmostEqual(c, 175.0)
+        self.assertAlmostEqual(w, 30.0)
+        self.assertIsNone(mf._arm_at({"left": {"rows": rows[:3]}}, "left", 380))
+
+    def test_fitted_warp_hard_edge_hem_centre_and_cuffs_on_the_arm(self):
+        import mls_fitted as mf
+        base, blm = avatar()
+        img, glm = self.full()
+        info = {}
+        layer = mf.warp(img, glm, blm, base=base, info=info)
+        a = layer[:, :, 3]
+        self.assertFalse(((a > 0) & (a < mf.HARD_EDGE)).any())  # no soft specks
+        self.assertIn("hem_c", info["pairs"])
+        hl, hc, hr = (info["pairs"][n][1] for n in ("hem_l", "hem_c", "hem_r"))
+        self.assertAlmostEqual(hc[1], hl[1])
+        self.assertTrue(hl[0] < hc[0] < hr[0])
+        mask = prod.figure_mask(base)
+        w_cuff = np.linalg.norm(np.subtract(info["pairs"]["cuff_out_l"][1], info["pairs"]["cuff_in_l"][1]))
+        arm = mf._arm_at(prod.find_arms(mask, blm), "left", info["pairs"]["cuff_out_l"][1][1])
+        self.assertLessEqual(w_cuff, arm[1] * mf.CUFF_ARM_EASE + 1e-6)  # never wider than the arm + ease
+        m = mf.coverage_metrics(layer, mask, info, blm)
+        self.assertEqual(set(m), {"uncovered_px", "excess_px", "gap_px", "hem_curve_px"})
+        plain = {}
+        before = mf.coverage_metrics(ml_warp_plain(img, glm, blm, base, plain), mask, plain, blm)
+        self.assertLess(m["hem_curve_px"], before["hem_curve_px"] / 2)  # 3 hem points: about half the sag
+
+
 if __name__ == "__main__":
     unittest.main()
