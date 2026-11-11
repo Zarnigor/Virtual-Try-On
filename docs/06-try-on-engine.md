@@ -277,3 +277,29 @@ head/neck edge and (neck-gap fill) a thin strip of the avatar's own tank collar 
   a scoop neckline instead of its V. Garments whose inner back is as bright as the ring (white shirts without shading)
   keep the old look (a flat patch under the chin). `TRYON_NECK_FIX=0` restores the previous behaviour.
 
+### MLS single-field benchmark (2026-11-11, `tools/warp-benchmark/`, NOT the production path)
+Method: the whole T-shirt warped by ONE rigid MLS field (Schaefer et al. 2006), inverse: control points p = body,
+q = garment, f(v) = R(v - p*) + q* with the weighted best rotation; garment points pre-scaled by the shoulder-width
+ratio (rigid MLS has no scale). Field on a 1/4-resolution grid, upsampled, one `cv2.remap`; alpha 1.0 and 1.5. No
+torso/sleeve/cap parts, no fills. Pairs: neck (collar edges + bottom centre, auto, weight 5, targets by the uniform
+scale), shoulder seam -> shoulder, armpit (auto: deepest outline convexity defect) -> armpit, chest/waist edges, hem
+(rule in docs/09 "Still open"), 2 cuff corners per sleeve (auto) -> along the arm direction (shoulder -> arm centre
+at armpit + 10 % of the figure height), length and width by the torso ratios. Pairs breaking the row or left/right
+order are rejected. Then the edge fix once on the outer contour and the production neck/head and hands overlays.
+Run: `tools/warp-benchmark/run.py` (sheets `out/sheet_mls.png`, `out/sheet_production.png`, `out/results.json`).
+
+Results (6 avatars):
+- **Garments skipped**: the sky-blue V-neck #39, #36 and #17. Their neckline cannot be auto-detected: the alpha
+  outline has a flat top and no darker inner back (centre-column colour distance to the fabric <= 5 on #36, noisy
+  10-20 on #39/#17). No values were invented. Only #28 (black, crew neck with a darker inner back) ran.
+- #28 auto: neck crew (inner back), armpits at garment y 166/174 (the sleeves hang joined below the real underarm),
+  cuffs auto. The chest pairs were rejected by the order check (garment chest y 122 is above those armpits).
+- Fold ratio (inverse Jacobian det < 0, garment pixels): alpha 1.0: 0.1-0.6 %; alpha 1.5: 2.7-4.5 %. Local scale
+  p1..p99: about 0.4-0.7 .. 6.5-11.8 (alpha 1.0); the extremes are at the underarm / sleeve-torso junction.
+- Pixels above the shoulder slope line outside the shoulder +4 px: 0 everywhere. Floating components: 0 (alpha 1.0);
+  11 px on female plus at alpha 1.5. Runtime 0.06-0.07 s per render (target < 2 s).
+- Looks: no shoulder pad, but the sleeves flare out horizontally like bat wings (the cuff targets pull the sleeve,
+  the torso points pull the side, nothing holds the region between), the outer shoulder/deltoid is bare above the
+  sleeve on most avatars, crescent holes at both underarms, the torso sides pinch in below the armpit so the avatar's
+  grey top shows, and the hem is curved. Production is clearly better on #28 on all 6 avatars.
+

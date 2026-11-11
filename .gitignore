@@ -12,6 +12,8 @@ test-garments/
 
 # try-on check output (tools/tryon_check/run.py)
 tools/tryon_check/out/
+# MLS benchmark output (avatar photos, tools/warp-benchmark/run.py)
+tools/warp-benchmark/out/
 
 # real avatar photos (never committed)
 /avatars/
