@@ -20,7 +20,8 @@ but the frontend must fully work too (React is required). The owner works and re
 - Stack: React + TypeScript, Django + DRF, PostgreSQL, Celery + Redis, Docker Compose, OpenCV + rembg.
   Auth: email + password only (no Google sign-in). Image model: **Nano Banana 2 (standard)** via the official Gemini API.
 - **Garment fit is per garment** (`fit_mode`: `adapt` default | `keep_shape`, docs/09 #93); `gender` female|male|unisex.
-  Garment real size is NOT entered. No tight/loose fit label. Engine treats keep_shape as adapt until the MLS benchmark.
+  Garment real size is NOT entered. No tight/loose fit label. **keep_shape = MLS per-point k preset A** (docs/09 #96,
+  shoulder_* marked at the sleeve seam); engine still treats keep_shape as adapt until the wiring (planned `TRYON_WARP`).
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
 - Garment AI cleaning (hanger/background removal, prompt 04) is in P0 but **off for now** (`AI_CLEANING_ENABLED=0`, no prepaid
   image credits, docs/09 #55): garments are cleaned by rembg only.

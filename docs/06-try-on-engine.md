@@ -5,7 +5,8 @@ This is a proposal; confirm the approach with the owner before building.
 **MVP scope: T-shirt (short sleeve) + pants.** The body photo is taken in a short-sleeved or sleeveless top and
 shorts/tight leggings, so no old sleeves or trouser legs show around the new garment.
 **The garment adapts to the body** per its `fit_mode` (docs/09 #93): `adapt` is what the engine does; `keep_shape`
-is accepted (`render_tryon(fit_modes=...)`) but warped like `adapt` until the MLS benchmark decides the method. There
+is accepted (`render_tryon(fit_modes=...)`) but warped like `adapt` until the engine wiring lands. **Decided
+2026-11-11 (docs/09 #96): `keep_shape` = MLS preset A** (see "keep_shape decision" at the end of this file). There
 is no size-mismatch display and no fit label.
 
 Inputs: body (image + landmarks + optional height_cm) or avatar (image + landmarks + required measurements),
@@ -438,3 +439,22 @@ torso near the shoulder (0.24-0.30). Scale < 1 = the large garment photos are sh
 - Specks (violet/grey dots at the old shoulder-gap edges on #44): garment edge pixels with partial alpha 87-173 left by
   the 2 px edge fix, blended over skin/white. Not alpha holes (#44 has none) and not the avatar's photo edge.
 Sheet `out/sheet_shoulder_slope.png` (rows #44, #45; k1.0 | A | V1 | V2 | V3 x male slim, male plus, female slim).
+
+### keep_shape decision (owner, 2026-11-11, docs/09 #96)
+`fit_mode = keep_shape` = the single-field rigid MLS warp (`tools/warp-benchmark/mls_landmarks.py`) with the per-point,
+per-axis fit strength **preset A**: target = aligned point + k x (body point - aligned point), alignment = one uniform
+scale (shoulder widths) + translation (shoulder-line centres).
+| group | k |
+|---|---|
+| neck (collar_left/right, collar_bottom) | 1.0 (anchors: target = alignment) |
+| shoulder | x 0.5, y 1.0 |
+| armpit, chest, waist | 0.3 |
+| hem | x 0.3, y 0.5 |
+| sleeve cuffs (outer, inner; arm-direction targets) | 0.3 |
+`adapt` = k 1.0 everywhere (unchanged). No shoulder_slope pair, no alignment tweak (rejected, docs/09 "Rejected").
+**Landmark requirement:** `shoulder_*` marked at the sleeve seam (on dropped shoulders: where the sleeve starts, out on
+the arm), collar points present; a chest above the armpit is allowed (warning only) and its pair is not used.
+With the old marking (shoulder inside the chest width) preset A leaves a bare-shoulder triangle (round 3/4).
+Evidence: `tools/warp-benchmark/out/sheet_shoulder_slope.png` (column A), round 5 table above: bare shoulders 0-3 px,
+fold 0-0.07 %, print distortion 0.021-0.029 (#44). Known cost: the garment's own sloped top sits above the body's
+shoulder line (excess 1000-3700 px, a natural dropped-shoulder look). Hem: benchmark assumption, still open (docs/09).

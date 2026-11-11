@@ -14,6 +14,9 @@ behind signed URLs (assumption; S3-compatible later).
 - **Garment**: owner (FK, null for admin catalog), type (`tshirt` | `pants`), image (cleaned transparent PNG),
   landmarks (JSON), visibility (private|public), status (pending|approved|review|hidden),
   fit_mode (adapt|keep_shape, default adapt), gender (female|male|unisex, default unisex), created_at.
+  Engine mapping (docs/09 #96): `adapt` = full fit (k 1.0); `keep_shape` = MLS per-point fit strength preset A
+  (docs/06 "keep_shape decision"). The engine wiring is a separate task, behind the planned flag `TRYON_WARP`
+  (not built yet); until then `render_tryon` warps keep_shape like adapt.
   No image update. The original upload is deleted after cleaning. No garment real-size field.
 - **Outfit**: owner, body (FK) or avatar (FK), garments (M2M), result_image, realistic_image (nullable), created_at
 - **Report**: garment, reporter, reason; unique (garment, reporter)

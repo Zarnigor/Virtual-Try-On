@@ -29,15 +29,16 @@ _(none blocking P0)_
   body's waist half-width (at least the hip half-width). Used only to compare methods; the warp method (production
   row warp + rigid sleeves vs MLS) stays the owner's choice. The production hem rule itself is #91 (proposed).
   Round 2 (marked landmarks + fit strength k, docs/06) uses the same hem assumption; still not a decision.
-- **`keep_shape` = per-point fit strength is a benchmark proposal (2026-11-11, not a decision):** docs/06 round 3,
-  presets A and B. How the engine maps `fit_mode` (#93) to k, and the exact k values, are NOT decided; the method and
-  preset choice stay with the owner. Measured on #44 only (#45 has no collar): A/B fix the hourglass and the squeezed
-  print but not the bare shoulders (docs/06 round 3).
-- **shoulder_slope pair + alignment tweak is a benchmark proposal (2026-11-11, not a decision):** docs/06 round 4.
-  V3 (both) closes most of the bare-shoulder triangle on #44 at the cost of 73-187 px of garment above the shoulder;
-  male plus is not closed. Whether to use it, the 50 % point, the 1.05 scale and the raise rule are NOT decided.
-  Round 5 (2026-11-11, re-marked shoulder_* at the sleeve seam): plain preset A already closes the gap (0-3 px);
-  the slope pair (V1) halves the garment-above-shoulder excess. Still a proposal; the method choice stays with the owner.
+
+## Rejected
+- **shoulder_slope pair (V1), alignment tweak (V2), both (V3)** for `keep_shape` (rejected by the owner 2026-11-11,
+  #96): they raise the garment top edge towards the jaw on male plus and add nothing over preset A once the shoulder
+  points are marked at the sleeve seam. Kept in `tools/warp-benchmark/` for reference only. Former proposal:
+  - **shoulder_slope pair + alignment tweak is a benchmark proposal (2026-11-11, not a decision):** docs/06 round 4.
+    V3 (both) closes most of the bare-shoulder triangle on #44 at the cost of 73-187 px of garment above the shoulder;
+    male plus is not closed. Whether to use it, the 50 % point, the 1.05 scale and the raise rule are NOT decided.
+    Round 5 (2026-11-11, re-marked shoulder_* at the sleeve seam): plain preset A already closes the gap (0-3 px);
+    the slope pair (V1) halves the garment-above-shoulder excess. Still a proposal; the method choice stays with the owner.
 
 ## Decided 2026-11-07
 12. **Body AI validation (prompt 02): P0.** Confirmed by owner.
@@ -377,3 +378,10 @@ _(none blocking P0)_
     armpit gives the warning `chest_above_armpit` (client + server), never an error. The keep_shape benchmark
     (`run_keep_shape.py`) no longer refuses such garments: the chest pair is not used, reported as "chest not used".
 
+## Decided 2026-11-11: oversized garments, keep_shape = preset A (owner decision)
+96. **2026-11-11: `fit_mode = keep_shape` = per-point fit strength preset A** (docs/06 "keep_shape decision"; benchmark
+    commit 4b6ffbe, round 5 variant 0): neck 1.0; shoulder x 0.5, y 1.0; armpit, chest, waist 0.3; hem x 0.3, y 0.5;
+    sleeve cuffs 0.3, on the single-field rigid MLS warp, computed with the re-marked landmarks: `shoulder_*` at the
+    sleeve seam, collar points present, chest pair not used when the chest is above the armpit (#94, #95).
+    `adapt` = k 1.0 (unchanged). Rejected: shoulder_slope pair, alignment tweak and both (see "Rejected"). Engine
+    wiring is a separate task (docs/04). The hem rule stays open (benchmark assumption, "Still open").
