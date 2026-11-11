@@ -123,5 +123,48 @@ class LandmarkMlsTests(unittest.TestCase):
         self.assertEqual(layer.shape, (1200, 600, 4))
 
 
+class KeepShapeTests(unittest.TestCase):
+    """Round 3: per-point, per-axis k (k_map), bare-shoulder and print-distortion metrics."""
+    full = LandmarkMlsTests.full
+
+    def test_k_map_is_per_point_and_per_axis_and_falls_back_to_k(self):
+        import mls_landmarks as ml
+        base, blm = avatar()
+        img, glm = self.full()
+        mask = prod.figure_mask(base)
+        p0, _, s = ml.control_points(glm, blm, mask, k=0.0)
+        p1, _, _ = ml.control_points(glm, blm, mask, k=1.0)
+        pa, _, _ = ml.control_points(glm, blm, mask, k_map=ml.PRESETS["A"])
+        a0, a1, got = (np.array(p["shoulder_l"][1]) for p in (p0, p1, pa))
+        self.assertTrue(np.allclose(got, a0 + np.array([0.5, 1.0]) * (a1 - a0)))  # shoulder x 0.5, y 1.0
+        a0, a1, got = (np.array(p["waist_l"][1]) for p in (p0, p1, pa))
+        self.assertTrue(np.allclose(got, a0 + 0.3 * (a1 - a0)))
+        self.assertEqual(ml.k_of({"chest": 0.3}, "waist", 0.7), (0.7, 0.7))  # unnamed group -> k
+        self.assertEqual(pa["neck_c"][1], p1["neck_c"][1])
+
+    def test_bare_shoulder_counts_uncovered_figure_pixels_in_the_band(self):
+        import mls_landmarks as ml
+        base, blm = avatar()
+        mask = prod.figure_mask(base)
+        info = {"pairs": {"neck_l": (None, (270.0, 250.0), 5.0), "neck_r": (None, (330.0, 250.0), 5.0)}}
+        covered = np.zeros((1200, 600, 4), np.uint8)
+        covered[:, :, 3] = 255
+        self.assertEqual(ml.bare_shoulder_px(covered, mask, info, blm), 0)
+        self.assertGreater(ml.bare_shoulder_px(np.zeros_like(covered), mask, info, blm), 500)
+
+    def test_print_distortion_is_zero_for_a_uniform_move(self):
+        import mls_landmarks as ml
+        img = np.zeros((200, 200, 4), np.uint8)
+        img[:, :] = (40, 160, 40, 255)
+        img[60:140, 50:150] = (230, 230, 230, 255)
+        box = ml.print_bbox(img)
+        self.assertEqual(box, (50, 60, 149, 139))
+        yy, xx = np.mgrid[0:300, 0:300].astype(np.float32)
+        layer = np.zeros((300, 300, 4), np.uint8)
+        layer[:, :, 3] = 255
+        self.assertEqual(ml.print_distortion(layer, {"map": (xx / 1.5, yy / 1.5)}, box), 0.0)
+        self.assertGreater(ml.print_distortion(layer, {"map": (xx ** 1.3 / 6, yy / 1.5)}, box), 0.05)
+
+
 if __name__ == "__main__":
     unittest.main()

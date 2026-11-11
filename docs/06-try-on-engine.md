@@ -346,3 +346,23 @@ Results (6 avatars: male + female slim/average/plus; alpha 1.0, k 1.0 unless not
   follows the body (bare skin at the top of the shoulders on female slim, wider than the body everywhere). A per-
   garment k (keep_shape ~ 0.5, adapt 1.0) is an option for docs/09 #93, the owner's choice.
 Sheets: `out/sheet_mls_k1.png`, `out/sheet_production.png` (same layout), `out/sheet_k05_vs_k1.png`.
+
+### MLS single-field benchmark, round 3: `keep_shape` proposal = per-point fit strength (2026-11-11, NOT production)
+`mls_landmarks.warp(..., k_map=...)`: the single k becomes a per-point, per-axis k. Same alignment (uniform scale +
+translation) and pair names; target = aligned point + (kx, ky) * (body point - aligned point). `k_map` = group ->
+number or `{"x", "y"}`; groups neck, shoulder, armpit, chest, waist, hem, cuff (both cuff corners; their derived
+arm-direction targets are kept, only weighted by k); an unnamed group uses `k`. Neck targets are the alignment itself,
+so their k has no effect. Presets (`mls_landmarks.PRESETS`):
+- **A**: neck 1.0; shoulder x 0.5, y 1.0; armpit, chest, waist 0.3; hem x 0.3, y 0.5; cuff 0.3.
+- **B**: as A with shoulder x 0.8; armpit, chest, waist 0.5; cuff 0.5.
+New metrics: `bare_shoulder_px` (figure pixels not covered by the garment in the band from the line collar edge target
+-> body shoulder point down 0.15 x shoulder width) and `print_distortion` (std / mean of the forward local area scale
+over the pixels sampled from the detected print box; #44 only). Runner `run_keep_shape.py` (k 1.0 | k 0.5 | A | B on
+all avatars, sheet `out/sheet_keep_shape.png`, crop `out/crop_keep_shape_worst.png`, `out/results3.json`).
+
+**Results: not run.** The input gate skipped both oversized garments (values are never invented):
+- #44: chest marked at y 205, above the armpit (y 318).
+- #45: no `collar` landmark; also chest y 322 above armpit y 476.
+Note: the gate "chest above armpit -> skip" conflicts with docs/09 #94 (oversized garments may have the armpit below the
+chest line; the warp drops the chest pair). With that gate, an oversized garment marked as #94 allows is never run.
+The method code and metrics are tested on synthetic data (`test_mls.py`).

@@ -42,6 +42,24 @@ REQUIRED = ("collar", "collar_bottom", "shoulder", "armpit", "chest", "waist", "
 _f = float
 
 
+# Per-point fit strength (round 3, keep_shape proposal, docs/06): group -> k or {"x": kx, "y": ky}. Groups: neck
+# (anchors: their target is the alignment itself, so k has no effect), shoulder, armpit, chest, waist, hem, cuff.
+PRESETS = {
+    "A": {"neck": 1.0, "shoulder": {"x": 0.5, "y": 1.0}, "armpit": 0.3, "chest": 0.3, "waist": 0.3,
+          "hem": {"x": 0.3, "y": 0.5}, "cuff": 0.3},
+    "B": {"neck": 1.0, "shoulder": {"x": 0.8, "y": 1.0}, "armpit": 0.5, "chest": 0.5, "waist": 0.5,
+          "hem": {"x": 0.3, "y": 0.5}, "cuff": 0.5},
+}
+
+
+def k_of(k_map, group, default=1.0):
+    """(kx, ky) of one group: k_map[group] as a number (both axes) or {"x", "y"}; missing -> default."""
+    v = (k_map or {}).get(group, default)
+    if isinstance(v, dict):
+        return float(v.get("x", default)), float(v.get("y", default))
+    return float(v), float(v)
+
+
 def missing_landmarks(glm: dict) -> list[str]:
     """Names of the required landmark groups that are absent or incomplete (never filled in)."""
     span = ("y", "left_x", "right_x")
@@ -60,14 +78,18 @@ def missing_landmarks(glm: dict) -> list[str]:
     return out
 
 
-def control_points(glm, blm, mask, k=1.0):
-    """(pairs {name: (q garment, p target, weight)}, rejected [names], s)."""
+def control_points(glm, blm, mask, k=1.0, k_map=None):
+    """(pairs {name: (q garment, p target, weight)}, rejected [names], s). k_map: per-point, per-axis k
+    (`k_of`); k is the default for every group k_map does not name."""
     g_sl, g_sr, g_sy = _f(glm["shoulder"]["left_x"]), _f(glm["shoulder"]["right_x"]), _f(glm["shoulder"]["y"])
     a_sl, a_sr, a_sy = _f(blm["shoulder"]["left_x"]), _f(blm["shoulder"]["right_x"]), _f(blm["shoulder"]["y"])
     s = (a_sr - a_sl) / (g_sr - g_sl)
     g_cx, a_cx = (g_sl + g_sr) / 2, (a_sl + a_sr) / 2
     aligned = lambda q: np.array([a_cx + (q[0] - g_cx) * s, a_sy + (q[1] - g_sy) * s])  # noqa: E731
-    fit = lambda q, b: tuple(aligned(q) + k * (np.asarray(b, float) - aligned(q)))  # noqa: E731
+    def fit(q, b, group):
+        kx, ky = k_of(k_map, group, k)
+        a = aligned(q)
+        return tuple(a + np.array([kx, ky]) * (np.asarray(b, float) - a))
     pairs, rejected = {}, []
 
     neck = ((_f(glm["collar"]["left_x"]), _f(glm["collar"]["y"])),
@@ -86,9 +108,9 @@ def control_points(glm, blm, mask, k=1.0):
     for side, sx in (("left", "_l"), ("right", "_r")):
         for r in ("shoulder", "armpit", "chest", "waist"):
             q = (_f(glm[r][f"{side}_x"]), _f(glm[r]["y"]))
-            pairs[r + sx] = (q, fit(q, (_f(blm[r][f"{side}_x"]), _f(blm[r]["y"]))), 1.0)
+            pairs[r + sx] = (q, fit(q, (_f(blm[r][f"{side}_x"]), _f(blm[r]["y"])), r), 1.0)
         q = (_f(glm["hem"][f"{side}_x"]), _f(glm["hem"]["y"]))
-        pairs["hem" + sx] = (q, fit(q, (b_hem_cx + (-hem_hw if side == "left" else hem_hw), hem_y)), 1.0)
+        pairs["hem" + sx] = (q, fit(q, (b_hem_cx + (-hem_hw if side == "left" else hem_hw), hem_y), "hem"), 1.0)
 
     g_len = _f(glm["hem"]["y"]) - g_sy
     b_len = hem_y - a_sy
@@ -108,14 +130,15 @@ def control_points(glm, blm, mask, k=1.0):
         perp = np.array([-d[1], d[0]])
         if (perp[0] > 0) != (side == "right"):  # outward = away from the body centre
             perp = -perp
-        pairs["cuff_out" + sx] = (tuple(out), fit(out, c + perp * w / 2), 1.0)
-        pairs["cuff_in" + sx] = (tuple(inn), fit(inn, c - perp * w / 2), 1.0)
+        pairs["cuff_out" + sx] = (tuple(out), fit(out, c + perp * w / 2, "cuff"), 1.0)
+        pairs["cuff_in" + sx] = (tuple(inn), fit(inn, c - perp * w / 2, "cuff"), 1.0)
     rejected += mls.drop_crossing_chest(pairs, glm)
     rejected += mls.validate(pairs)
     return pairs, rejected, s
 
 
-def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1.0, base=None, info=None):
+def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1.0, base=None, info=None,
+         k_map=None):
     t0 = time.perf_counter()
     info = {} if info is None else info
     W, H = out_size
@@ -125,7 +148,7 @@ def warp(garment_rgba, garment_lm, body_lm, out_size=(600, 1200), alpha=1.0, k=1
     if miss:
         info.update({"skipped": True, "missing": miss})
         return None
-    pairs, rejected, s = control_points(garment_lm, body_lm, mask, k)
+    pairs, rejected, s = control_points(garment_lm, body_lm, mask, k, k_map)
     names = list(pairs)
     q = np.array([pairs[n][0] for n in names], float) * s
     p = np.array([pairs[n][1] for n in names], float)
@@ -172,3 +195,60 @@ def scale_at(info, names):
         sv = np.linalg.svd(J, compute_uv=False)
         out[n] = (round(float(1 / max(sv[0], 1e-9)), 2), round(float(1 / max(sv[1], 1e-9)), 2))
     return out
+
+
+BARE_BAND = 0.15  # x body shoulder width: depth of the shoulder slope band below the collar -> shoulder line
+
+
+def bare_shoulder_px(layer, base_mask, info, body_lm):
+    """Figure pixels (skin or the avatar's own top) not covered by the garment (alpha < 128) inside the shoulder
+    slope band: per side between the collar edge target and the body shoulder point, from the line collar edge ->
+    shoulder point down BARE_BAND x the shoulder width."""
+    cover = layer[:, :, 3] >= 128
+    band = BARE_BAND * (_f(body_lm["shoulder"]["right_x"]) - _f(body_lm["shoulder"]["left_x"]))
+    H, W = cover.shape
+    ys, xs = np.mgrid[0:H, 0:W]
+    total = 0
+    for sx, side in (("_l", "left"), ("_r", "right")):
+        if "neck" + sx not in info["pairs"]:
+            continue
+        x0, y0 = info["pairs"]["neck" + sx][1]
+        x1, y1 = _f(body_lm["shoulder"][f"{side}_x"]), _f(body_lm["shoulder"]["y"])
+        if abs(x1 - x0) < 1:
+            continue
+        line = y0 + (y1 - y0) / (x1 - x0) * (xs + 0.5 - x0)
+        inside = (xs >= min(x0, x1)) & (xs <= max(x0, x1)) & (ys + 0.5 >= line) & (ys + 0.5 <= line + band)
+        total += int((inside & base_mask & ~cover).sum())
+    return total
+
+
+def print_bbox(img, min_dist=60.0):
+    """(x0, y0, x1, y1) in garment px of the print: the largest component of garment pixels whose colour is at least
+    min_dist (BGR distance) from the median fabric colour, or None. Detected, never entered."""
+    a = img[:, :, 3] > 128
+    if not a.any():
+        return None
+    fabric = np.median(img[:, :, :3][a].astype(np.float32), axis=0)
+    far = a & (np.linalg.norm(img[:, :, :3].astype(np.float32) - fabric, axis=2) >= min_dist)
+    far = cv2.morphologyEx(far.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+    n, _, st, _ = cv2.connectedComponentsWithStats(far, connectivity=8)
+    if n < 2:
+        return None
+    i = 1 + int(np.argmax(st[1:, 4]))
+    x, y, w, h = st[i, :4]
+    return int(x), int(y), int(x + w - 1), int(y + h - 1)
+
+
+def print_distortion(layer, info, bbox):
+    """Std-dev of the forward local area scale (1 / |det| of the inverse map) over the garment pixels whose source
+    lies inside the print bbox (garment px), normalised by its mean (0 = the print only moves/scales uniformly)."""
+    if bbox is None:
+        return None
+    mx, my = info["map"]
+    det = np.gradient(mx, axis=1) * np.gradient(my, axis=0) - np.gradient(mx, axis=0) * np.gradient(my, axis=1)
+    x0, y0, x1, y1 = bbox
+    on = (layer[:, :, 3] > 128) & (mx >= x0) & (mx <= x1) & (my >= y0) & (my <= y1) & (np.abs(det) > 1e-6)
+    if not on.any():
+        return None
+    sc = 1.0 / np.abs(det[on])
+    return round(float(sc.std() / sc.mean()), 3)
