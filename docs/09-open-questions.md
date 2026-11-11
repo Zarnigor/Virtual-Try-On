@@ -28,6 +28,7 @@ _(none blocking P0)_
   hip_y + 0.35 x (crotch_y - hip_y), at most crotch_y - 10 px, with the hem half-width = garment hem/waist ratio x the
   body's waist half-width (at least the hip half-width). Used only to compare methods; the warp method (production
   row warp + rigid sleeves vs MLS) stays the owner's choice. The production hem rule itself is #91 (proposed).
+  Round 2 (marked landmarks + fit strength k, docs/06) uses the same hem assumption; still not a decision.
 
 ## Decided 2026-11-07
 12. **Body AI validation (prompt 02): P0.** Confirmed by owner.

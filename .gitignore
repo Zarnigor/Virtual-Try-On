@@ -19,3 +19,5 @@ tools/warp-benchmark/out/
 /avatars/
 # demo garment folder (cleaned garment PNGs + landmarks)
 /demo_garments/
+# MLS benchmark garment export (cleaned garment PNGs + landmarks, tools/warp-benchmark/run_landmarks.py)
+tools/warp-benchmark/data/

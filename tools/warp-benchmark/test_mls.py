@@ -84,5 +84,44 @@ class ChestPairTests(unittest.TestCase):
         self.assertEqual(sha(rgb), NORMAL_PROD_SHA)
 
 
+class LandmarkMlsTests(unittest.TestCase):
+    """mls_landmarks: marked landmarks only, fit strength k."""
+
+    def full(self):
+        img, glm = garment(armpit_y=115, chest_y=150)
+        glm = dict(glm)
+        glm.pop("sleeve_end")
+        glm["collar"] = {"y": 30, "left_x": 175, "right_x": 225}
+        glm["collar_bottom"] = {"x": 200, "y": 60}
+        glm["sleeve_cuff_outer"] = {"left": {"x": 58, "y": 125}, "right": {"x": 342, "y": 125}}
+        glm["sleeve_cuff_inner"] = {"left": {"x": 90, "y": 150}, "right": {"x": 310, "y": 150}}
+        return img, glm
+
+    def test_missing_landmark_is_reported_never_filled(self):
+        import mls_landmarks as ml
+        img, glm = self.full()
+        self.assertEqual(ml.missing_landmarks(glm), [])
+        glm.pop("collar")
+        info = {}
+        self.assertIsNone(ml.warp(img, glm, avatar()[1], info=info))
+        self.assertEqual(info["missing"], ["collar"])
+
+    def test_k_zero_is_the_aligned_garment_and_k_one_reaches_the_body(self):
+        import mls_landmarks as ml
+        base, blm = avatar()
+        img, glm = self.full()
+        mask = prod.figure_mask(base)
+        p0, _, s = ml.control_points(glm, blm, mask, k=0.0)
+        p1, _, _ = ml.control_points(glm, blm, mask, k=1.0)
+        q = np.array(p0["waist_l"][0]) * s
+        self.assertTrue(np.allclose(np.array(p0["waist_l"][1]) - q, np.array(p0["shoulder_l"][1]) -
+                                    np.array(p0["shoulder_l"][0]) * s))  # one translation for every point
+        self.assertEqual(p1["waist_l"][1], (220.0, 480.0))
+        self.assertEqual(p0["neck_c"][1], p1["neck_c"][1])  # anchors never move off the alignment
+        info = {}
+        layer = ml.warp(img, glm, blm, base=base, info=info)
+        self.assertEqual(layer.shape, (1200, 600, 4))
+
+
 if __name__ == "__main__":
     unittest.main()

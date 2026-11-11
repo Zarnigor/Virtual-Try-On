@@ -308,3 +308,41 @@ Results (6 avatars):
   sleeve on most avatars, crescent holes at both underarms, the torso sides pinch in below the armpit so the avatar's
   grey top shows, and the hem is curved. Production is clearly better on #28 on all 6 avatars.
 
+
+### MLS single-field benchmark, round 2: marked landmarks + fit strength k (2026-11-11, NOT the production path)
+Module `tools/warp-benchmark/mls_landmarks.py` (`warp(garment_rgba, garment_lm, body_lm, out_size, alpha, k)`),
+runner `run_landmarks.py` (exports the garments read-only to `tools/warp-benchmark/data/`, not in git). Same rigid
+MLS solver, grid, remap, edge fix and neck handling as round 1, but every control point comes from the **marked**
+garment landmarks (docs/09 #92 set), paired by name: collar edges + collar_bottom (V tip on a V neck; anchors, weight
+5, alignment only), shoulder seam, armpit, chest and waist edges, hem (benchmark rule, docs/09 "Still open"),
+sleeve_cuff_outer/inner -> derived along the arm direction (length by the shoulder-to-hem ratio, width by the chest
+width ratio, cuff line perpendicular to the arm). A garment missing any of these is skipped, never filled in.
+Pairs are checked before warping (`drop_crossing_chest`, then the row and left/right order).
+
+**Fit strength k:** the garment is first aligned by ONE uniform scale (body / garment shoulder width) + translation
+(shoulder-line centres together; the neck anchors ride on it). Each target = aligned point + k x (body point -
+aligned point). k = 1 full fit, k = 0 the aligned garment unchanged.
+
+Results (6 avatars: male + female slim/average/plus; alpha 1.0, k 1.0 unless noted; `out/results2.json`):
+| garment | fold ratio | local scale p1..p99 | floating px | above shoulder line | runtime |
+|---|---|---|---|---|---|
+| #28 black (male) | 0-0.56 % | 0.53-0.73 .. 2.1-3.1 | 0 | 0 | 0.06-0.08 s |
+| #44 green print, oversized | 2.2-3.3 % | 0.16-0.22 .. 4.7-5.4 | 0 | 0 | 0.06 s |
+| #44 alpha 1.5 | 1.4-3.3 % | 0.14-0.18 .. 5.5-8.5 | 0 | 0 | 0.06-0.07 s |
+| #44 k 0.5 | 0-0.11 % | 0.33-0.40 .. 1.9-2.4 | 0 | 0 | 0.06 s |
+| #43 white fitted (female) | 0-0.50 % | 0.29-0.40 .. 1.8-2.8 | 0 | 0 | 0.06-0.07 s |
+| #40 sky-blue V-neck | 0.18-0.92 % | 0.18-0.24 .. 1.2-2.1 | 0 | 0 | 0.06-0.07 s |
+- **#45 white oversized skipped**: no `collar` landmark marked (collar_bottom only). So alpha 1.5 and k 0.5 ran on #44 only.
+- #44: chest is marked above the armpit (oversized), so both chest pairs are dropped on every avatar. Local scale at
+  the armpit / inner-cuff targets (they almost touch, not moved or merged): min 0.37-0.59, max 0.70-1.05 (k 1),
+  inner cuff down to 0.31 on female average; k 0.5: 0.54-0.80. Worst fold: #44 on female slim (3.3 %),
+  `out/crop_worst.png`.
+- Looks (k 1): no floating strips anywhere (production has skin slits between its rigid sleeves and the torso on most
+  cells of #43, #40, #44). #44 is pulled into an hourglass: balloon "pad" sleeves, S-shaped folds down both torso
+  sides, the print squeezed at the waist. #28/#43/#40 read as T-shirts but the outer shoulder is bare above the
+  sleeve on male plus, the sleeve edges are ragged/rippled (#43, #40), and the avatar's grey top shows beside the
+  torso at the waist on the plus avatars.
+- k 0.5 vs 1.0 (#44): k 0.5 keeps the boxy oversized shape, no folds, print undistorted; but the garment no longer
+  follows the body (bare skin at the top of the shoulders on female slim, wider than the body everywhere). A per-
+  garment k (keep_shape ~ 0.5, adapt 1.0) is an option for docs/09 #93, the owner's choice.
+Sheets: `out/sheet_mls_k1.png`, `out/sheet_production.png` (same layout), `out/sheet_k05_vs_k1.png`.
