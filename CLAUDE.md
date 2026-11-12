@@ -21,7 +21,9 @@ but the frontend must fully work too (React is required). The owner works and re
   Auth: email + password only (no Google sign-in). Image model: **Nano Banana 2 (standard)** via the official Gemini API.
 - **Garment fit is per garment** (`fit_mode`: `adapt` default | `keep_shape`, docs/09 #93); `gender` female|male|unisex.
   Garment real size is NOT entered. No tight/loose fit label. **keep_shape = MLS per-point k preset A** (docs/09 #96,
-  shoulder_* marked at the sleeve seam); engine still treats keep_shape as adapt until the wiring (planned `TRYON_WARP`).
+  shoulder_* marked at the sleeve seam); wired only in the MLS engine (`TRYON_WARP=mls`, docs/09 #98); the default
+  `parts` engine still warps keep_shape like adapt. **Warp method (parts vs MLS) and hem rule are NOT decided.**
+  Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
 - Garment AI cleaning (hanger/background removal, prompt 04) is in P0 but **off for now** (`AI_CLEANING_ENABLED=0`, no prepaid
   image credits, docs/09 #55): garments are cleaned by rembg only.
@@ -101,7 +103,7 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-Last updated: 2026-11-10. The first task (summary + plan) is done. The owner approved the 10-step plan below.
+Last updated: 2026-11-12. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
 - [ ] 1. Day-1 experiment, properly: 3 real male avatars (avatar-prep + landmark editor), fix sleeves
@@ -162,9 +164,15 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       Dropped-shoulder one-piece warp for #36 built behind `TRYON_DROPPED_SHOULDER_SINGLE`, default 0 (sleeves shear
       below the armpit; docs/09 #90).
       T-shirt hem rule `TRYON_HEM_RULE` (default 1, proposed, docs/09 #91): hem at hip + 0.35 x (crotch - hip).
+      **2026-11-11 (docs/09 #93-98):** per-garment `fit_mode` + `gender`; gender enforced in try-on (`GENDER_MISMATCH`,
+      `BODY_SEX_REQUIRED`, `for_sex`); MLS single-field T-shirt warp in `apps/tryon_engine/mls.py` behind
+      `TRYON_WARP=parts|mls` (default `parts`, falls back with `mls_fallback`). keep_shape = preset A only on `mls`.
+      **Owner to decide: parts vs MLS as default, and the hem rule (#91 / docs/09 "Still open").**
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.
+      **2026-11-12:** 267 backend tests, tsc, 57 vitest pass. Check tools added: `tools/tryon_check/landmarks_overlay.py`
+      (landmark overlays + docs/03 checks, read-only), `neck_regress.py` (TRYON_NECK_FIX off/on diff). No ESLint yet.
 - [ ] 10. P1 if time: realistic render (prompt 05).
 
 Open questions for the owner (ask once, then log the answers in docs/09):

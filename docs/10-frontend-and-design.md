@@ -22,13 +22,13 @@ silhouettes and flat T-shirt/pants shapes only as placeholders. In the app:
 | 1 | Kirish | /login | POST /auth/login, /auth/register | none (brand art static) |
 | 2 | Bosh sahifa | / | GET /body (status), GET /garments?limit, GET /outfits?limit | body image, garment thumbs, outfit result thumbs |
 | 3 | Tana tanlash | /body | GET /body (exists?), GET /avatars | avatar images for the 3 builds |
-| 4 | Oʻz rasmini yuklash | /body/new | POST /body (file, 18+ flag), GET /jobs/{id} | requirement sample image (served by the backend), uploaded-photo preview while checking |
+| 4 | Oʻz rasmini yuklash | /body/new | POST /body (file, sex, 18+ flag), GET /jobs/{id} | requirement sample image (served by the backend), uploaded-photo preview while checking |
 | 5 | Belgilash sahifasi | /body/landmarks | GET /body (normalized image + landmarks), POST /body/confirm | normalized body image |
 | 6 | Model tanlash | /model | GET /avatars/nearest?... | nearest avatar image |
 | 7 | Kiyimlar | /garments | GET /garments?scope=mine\|catalog&type= | garment thumbnails; DELETE /garments/{id} |
 | 8 | Kiyim yuklash va tozalash | /garments/new | POST /garments (file, type), GET /jobs/{id}, then Save/Cancel | uploaded original (temporary preview) and cleaned result |
-| 9 | Kiyimni belgilash | /garments/{id}/landmarks | PATCH landmarks, PATCH visibility | cleaned garment image (editor: design artboard VariantC, `components/landmark-editor/`) |
-| 10 | Kiyib koʻrish | /try-on | GET /garments, POST /tryon, POST /tryon/{id}/realistic, POST /outfits | body or avatar image, garment thumbs, result image, realistic image |
+| 9 | Kiyimni belgilash | /garments/{id}/landmarks | PATCH landmarks, PATCH visibility, PATCH fit_mode / gender | cleaned garment image (editor: design artboard VariantC, `components/landmark-editor/`) |
+| 10 | Kiyib koʻrish | /try-on | GET /garments?for_sex, POST /tryon, POST /tryon/{id}/realistic, POST /outfits | body or avatar image, garment thumbs, result image, realistic image |
 | 11 | Mening obrazlarim | /outfits | GET /outfits, DELETE /outfits/{id} | result and realistic images |
 | 12 | Profil va maxfiylik | /profile | GET /body, PATCH /body/measurements, DELETE /body, DELETE /me | none |
 
@@ -56,5 +56,8 @@ with a `deleted` flag.
   Landmark names are fixed (docs/03). Run the sanity checks on the client AND the server.
 - Screen 6: all five measurements are required. Units are cm. (Circumference vs front width: open question 13.)
 - Screen 10: toggling Oddiy/Realistik switches which backend image is shown. The AI button creates a job.
+- Screen 10: lists only garments matching the body/avatar sex; "Barcha kiyimlarni koʻrsatish" shows the rest marked
+  "Boshqa jins uchun" with the try-on button disabled and explained (docs/09 #97). An own body without `sex` (created
+  earlier) asks once via `PATCH body/sex/` before try-on.
 - Responsive: pages stack at tablet/phone width; the landmark editor stays usable (pinch/zoom) but desktop is the target.
 - All user-facing strings go through one Uzbek locale file.

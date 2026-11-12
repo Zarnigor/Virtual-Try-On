@@ -32,7 +32,8 @@ P0 is large for 3 days. If behind schedule, cut in this order: outfits, realisti
 - Show one rejected upload on purpose (e.g. thick jacket or long sleeves) to demonstrate quality control.
 
 ## Tests to write
-- Landmark sanity checks (order, ranges, chest >= armpit, per-leg widths).
+- Landmark sanity checks (order, ranges, body chest >= armpit, per-leg widths; garments: chest above armpit is a warning only).
+- Garment gender in try-on (`GENDER_MISMATCH`, `BODY_SEX_REQUIRED`, `for_sex` filter) and `TRYON_WARP` fallback (`mls_fallback`).
 - Immutability: second body upload fails; no update endpoints for body photo/landmarks and garment image.
 - Measurements change allowed once per 365 days only.
 - Body deletion removes body, photos and its outfits.

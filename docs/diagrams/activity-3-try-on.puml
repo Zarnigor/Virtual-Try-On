@@ -8,14 +8,21 @@ if (Tana bormi?) then (ha)
 else (yoʻq)
   :Tana yaratish\n(oʻz tanam yoki model);
 endif
-:Kiyim tanlash\n(katalog yoki oʻzimniki);
+:Kiyim tanlash\n(katalog yoki oʻzimniki,\nfaqat mos jins);
 |Tizim|
-:Kiyib koʻrish:\nmasshtab, deformatsiya, joylash;
+if (Kiyim jinsi tanaga mosmi?) then (ha)
+else (yoʻq)
+  |Foydalanuvchi|
+  :Sababni koʻrish\n(GENDER_MISMATCH);
+  stop
+endif
+|Tizim|
+:Kiyib koʻrish:\nmasshtab, deformatsiya (fit_mode), joylash;
 |Foydalanuvchi|
 :Natijani koʻrish;
 if (Realistik?) then (ha)
   |AI|
-  :Realistik qayta chizish\n(9:16, keyin 600x1200 ga qaytarish); <<#E6DDF8>>
+  #E6DDF8:Realistik qayta chizish\n(9:16, keyin 600x1200 ga qaytarish);
   |Tizim|
   :Natijani tekshirish\n(joylashuv oʻzgarmaganmi);
 endif

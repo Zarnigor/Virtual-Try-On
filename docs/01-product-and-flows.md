@@ -15,11 +15,11 @@ Demo-ability matters: the demo must not depend on live AI speed (keep prepared r
 | Page | Purpose | Priority |
 |---|---|---|
 | Sign in / register | Account (required: body and garments are per-user and private) | P0 |
-| Create my body | Upload once (A-pose), checks, mark landmarks, optional height, confirm | P0 |
+| Create my body | Choose sex (required), upload once (A-pose), checks, mark landmarks, optional height, confirm | P0 |
 | Choose model | Gender + optional measurements -> nearest avatar | P0 |
 | Garments | Catalog (public) + My garments | P0 |
-| Upload garment | Upload, AI cleaning (hanger removal), preview, mark landmarks, visibility | P0 |
-| Try on | Body + garment, result, fit indicator | P0 |
+| Upload garment | Upload, cleaning (rembg; AI hanger removal is off for now, docs/09 #55), preview, mark landmarks, visibility, fit mode, gender | P0 |
+| Try on | Body + garment (matching gender only, docs/09 #97), result, quality warnings (no fit label) | P0 |
 | Realistic render button | AI redraw of a try-on result | P1 |
 | My outfits | Saved outfits | P1 |
 | Public garments: moderation, report button | Visible to others | P2 |

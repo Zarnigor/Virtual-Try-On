@@ -5,44 +5,39 @@ title Activity 2: Kiyim yuklash, tozalash va public qilish
 |Foydalanuvchi|
 start
 repeat
-  :Rasm yuklash,\ntur tanlash;
+  :Rasm yuklash,\ntur tanlash (futbolka / shim);
   |Tizim|
   :Kod tekshiruvi\n(hajm, oʻlcham, tur);
   if (Kod OK?) then (ha)
     |AI|
-    :Kirish tekshiruvi\n(bitta kiyim, old tomon); <<#E6DDF8>>
+    #E6DDF8:Kirish tekshiruvi\n(bitta kiyim, old tomon);
+    |Tizim|
     if (AI OK?) then (ha)
-      :Hanger va fonni\nolib tashlash; <<#E6DDF8>>
-      |Tizim|
+      :Fonni olib tashlash (rembg)\n(AI tozalash hozircha oʻchiq);
       :Sifat tekshiruvi\n(rang, shakl oʻzgarmaganmi);
       if (Sifat OK?) then (ha)
         |Foydalanuvchi|
         :Natijani koʻrish;
         if (Saqlaysizmi?) then (ha)
-          :Chiziqlarni belgilash;
+          :Chiziqlarni belgilash,\nfit_mode va jins tanlash;
           |Tizim|
           :Kiyimni saqlash\n(egasiga darhol koʻrinadi);
           if (Hamma uchunmi?) then (ha)
             |AI|
-            :AI moderatsiya; <<#E6DDF8>>
-            switch (Qaror?)
-            case (approve)
-              |Tizim|
+            #E6DDF8:AI moderatsiya;
+            |Tizim|
+            if (Qaror?) then (approve)
               :Umumiy katalogga qoʻshish;
-              stop
-            case (review)
-              |Tizim|
+            elseif (Qaror?) then (review)
               :Admin navbatiga qoʻyish;
-              stop
-            case (reject)
-              |Tizim|
+            else (reject)
               :Yashirish;
-              stop
-            endswitch
+            endif
           else (yoʻq)
-            stop
           endif
+          stop
         else (yoʻq)
+          |Foydalanuvchi|
           :Bekor qilindi;
           stop
         endif

@@ -365,6 +365,8 @@ _(none blocking P0)_
     decision 1's "the garment always adapts". The try-on task passes `fit_modes` to `render_tryon`, which ignores it
     for now (TODO): **engine behaviour for keep_shape is pending the MLS benchmark** (docs/06 "MLS single-field
     benchmark"). Existing garments got the defaults (adapt, unisex) by migration 0005.
+    **Update 2026-11-11:** keep_shape = preset A (#96), wired for T-shirts in the MLS engine behind `TRYON_WARP=mls`
+    (#98); the default `parts` engine still ignores fit_mode.
 
 ## Decided 2026-11-11: garment armpit <= chest rule removed
 94. **2026-11-11: Garment armpit<=chest rule removed (oversized garments); body rule unchanged.** Client

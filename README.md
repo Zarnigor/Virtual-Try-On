@@ -82,6 +82,8 @@ docker compose exec -T backend python manage.py promote_garments --list         
 docker compose exec -T backend python manage.py promote_garments --ids 28 33 --catalog     # public + approved
 docker compose exec -T backend python manage.py reflatten_garments --all-solid --dry-run   # flatten lighting once
 docker compose exec -T -e ENGINE=new backend python manage.py shell < tools/tryon_check/run.py   # try-on check
+docker compose exec -T backend python manage.py shell < tools/tryon_check/landmarks_overlay.py   # landmark overlays + checks (read-only)
+docker compose exec -T backend python manage.py shell < tools/tryon_check/neck_regress.py       # TRYON_NECK_FIX off/on diff
 docker compose logs -f backend worker
 docker compose down                                           # stop (add -v to wipe db + media)
 ```

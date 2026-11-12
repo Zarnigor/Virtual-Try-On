@@ -5,12 +5,12 @@ title Activity 1: Oʻz tanani yaratish (bir marta, tasdiqlangach oʻzgarmaydi)
 |Foydalanuvchi|
 start
 repeat
-  :Rasm yuklash;
+  :Jinsni tanlash (majburiy),\nrasm yuklash, 18+ tasdiq;
   |Tizim|
   :Kod tekshiruvi\n(boʻy, qoʻl, oyoq, rasm oʻlchami);
   if (Kod OK?) then (ha)
     |AI|
-    :AI tekshiruvi\n(old tomon, tor kiyim, kalta yeng, 18+); <<#E6DDF8>>
+    #E6DDF8:AI tekshiruvi\n(old tomon, tor kiyim, kalta yeng, 18+);
     if (AI OK?) then (ha)
       |Tizim|
       :Fon olib tashlash,\nbelgilarni aniqlash;
