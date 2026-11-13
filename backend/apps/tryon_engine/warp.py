@@ -1507,7 +1507,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True,
                  source: str = "body", dropped_shoulder_single: bool = False, hem_rule: bool = False,
                  hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0,
-                 fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True):
+                 fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True,
+                 mls_sleeve: str = "C"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1532,6 +1533,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     When MLS cannot run (missing landmarks, failed core pairs) the T-shirt falls back to "parts" and
     debug["quality_warnings"] gets "mls_fallback". Pants always use their own warp. debug["engine"] = the engine
     the T-shirt actually used ("parts" when there is no T-shirt).
+    mls_sleeve (setting TRYON_MLS_SLEEVE, default "C", docs/09 #104): the MLS sleeve variant (adapt only).
     neck_hole (setting TRYON_NECK_HOLE, docs/09 #102): MLS only, adapt and keep_shape. When the T-shirt landmarks carry
     `neck_hole.polygon` and it passes landmark_checks.neck_hole_problem (same rules as PATCH), the MLS layer is made
     with neckline_variant="hole" + that polygon (never neck_clip); a failing polygon is skipped with quality warning
@@ -1563,7 +1565,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         try:
             mls_layer, mls_info = mls_engine.tshirt_layer(
                 *by_type["tshirt"], body_lm, mask, fit_modes.get("tshirt", "adapt"), H, W,
-                (hem_hip_fraction, hem_crotch_margin), **hole_kw)
+                (hem_hip_fraction, hem_crotch_margin), sleeve_variant=mls_sleeve, **hole_kw)
             info["neck_hole"] = bool(hole_kw)
             info.update(engine="mls", mls=mls_info, sleeve_hems=mls_info["sleeve_hems"])
             warnings += [f"tshirt: mls dropped {r}" for r in mls_info["rejected"]]

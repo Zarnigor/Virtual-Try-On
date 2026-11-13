@@ -806,3 +806,155 @@ the flag off, for keep_shape and for parts. Manual check `tools/warp-benchmark/r
 | #28 (crew) | 6-91 | 0 | 0.11-0.12 |
 | #43 (crew, no polygon) | 0 | - | 0.10-0.12 |
 | #47 (square) | 12063-18947 | 3-6 | 0.11-0.12 |
+
+### Shoulder line fit, round 9 (2026-11-13, NOT production, no winner picked)
+Problem: on adapt T-shirts skin shows on the shoulder top between the neck and the shoulder seam (round 8b
+`shoulder_top_skin_px` 3518 / 4213 L / R); only two pairs (collar edge, shoulder seam) set the slope between them.
+Keyword `mls.tshirt_layer(..., shoulder_variant="off" | "line")` (default "off", pixel-identical; `render_tryon` never
+passes it, tested; a no-op in keep_shape, tested against "off" with the same other keywords on #44 / #45 x 6 avatars
+x sleeve C / r7, 0 px). "line", per side (`mls.shoulder_line`): garment = the top alpha edge (alpha > 128) in the
+column at 25 / 50 / 75 % of collar edge -> shoulder seam; body = in the column at the same fraction of neck edge
+(neck.left_x / right_x) -> acromion, the first background -> figure step under the neck row (the collar_floor rule:
+head and hair above the neck row are not taken), target moved UP by `SHOULDER_LINE_EASE` = 2 px; 3 pairs
+`sline25|50|75_l|r`, weight 1.0 (the shoulder pair's). A side is skipped and reported when a collar / neck point is
+missing or a sample has no edge; columns that are figure at the neck row (head / hair) and near-vertical samples
+(|dy/dx| > 2 between neighbour columns) are recorded, nothing changed. Base: sleeve variant C, collar_floor on (default),
+side_floor off, neckline r7.
+
+Data: the round 8b exporter with `EXPORT_ROOT=.../data/shoulder9` (current DB). Runner `run_shoulder9.py`: #28, #43, #40
+x 6 avatars, adapt (#28 is keep_shape in the DB now; the runner forces adapt like round 8b). Both variants are measured
+in the C run's bands. `above` = garment px OUTSIDE the figure in the shoulder-top band (fabric sticking up). `res` = max
+distance between a line pair's body target and where its garment point actually lands (forward search in the inverse
+map), measured in both variants for the same pairs. Out: `out/table_shoulder9.md`, `out/results_shoulder9.json`,
+`out/sheet_shoulder9_<id>.png` (C | C + line, 3x; blue = shoulder-top band, green = body target, magenta = where the
+garment point landed), `out/crop_shoulder9_worst.png`, `out/crop_shoulder9_neck_40.png`.
+
+| garment | variant | shoulder-top skin L / R | above shoulder L / R | arm-band skin L / R | gap | excess | fold (max) | line residual px (max L / R) |
+|---|---|---|---|---|---|---|---|---|
+| #28 | C | 384 / 376 | 4144 / 4252 | 459 / 570 | 2423 | 2144 | 0.00309 | 15.0 / 12.4 |
+| #28 | C + line | 1076 / 721 | 725 / 955 | 505 / 609 | 2399 | 217 | 0.00308 | 2.2 / 2.2 |
+| #43 | C | 967 / 1054 | 749 / 625 | 2355 / 2643 | 3501 | 39 | 0.00343 | 16.8 / 15.5 |
+| #43 | C + line | 1562 / 1333 | 166 / 124 | 2491 / 2717 | 3474 | 34 | 0.00337 | 10.8 / 9.5 |
+| #40 | C | 1278 / 1573 | 2042 / 1797 | 2575 / 2390 | 2105 | 3168 | 0.00727 | 31.3 / 31.6 |
+| #40 | C + line | 1365 / 1415 | 1039 / 975 | 2572 / 2386 | 2086 | 3055 | 0.00920 | 23.5 / 24.5 |
+| all | C | 2629 / 3003 | 6935 / 6674 | 5389 / 5603 | 8029 | 5351 | 0.00727 | 31.3 / 31.6 |
+| all | C + line | 4003 / 3469 | 1930 / 2054 | 5568 / 5712 | 7959 | 3306 | 0.00920 | 23.5 / 24.5 |
+
+Runtime 0.087 s max in both. Sampling notes: none (no skipped side, no head / hair column, no near-vertical sample).
+
+Observations (not a decision):
+- The reference already differs from round 8b (2629 / 3003 vs 3518 / 4213): collar_floor is on by default now, base C.
+- "line" does what it aims at geometrically: the garment's top edge follows the body's shoulder edge (residuals down,
+  e.g. #28 15.0 -> 2.2 px), fabric above the shoulder drops 6935 / 6674 -> 1930 / 2054 px, excess on #28 2144 -> 217.
+- But **shoulder-top skin goes UP** (2629 / 3003 -> 4003 / 3469): with the edge on the contour a 1-3 px skin sliver
+  stays along the whole shoulder line (seen on the sheets). Likely cause, NOT verified: the sampled garment edge is
+  alpha > 128 but the layer then drops alpha < 230 (HARD_EDGE), so the visible edge may sit ~1-2 px under the target
+  and the 2 px ease is not enough. In C the fabric stood ABOVE the shoulder and covered that strip. Worse than C on at least one metric in 18 / 18 runs (all: shoulder-top skin on
+  every #28 / #43 run; #40 mostly fold, 0.00727 -> 0.00920 max, and small arm-band / gap / excess increases).
+- #40 neck crops: collar_floor raises nothing on #40 (0 px), so it does not fight the 25 % pair there; neck_l / neck_r
+  residuals stay ~2 px except m-average right 2.4 -> 6.7. The 25 % pair pulls the fabric next to the collar corner down
+  to the shoulder while the neck pair stays up: a visible kink in the V band near the collar corner (m-plus, f-plus).
+  On #28 / #43 (collar_floor raises 0.3-9.8 px) the neck residuals do not change (+-1 px).
+- Not tried (the owner's call): a larger ease, measuring the garment edge at the HARD_EDGE alpha, dropping the 25 % pair.
+
+**Re-run with the production neckline (owner 2026-11-13).** The table above used the r7 neckline for every garment:
+the runner calls `tshirt_layer` directly and passed no neckline keywords, so #40's stored polygon (13 points) was not
+applied and the label / inner back stayed in the crops. Now a garment with `neck_hole.polygon` gets
+`neckline_variant="hole"` + the polygon in BOTH variants (as `render_tryon` does; no neck_clip; `NECK_HOLE=0` = the
+first run). #28 and #43 have no polygon in the DB: unchanged. The warped hole (union of both variants) is taken out of
+the shoulder-top band: without that the intended opening counted as skin (#40 sum 2629 -> 8631 L). The r7-neck run is
+kept in `out/shoulder9_r7neck/`.
+
+| #40 | shoulder-top skin L / R | above shoulder L / R | arm-band skin L / R | gap | excess | fold (max) |
+|---|---|---|---|---|---|---|
+| r7 neck, C | 1278 / 1573 | 2042 / 1797 | 2575 / 2390 | 2105 | 3168 | 0.00727 |
+| r7 neck, C + line | 1365 / 1415 | 1039 / 975 | 2572 / 2386 | 2086 | 3055 | 0.00920 |
+| hole, C | 745 / 953 | 1655 / 1446 | 2575 / 2390 | 2105 | 3057 | 0.00794 |
+| hole, C + line | 1182 / 1211 | 547 / 516 | 2572 / 2386 | 2086 | 2966 | 0.00988 |
+| all, hole, C | 2096 / 2383 | 6548 / 6323 | 5389 / 5603 | 8029 | 5240 | 0.00794 |
+| all, hole, C + line | 3820 / 3265 | 1438 / 1595 | 5568 / 5712 | 7959 | 3217 | 0.00988 |
+
+With the hole, "line" is worse than C on #40's shoulder-top skin too (it was about even with the r7 neck); still 18 / 18
+runs worse on at least one metric. `out/crop_shoulder9_neck_40.png`: the opening is clean (label and inner back gone)
+in both variants; with "line" the V band still kinks next to the collar corner (m-plus, f-plus).
+
+**Without the 25 % pair (owner 2026-11-13).** Third variant `C+line50/75` = "line" with `shoulder_fractions=(0.5, 0.75)`
+(new benchmark keyword on `tshirt_layer`, default 25 / 50 / 75 %, tested; ignored when the variant is off). Same run as
+above (production neckline on #40, hole union of all three variants out of the band; that is why C moved a few px).
+Residuals are measured on the 25 / 50 / 75 % points in every variant. The two-variant run is kept in
+`out/shoulder9_hole_2var/`.
+
+| garment | variant | shoulder-top skin L / R | above shoulder L / R | arm-band skin L / R | gap | excess | fold (max) | neck residual (max) |
+|---|---|---|---|---|---|---|---|---|
+| #28 | C | 384 / 376 | 4144 / 4252 | 459 / 570 | 2423 | 2144 | 0.00309 | 2.8 |
+| #28 | C + line | 1076 / 721 | 725 / 955 | 505 / 609 | 2399 | 217 | 0.00308 | 2.8 |
+| #28 | C + line 50/75 | 889 / 665 | 1516 / 1793 | 497 / 596 | 2401 | 651 | 0.00309 | 2.8 |
+| #43 | C | 967 / 1054 | 749 / 625 | 2355 / 2643 | 3501 | 39 | 0.00343 | 2.7 |
+| #43 | C + line | 1562 / 1333 | 166 / 124 | 2491 / 2717 | 3474 | 34 | 0.00337 | 2.5 |
+| #43 | C + line 50/75 | 1459 / 1263 | 215 / 194 | 2460 / 2694 | 3460 | 34 | 0.00342 | 2.8 |
+| #40 | C | 737 / 947 | 1655 / 1446 | 2575 / 2390 | 2105 | 3057 | 0.00794 | 2.4 |
+| #40 | C + line | 1181 / 1210 | 538 / 506 | 2572 / 2386 | 2086 | 2966 | 0.00988 | 6.7 |
+| #40 | C + line 50/75 | 1173 / 1208 | 520 / 472 | 2569 / 2384 | 2088 | 2934 | 0.00808 | 2.4 |
+| all | C | 2088 / 2377 | 6548 / 6323 | 5389 / 5603 | 8029 | 5240 | 0.00794 | |
+| all | C + line | 3819 / 3264 | 1429 / 1585 | 5568 / 5712 | 7959 | 3217 | 0.00988 | |
+| all | C + line 50/75 | 3521 / 3136 | 2251 / 2459 | 5526 / 5674 | 7949 | 3619 | 0.00808 | |
+
+Observations (not a decision):
+- Dropping the 25 % pair removes the V-band kink next to the collar corner on #40 (`crop_shoulder9_neck_40.png`,
+  third column) and its side effects: fold max 0.00988 -> 0.00808 (C 0.00794), neck residual max 6.7 -> 2.4 px.
+- Shoulder-top skin is a little lower than with the 25 % pair but still higher than C on every garment (all
+  3521 / 3136 vs C 2088 / 2377); fabric above the shoulder stays far below C (2251 / 2459 vs 6548 / 6323).
+- Still worse than C on at least one metric in 18 / 18 runs (both line variants).
+
+**Round 9b: garment edge at the HARD_EDGE alpha (2026-11-13, NOT production, no winner).** Same data / setup (production
+neckline on #40). New benchmark keywords on `tshirt_layer` (ignored when the variant is off, tested):
+`shoulder_edge_alpha` (default 128; the garment edge = first row with alpha > it) and `shoulder_ease` (default 2 px).
+Variants, all full line 25 / 50 / 75 %: `line_hard2` (edge alpha > HARD_EDGE - 1 = 228, i.e. the edge the fitted layer
+keeps, ease 2), `line_hard4` (the same, ease 4). shoulder_top_skin is split: **edge skin** = uncovered figure px within
+4 px below the body's top edge (first background -> figure step under the neck row, per column: the thin line);
+**inner skin** = the rest of the band. Residuals: each line variant on its own pairs. Runner `run_shoulder9b.py` ->
+`out/table_shoulder9b.md`, `out/results_shoulder9b.json`, `out/sheet_shoulder9b_<id>.png` (C | C+line | line_hard2 |
+line_hard4; #40 also shows the competing pairs' targets in orange with their names).
+
+| | variant | edge skin L / R | inner skin L / R | above shoulder L / R | arm-band skin L / R | gap | excess | fold (max) | line residual max L / R |
+|---|---|---|---|---|---|---|---|---|---|
+| all | C | 1168 / 1063 | 849 / 1249 | 6548 / 6323 | 5389 / 5603 | 8029 | 5240 | 0.00794 | 31.3 / 31.6 |
+| all | C+line | 2901 / 1967 | 840 / 1227 | 1438 / 1595 | 5568 / 5712 | 7959 | 3217 | 0.00988 | 23.5 / 24.5 |
+| all | line_hard2 | 2131 / 1310 | 829 / 1219 | 1664 / 1898 | 5567 / 5713 | 7974 | 3240 | 0.01015 | 22.8 / 23.8 |
+| all | line_hard4 | 1035 / 748 | 820 / 1211 | 2262 / 3088 | 5551 / 5717 | 7995 | 3295 | 0.00999 | 23.1 / 24.0 |
+| #28 | C / C+line / hard2 / hard4 | 158/106, 850/451, 503/242, 189/107 | 226 / 270 (all) | 4144/4252, 725/955, 861/1126, 1203/1687 | | | 2144, 217, 235, 235 | | |
+| #43 | C / C+line / hard2 / hard4 | 643/566, 1251/867, 978/590, 489/341 | 324/488 .. 295/450 | 749/625, 166/124, 192/171, 323/529 | | | | | |
+| #40 | C / C+line / hard2 / hard4 | 367/391, 800/649, 650/478, 357/300 | 299/491 (all) | 1655/1446, 547/516, 611/601, 736/872 | | | | 0.00794 .. 0.01015 | |
+
+Observations (not a decision):
+- The skin increase of round 9 is the thin edge line: inner skin is the same in every variant (+-30 px); only edge
+  skin moves. Measuring the garment edge at the HARD_EDGE alpha shrinks it, ease 4 removes it: **line_hard4 has less
+  edge skin than C** (1035 / 748 vs 1168 / 1063 summed) and still 2.0 / 2.9x less fabric above the shoulder than C
+  (2262 / 3088 vs 6548 / 6323).
+- line_hard4 is still worse than C on at least one metric in 18 / 18 runs: arm-band skin (L 15, R 13 runs, +0.5-3 %),
+  fold (13 runs, max 0.00794 -> 0.00999, mostly #40), edge skin L (11 runs, small per run although the sum drops), gap
+  (7), above (3 / 4: #43 left / right), excess (4).
+- **#40 residual 15-24 px, what competes (not fixed):** collar_floor raises nothing on #40 (0 px), so it is not the
+  cause. The line pairs fight `neck_l` / `neck_r` (weight 5) and `shoulder_l` / `shoulder_r` (weight 1): per line pair
+  the furthest-off stretch |dp| / (s |dq|) is 0.45-0.71 against neck (compressed) and 1.36-1.70 against shoulder
+  (stretched); on m-plus the 75 % pairs also pull against `smid_in` (x0.63-0.68). Cause, from the pair positions (C+line,
+  m-slim, left): garment `sline25_l` q (210, 32) is OUTSIDE `neck_l` q (240, 12), but its body target p (246, 231) is
+  INSIDE neck_l's target (237.8, 225): #40's wide V collar lands outside the body's neck edge, while the line samples
+  start AT the neck edge, so the near-neck line pairs cross the neck pairs; the heavier neck pair wins. #28 / #43 (crew)
+  residuals: 2.2 px (#28), 9.5-11.7 (#43).
+- Re-run without the neck hole (owner 2026-11-13, `NECK_HOLE=0`, r7 neckline on #40; the files in `out/` are this run,
+  the hole run is kept in `out/shoulder9b_hole/`): all C 1348 / 1258 edge, 1281 / 1745 inner, 6935 / 6674 above;
+  line_hard4 1077 / 793, 938 / 1353, 2894 / 3638; same picture (line_hard4 edge skin below C).
+- Final sheets (owner 2026-11-13): `CLEAN=1 NECK_HOLE=1` = as the user sees the result (production neckline: #40's
+  hole cut; no bands, dots or pair names). `out/` holds this run (its table = the hole run); the no-hole run with
+  overlays is in `out/shoulder9b_nohole/`, the hole run with overlays in `out/shoulder9b_hole/`.
+- Re-export after the owner's edits (2026-11-13): female slim / average shoulder points moved (f-slim y 261 -> 253,
+  x 175 / 422 -> 182 / 420; f-average y 270 -> 264, x 180 / 424 -> 184 / 422) and #28 / #43 got owner polygons, so
+  all three garments now have the hole. Clean sheets regenerated; all C edge 555 / 420, above 7517 / 7173; line_hard4
+  edge 598 / 376, above 2518 / 3432. The shoulder-top band follows the shoulder point, so before / after numbers of
+  the two female avatars are not like for like. Previous clean run: `out/shoulder9b_clean_before_female_1532/`,
+  previous export: `data/shoulder9_prev_*`.
+- **Owner decision 2026-11-13 (docs/09 #104): production uses C (sleeve variant C, shoulder line off).** The line
+  variants stay benchmark keywords.
+- Open (owner): start the body samples at the collar target instead of the neck edge on wide necks; use line_hard4 50/75
+  (round 9 showed the 25 % pair kinks the V band); arm-band / fold side effects.

@@ -51,6 +51,12 @@ garment (cv2.remap with mx, my) and cleared (union with the r7 back-collar clear
 skin fill like "clear_skin" (admin avatars only; source != "avatar" -> exactly "hole"). `neck_hole_polygon` (keyword,
 [[x, y], ...] in garment px, owner-drawn; benchmark file data/neck_hole/<id>.json) replaces the GrabCut hole when given.
 
+shoulder_variant (keyword only, benchmark round 9, default "off"; render_tryon never passes it): "line" adds 3 pairs
+per side on the shoulder LINE (`shoulder_line`, adapt only, a no-op in keep_shape), docs/06 "Shoulder line fit, round 9".
+shoulder_fractions (benchmark, default SHOULDER_LINE_FRACTIONS = 25 / 50 / 75 %): which fractions get a pair;
+shoulder_ease (default SHOULDER_LINE_EASE = 2 px) and shoulder_edge_alpha (default 128; round 9b uses HARD_EDGE - 1):
+the target lift and the garment-edge alpha threshold. All ignored when shoulder_variant is "off".
+
 neck_clip (keyword only, benchmark, default False; render_tryon never passes it): the finished layer's alpha is clipped
 to the avatar's figure mask dilated by NECK_CLIP_DILATE px (edge ~0.7 px soft) in the neck/shoulder box: rows from the
 neck-zone top (warp.neck_zone_rows) to the body shoulder row, columns between the two shoulder (acromion) targets, so
@@ -78,6 +84,11 @@ UNDERARM_CLAMP = 2.0
 HARD_EDGE = int(0.9 * 255)
 SLEEVE_VARIANTS = ("r7", "A", "B", "C")
 NECKLINE_VARIANTS = ("r7", "clear", "clear_skin", "hole", "hole_skin")
+SHOULDER_VARIANTS = ("off", "line")
+SHOULDER_LINE_FRACTIONS = (0.25, 0.5, 0.75)  # of collar edge -> shoulder seam (garment) / neck edge -> acromion (body)
+SHOULDER_LINE_EASE = 2  # px: the body target sits this far ABOVE the figure's top edge (fabric on the shoulder)
+SHOULDER_LINE_WEIGHT = 1.0  # same as the shoulder pair
+SHOULDER_LINE_STEEP = 2.0  # |dy/dx| between the neighbour columns above this = a near-vertical edge (recorded only)
 NECK_HOLE_BELT = 15  # garment px: GrabCut decides only inside this belt around the landmark polygon (owner: 10-15)
 NECK_HOLE_ITERS = 5
 NECKLINE_INSET = 0.06  # the opening's sides move inward by this x the collar width: the collar band stays (owner)
@@ -736,9 +747,83 @@ def collar_floor(pairs, blm, mask, margin=COLLAR_FLOOR_MARGIN, max_raise=COLLAR_
     return out
 
 
+
+def shoulder_line(pairs, glm, blm, mask, g_alpha, fractions=SHOULDER_LINE_FRACTIONS, ease=SHOULDER_LINE_EASE,
+                  edge_alpha=128):
+    """Round 9 benchmark (keyword tshirt_layer(shoulder_variant="line"), adapt only, docs/06 "Shoulder line fit,
+    round 9"): per side, 3 pairs `sline<NN>_l|r` on the shoulder LINE. Garment: the top alpha edge (alpha > 128) in
+    the column at fraction f of collar edge -> shoulder seam. Body: in the column at f of neck edge (neck.left_x /
+    right_x) -> acromion (shoulder.left_x / right_x), the first background -> figure step under the neck row (the
+    collar_floor rule, so the head and hair above the neck row are not taken), target moved UP by `ease` px.
+    Weight = the shoulder pair's. A side is skipped (reason in the report) when a collar point is missing or a sample
+    has no edge. Returns {side: {"pairs": [...], "skipped": reason?, "head_columns": [...], "steep": [...]}}; pairs
+    are added in place. edge_alpha (round 9b): the garment edge is the first row with alpha > edge_alpha (default
+    128; HARD_EDGE - 1 = the edge the fitted layer keeps after its hard-edge cut)."""
+    H, W = mask.shape
+    gH, gW = g_alpha.shape
+    solid = g_alpha > edge_alpha
+    y_neck = max(int(round(_f(blm["neck"]["y"]))), 0)
+    report = {}
+
+    def g_edge(x):
+        x = int(round(x))
+        if not 0 <= x < gW:
+            return None
+        ys = np.nonzero(solid[:, x])[0]
+        return int(ys[0]) if len(ys) else None
+
+    def b_edge(x):
+        """(edge y or None, head/hair above: the column is figure at the neck row)."""
+        x = int(round(x))
+        if not 0 <= x < W:
+            return None, False
+        col = mask[y_neck:, x].astype(bool)
+        steps = np.nonzero(~col[:-1] & col[1:])[0]
+        return (y_neck + int(steps[0]) + 1 if len(steps) else None), bool(col[0])
+
+    def steep(edge, x):
+        a, b = edge(x - 1), edge(x + 1)
+        a = a[0] if isinstance(a, tuple) else a
+        b = b[0] if isinstance(b, tuple) else b
+        return a is not None and b is not None and abs(b - a) / 2.0 > SHOULDER_LINE_STEEP
+
+    for side, sx in (("left", "_l"), ("right", "_r")):
+        rep = {"pairs": [], "head_columns": [], "steep": []}
+        report[side] = rep
+        try:
+            gc, gs = _f(glm["collar"][f"{side}_x"]), _f(glm["shoulder"][f"{side}_x"])
+            bc, bs = _f(blm["neck"][f"{side}_x"]), _f(blm["shoulder"][f"{side}_x"])
+        except (KeyError, TypeError):
+            rep["skipped"] = "collar or neck point missing"
+            continue
+        new = {}
+        for f in fractions:
+            name = f"sline{int(round(f * 100)):02d}{sx}"
+            gx, bx = gc + f * (gs - gc), bc + f * (bs - bc)
+            gy = g_edge(gx)
+            by, head = b_edge(bx)
+            if head:
+                rep["head_columns"].append(int(round(bx)))
+            if gy is None or by is None:
+                rep["skipped"] = f"no {'garment' if gy is None else 'body'} edge at {int(round(f * 100))} %"
+                new = {}
+                break
+            if steep(g_edge, gx):
+                rep["steep"].append(f"garment {name}")
+            if steep(b_edge, bx):
+                rep["steep"].append(f"body {name}")
+            new[name] = ((float(int(round(gx))), float(gy)), (float(int(round(bx))), float(by - ease)),
+                         SHOULDER_LINE_WEIGHT)
+        pairs.update(new)
+        rep["pairs"] = sorted(new)
+    return report
+
+
 def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=600, hem_rule=(0.35, 10.0), *,
                  sleeve_variant="r7", debug_map=False, side_floor=False, neckline_variant="r7", source="body",
-                 base=None, neck_clip=False, neck_hole_polygon=None, collar_floor_on=True):
+                 base=None, neck_clip=False, neck_hole_polygon=None, collar_floor_on=True, shoulder_variant="off",
+                 shoulder_fractions=SHOULDER_LINE_FRACTIONS, shoulder_ease=SHOULDER_LINE_EASE,
+                 shoulder_edge_alpha=128):
     """(BGRA layer HxW, info {engine, pairs, rejected, s, neck_opening?, sleeve_hems, runtime, map?}).
     Raises MlsUnavailable (missing landmarks, failed core pairs, bad geometry): the caller uses the parts engine.
     sleeve_variant: benchmark only (module docstring); debug_map: info["map"] = (mx, my) for the fold metric."""
@@ -746,6 +831,10 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
         raise ValueError(f"unknown sleeve variant: {sleeve_variant!r}")
     if neckline_variant not in NECKLINE_VARIANTS:
         raise ValueError(f"unknown neckline variant: {neckline_variant!r}")
+    if shoulder_variant not in SHOULDER_VARIANTS:
+        raise ValueError(f"unknown shoulder variant: {shoulder_variant!r}")
+    if fit_mode == "keep_shape":  # shoulder line: adapt only (round 9 benchmark), a no-op in keep_shape
+        shoulder_variant = "off"
     if neckline_variant in ("clear_skin", "hole_skin") and source != "avatar":  # docs/02 rule 12, docs/09 #89
         neckline_variant = neckline_variant.replace("_skin", "")
     if fit_mode == "keep_shape":  # side_floor disabled for keep_shape for now (owner, 2026-11-12): a no-op there
@@ -764,6 +853,8 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
     lost = [n for n in CORE_PAIRS if n not in pairs]
     if lost:
         raise MlsUnavailable(f"pair validation failed: {', '.join(lost)}")
+    sline = shoulder_line(pairs, glm, body_lm, mask, img[:, :, 3], shoulder_fractions, shoulder_ease,
+                          shoulder_edge_alpha) if shoulder_variant == "line" else None
     raised = collar_floor(pairs, body_lm, mask) if collar_floor_on else None
     mx, my = _inverse_maps(pairs, s, H, W)
     if side_floor:  # second stage: pairs where the first solve left the garment edge, x floored; solve again
@@ -784,6 +875,8 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
     info = {"engine": "mls", "fit_mode": fit_mode, "pairs": pairs, "rejected": rejected, "s": s}
     if raised is not None:
         info["collar_floor"] = raised
+    if sline is not None:
+        info["shoulder_line"] = sline
     if debug_map:
         info["map"] = (mx, my)
     geo = prod.back_collar_geometry(img[:, :, 3] > 128, glm, img)

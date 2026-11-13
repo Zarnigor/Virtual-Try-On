@@ -222,12 +222,35 @@ class SleeveVariantTests(SimpleTestCase):
         with self.assertRaises(ValueError):  # never a silent fallback to parts
             _layer("D")
 
-    def test_render_tryon_does_not_pass_it(self):
+    def test_render_tryon_passes_the_setting_default_c(self):  # docs/09 #104
         base, lm = body()
         g, glm = shirt()
         with mock.patch("apps.tryon_engine.mls.tshirt_layer", wraps=mls.tshirt_layer) as spy:
             warp.render_tryon(base, lm, [("tshirt", g, eng(glm))], warp_engine="mls")
-        self.assertNotIn("sleeve_variant", spy.call_args.kwargs)
+            self.assertEqual(spy.call_args.kwargs["sleeve_variant"], "C")
+            warp.render_tryon(base, lm, [("tshirt", g, eng(glm))], warp_engine="mls", mls_sleeve="r7")
+            self.assertEqual(spy.call_args.kwargs["sleeve_variant"], "r7")
+        self.assertEqual(render_flags("avatar")["mls_sleeve"], "C")
+        with override_settings(TRYON_MLS_SLEEVE="B"):
+            self.assertEqual(render_flags("avatar")["mls_sleeve"], "B")
+
+    def test_setting_is_validated(self):
+        from tryon_studio.settings.base import parse_mls_sleeve
+        self.assertEqual(parse_mls_sleeve(None), "C")
+        self.assertEqual(parse_mls_sleeve(" r7 "), "r7")
+        with self.assertRaises(ImproperlyConfigured):
+            parse_mls_sleeve("D")
+
+    def test_c_in_render_tryon_equals_the_layer_and_keep_shape_ignores_it(self):
+        base, lm = body()
+        g, glm = shirt()
+        mask = warp.figure_mask(cv2.resize(warp._bgra(base), (600, 1200)))
+        _, _, dbg = warp.render_tryon(base, lm, [("tshirt", g, eng(glm))], warp_engine="mls")
+        layer, _ = mls.tshirt_layer(g, eng(glm), lm, mask, "adapt", 1200, 600, sleeve_variant="C")
+        np.testing.assert_array_equal(dbg["tshirt_layer"], layer)
+        a, _ = mls.tshirt_layer(g, glm, lm, mask, "keep_shape", sleeve_variant="C")
+        b, _ = mls.tshirt_layer(g, glm, lm, mask, "keep_shape", sleeve_variant="r7")
+        np.testing.assert_array_equal(a, b)
 
     def test_a_has_no_mid_sleeve_pairs(self):
         _, r7, _, _ = _layer("r7")
@@ -666,3 +689,114 @@ class CollarFloorTests(SimpleTestCase):
         self.assertNotIn("collar_floor", off)
         for name in ("neck_l", "neck_r"):
             self.assertLessEqual(on["pairs"][name][1][1], off["pairs"][name][1][1])
+
+
+class ShoulderLineTests(SimpleTestCase):
+    """Benchmark round 9 (docs/06 "Shoulder line fit, round 9"): shoulder_variant off | line, keyword only, default
+    off; adapt only (a no-op in keep_shape)."""
+
+    def test_default_is_off_and_unknown_is_an_error(self):
+        a, ia, _, _ = _layer()
+        b, ib, _, _ = _layer(shoulder_variant="off")
+        np.testing.assert_array_equal(a, b)
+        self.assertEqual(ia["pairs"], ib["pairs"])
+        self.assertNotIn("shoulder_line", ia)
+        with self.assertRaises(ValueError):
+            _layer(shoulder_variant="curve")
+
+    def test_render_tryon_does_not_pass_it(self):
+        base, lm = body()
+        g, glm = shirt()
+        with mock.patch("apps.tryon_engine.mls.tshirt_layer", wraps=mls.tshirt_layer) as spy:
+            warp.render_tryon(base, lm, [("tshirt", g, eng(glm))], warp_engine="mls")
+        self.assertNotIn("shoulder_variant", spy.call_args.kwargs)
+
+    def test_line_adds_three_pairs_per_side_on_the_shoulder_edge(self):
+        _, info, mask, lm = _layer("C", shoulder_variant="line")
+        names = sorted(k for k in info["pairs"] if k.startswith("sline"))
+        self.assertEqual(names, ["sline25_l", "sline25_r", "sline50_l", "sline50_r", "sline75_l", "sline75_r"])
+        for side, sx in (("left", "_l"), ("right", "_r")):
+            self.assertNotIn("skipped", info["shoulder_line"][side])
+            for k in names:
+                if not k.endswith(sx):
+                    continue
+                (_, _), (px, py), w = info["pairs"][k]
+                self.assertEqual(w, mls.SHOULDER_LINE_WEIGHT)
+                col = mask[:, int(px)]
+                self.assertFalse(col[int(py)])  # SHOULDER_LINE_EASE px above the edge: background
+                self.assertTrue(col[int(py) + mls.SHOULDER_LINE_EASE])  # the edge itself: figure
+
+    def test_side_without_collar_or_edge_is_skipped_and_reported(self):
+        base, lm = body()
+        g, glm = shirt()
+        mask = warp.figure_mask(cv2.resize(warp._bgra(base), (600, 1200)))
+        pairs = {}
+        no_collar = {k: v for k, v in glm.items() if k != "collar"}
+        rep = mls.shoulder_line(pairs, no_collar, lm, mask, warp._bgra(g)[:, :, 3])
+        self.assertEqual(pairs, {})
+        self.assertEqual(rep["left"]["skipped"], "collar or neck point missing")
+        rep = mls.shoulder_line(pairs, glm, lm, mask, np.zeros(warp._bgra(g).shape[:2], np.uint8))
+        self.assertEqual(pairs, {})
+        self.assertTrue(rep["right"]["skipped"].startswith("no garment edge"))
+
+    def test_keep_shape_line_is_identical_to_off(self):  # same other keywords (collar_floor_on default)
+        base, lm = body()
+        g, glm = shirt()
+        mask = warp.figure_mask(cv2.resize(warp._bgra(base), (600, 1200)))
+        a, ia = mls.tshirt_layer(g, glm, lm, mask, "keep_shape", sleeve_variant="C", shoulder_variant="line")
+        b, _ = mls.tshirt_layer(g, glm, lm, mask, "keep_shape", sleeve_variant="C", shoulder_variant="off")
+        np.testing.assert_array_equal(a, b)
+        self.assertNotIn("shoulder_line", ia)
+
+    @skipUnless((R10_FIXTURE / "expected").is_dir(), "round 10 fixture missing (see MlsSideFloorOffRegressionTests)")
+    def test_keep_shape_line_is_identical_to_off_on_44_45(self):
+        n = 0
+        for gid in ("44", "45"):
+            g = cv2.imread(str(R10_FIXTURE / "garments" / f"{gid}.png"), cv2.IMREAD_UNCHANGED)
+            glm = json.loads((R10_FIXTURE / "garments" / f"{gid}.json").read_text())
+            for pk in range(1, 7):
+                base = cv2.imread(str(R10_FIXTURE / "avatars" / f"{pk}.png"), cv2.IMREAD_UNCHANGED)
+                blm = json.loads((R10_FIXTURE / "avatars" / f"{pk}.json").read_text())
+                mask = warp.figure_mask(base)
+                for sv in ("C", "r7"):
+                    with self.subTest(garment=gid, avatar=pk, sleeve=sv):
+                        off, _ = mls.tshirt_layer(g, glm, blm, mask, "keep_shape", 1200, 600, sleeve_variant=sv)
+                        line, _ = mls.tshirt_layer(g, glm, blm, mask, "keep_shape", 1200, 600, sleeve_variant=sv,
+                                                   shoulder_variant="line")
+                        self.assertEqual(int((off != line).any(2).sum()), 0)
+                        n += 1
+        self.assertEqual(n, 24)
+
+
+class ShoulderFractionsTests(SimpleTestCase):
+    """Round 9: shoulder_fractions picks which line pairs exist (benchmark keyword, default 25 / 50 / 75 %)."""
+
+    def test_default_equals_explicit_and_50_75_drops_the_25_pair(self):
+        a, ia, _, _ = _layer("C", shoulder_variant="line")
+        b, ib, _, _ = _layer("C", shoulder_variant="line", shoulder_fractions=mls.SHOULDER_LINE_FRACTIONS)
+        np.testing.assert_array_equal(a, b)
+        _, ic, _, _ = _layer("C", shoulder_variant="line", shoulder_fractions=(0.5, 0.75))
+        self.assertEqual(sorted(k for k in ic["pairs"] if k.startswith("sline")),
+                         ["sline50_l", "sline50_r", "sline75_l", "sline75_r"])
+        off, _, _, _ = _layer("C")
+        off2, _, _, _ = _layer("C", shoulder_fractions=(0.5, 0.75))  # ignored when the variant is off
+        np.testing.assert_array_equal(off, off2)
+
+
+class ShoulderEdgeAlphaEaseTests(SimpleTestCase):
+    """Round 9b: shoulder_ease / shoulder_edge_alpha (benchmark keywords): defaults = round 9, ignored when off."""
+
+    def test_defaults_and_off(self):
+        a, _, _, _ = _layer("C", shoulder_variant="line")
+        b, _, _, _ = _layer("C", shoulder_variant="line", shoulder_ease=mls.SHOULDER_LINE_EASE, shoulder_edge_alpha=128)
+        np.testing.assert_array_equal(a, b)
+        off, _, _, _ = _layer("C")
+        off2, _, _, _ = _layer("C", shoulder_ease=4, shoulder_edge_alpha=mls.HARD_EDGE - 1)
+        np.testing.assert_array_equal(off, off2)
+
+    def test_hard_edge_and_ease_move_the_pairs(self):
+        _, i128, _, _ = _layer("C", shoulder_variant="line")
+        _, ihard, _, _ = _layer("C", shoulder_variant="line", shoulder_ease=4, shoulder_edge_alpha=mls.HARD_EDGE - 1)
+        for k in ("sline50_l", "sline50_r"):
+            self.assertGreaterEqual(ihard["pairs"][k][0][1], i128["pairs"][k][0][1])  # garment edge never higher
+            self.assertEqual(ihard["pairs"][k][1][1], i128["pairs"][k][1][1] - 2)  # ease 4 vs 2: 2 px higher

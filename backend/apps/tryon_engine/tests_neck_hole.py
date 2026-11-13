@@ -39,7 +39,9 @@ def _fixture():
 
 
 def _render(base, blm, g, glm, mode="adapt", engine="mls", **over):
-    flags = {**render_flags("avatar"), "warp_engine": engine, **over}
+    # the fixture was exported with the r7 sleeves (before docs/09 #104 made C the default): pin them here, these
+    # tests check the neck-hole wiring, not the sleeve variant
+    flags = {**render_flags("avatar"), "warp_engine": engine, "mls_sleeve": "r7", **over}
     return render_tryon(base, blm, [("tshirt", g, engine_landmarks("tshirt", glm))], 1200, 600,
                         fit_modes={"tshirt": mode}, **flags)
 
@@ -145,7 +147,8 @@ class NeckHoleRegressionTests(SimpleTestCase):
         self.assertEqual(with_poly.kwargs["neckline_variant"], "hole")
         self.assertEqual(with_poly.kwargs["neck_hole_polygon"], self.polys["47"])
         self.assertNotIn("neck_clip", with_poly.kwargs)
-        self.assertEqual(without.kwargs, {})  # called exactly as before
+        self.assertEqual(without.kwargs, {"sleeve_variant": "r7"})  # no neckline keywords without a polygon
+        self.assertEqual(with_poly.kwargs["sleeve_variant"], "r7")
 
 
 @skipUnless((FIXTURE / "expected").is_dir(), "tryon_neck fixture missing (see NeckHoleRegressionTests)")

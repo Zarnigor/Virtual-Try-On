@@ -192,6 +192,10 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       324 backend tests, 78 vitest, tsc clean.
       **2026-11-13 (docs/09 #103, uncommitted):** the hole applies to keep_shape too (the adapt-only check in
       `warp._neck_hole_kwargs` removed); no polygon = pixel-identical as before.
+      **2026-11-13 round 9 / 9b (docs/06 "Shoulder line fit, round 9"):** shoulder line benchmark (keywords
+      `shoulder_variant`, `shoulder_fractions`, `shoulder_ease`, `shoulder_edge_alpha`, all default off / round 9).
+      **Decided (docs/09 #104): production MLS uses sleeve variant C** (`TRYON_MLS_SLEEVE`, default C), shoulder line
+      not used. 335 backend tests pass.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

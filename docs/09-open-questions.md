@@ -473,3 +473,11 @@ _(none blocking P0)_
     Tests (#28, #40, #47 x 6 avatars x adapt + keep_shape): fabric left <= 5 px (#40) / 6 px (#28, #47); band 0 px off
     the hole; on the hole's antialiased edge 0 px for #40 adapt and <= 4 px elsewhere (pixels already partly
     transparent, alpha 129-199, at w 0.28-0.49, which alpha x (1 - w) takes under 128; measured 1-4 px).
+
+## Decided 2026-11-13: MLS sleeve variant C in production (owner decision)
+104. **2026-11-13: the MLS engine uses sleeve variant C** (round 8 / 8b: B's mid-sleeve pairs at the deltoid edge +
+    `cuff_mid`, docs/06), new setting `TRYON_MLS_SLEEVE` (`r7 | A | B | C`, default `C`, invalid value stops startup),
+    passed by `render_tryon` as `sleeve_variant`. Adapt garments only: keep_shape output is unchanged (C and r7 give the
+    same layer there, tested). The shoulder line of round 9 / 9b is **not** used (stays a benchmark keyword, default
+    off). `mls.tshirt_layer`'s own default stays `r7` so the frozen fixtures keep their meaning; the neck-hole fixture
+    tests pin `mls_sleeve="r7"`. Only with `TRYON_WARP=mls`; the default engine is still `parts` (#98, not decided).

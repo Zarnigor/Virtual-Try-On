@@ -2,7 +2,8 @@
 TRYON_EDGE_FEATHER. Structural steps (default 1): TRYON_SHOULDER_CAP, TRYON_HEM_SNAP, TRYON_HALO_REMOVAL,
 TRYON_NECK_FIX, TRYON_NECK_GAP_FILL. TRYON_DROPPED_SHOULDER_SINGLE (default 0, docs/09 #90).
 T-shirt hem rule: TRYON_HEM_RULE (default 1), TRYON_HEM_HIP_FRACTION, TRYON_HEM_CROTCH_MARGIN (docs/09 #91).
-TRYON_WARP: "parts" (default) | "mls" for the T-shirt (docs/09 #98). TRYON_NECK_HOLE (default 1, MLS only, docs/09 #102)."""
+TRYON_WARP: "parts" (default) | "mls" for the T-shirt (docs/09 #98). TRYON_NECK_HOLE (default 1, MLS only, docs/09 #102).
+TRYON_MLS_SLEEVE: MLS sleeve variant, default "C" (docs/09 #104)."""
 from django.conf import settings
 
 
@@ -18,4 +19,4 @@ def render_flags(source: str = "body") -> dict:
             "dropped_shoulder_single": settings.TRYON_DROPPED_SHOULDER_SINGLE,
             "hem_rule": settings.TRYON_HEM_RULE, "hem_hip_fraction": settings.TRYON_HEM_HIP_FRACTION,
             "hem_crotch_margin": settings.TRYON_HEM_CROTCH_MARGIN, "warp_engine": settings.TRYON_WARP,
-            "neck_hole": settings.TRYON_NECK_HOLE}
+            "neck_hole": settings.TRYON_NECK_HOLE, "mls_sleeve": settings.TRYON_MLS_SLEEVE}

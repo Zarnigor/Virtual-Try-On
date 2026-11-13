@@ -178,6 +178,20 @@ def parse_tryon_warp(value):
 
 
 TRYON_WARP = parse_tryon_warp(os.environ.get("TRYON_WARP"))
+# MLS sleeve variant (docs/09 #104, owner 2026-11-13): "C" = deltoid-edge mid-sleeve pairs + cuff_mid (docs/06 round 8);
+# r7 | A | B kept for comparison. Used only by TRYON_WARP=mls, adapt garments (keep_shape ignores it).
+TRYON_MLS_SLEEVE_CHOICES = ("r7", "A", "B", "C")
+
+
+def parse_mls_sleeve(value):
+    value = (value or "C").strip()
+    if value not in TRYON_MLS_SLEEVE_CHOICES:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(f"TRYON_MLS_SLEEVE must be one of {', '.join(TRYON_MLS_SLEEVE_CHOICES)}, got {value!r}")
+    return value
+
+
+TRYON_MLS_SLEEVE = parse_mls_sleeve(os.environ.get("TRYON_MLS_SLEEVE"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
