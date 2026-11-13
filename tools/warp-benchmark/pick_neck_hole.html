@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neck hole picker</title>
+<!--
+  Mark the neckline interior (inside the collar band's INNER edge) of a garment PNG as a polygon.
+  Benchmark helper for tools/warp-benchmark/run_neck_hole.py (docs/06 "Hole mask").
+  Self-contained: open this file directly in a browser. No network, no libraries.
+  Output: {"polygon": [[x, y], ...]} in the image's natural pixels (integers).
+  Save the file to tools/warp-benchmark/data/neck_hole/<garment id>.json.
+-->
+<style>
+  :root { --line: #e0245e; --fill: rgba(224, 36, 94, 0.25); --point: #ffffff; --ui: #f4f4f5; --text: #18181b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, -apple-system, sans-serif; color: var(--text); background: #fafafa; }
+  header { padding: 10px 16px; background: var(--ui); border-bottom: 1px solid #d4d4d8;
+           display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+  header label { display: inline-flex; gap: 6px; align-items: center; }
+  button { font: inherit; padding: 4px 10px; border: 1px solid #a1a1aa; border-radius: 4px; background: #fff;
+           cursor: pointer; }
+  button:hover { background: #eee; }
+  input[type=text] { font: inherit; width: 8em; padding: 3px 6px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; padding: 12px 16px; }
+  #wrap { overflow: auto; max-height: calc(100vh - 110px); border: 1px solid #d4d4d8;
+          background: repeating-conic-gradient(#e4e4e7 0% 25%, #fff 0% 50%) 0 0 / 16px 16px; }
+  canvas { display: block; cursor: crosshair; }
+  aside { display: flex; flex-direction: column; gap: 8px; }
+  textarea { width: 100%; min-height: 260px; font: 12px/1.4 ui-monospace, Menlo, monospace; }
+  .muted { color: #71717a; }
+  #status { font: 12px ui-monospace, Menlo, monospace; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <label>Garment PNG <input type="file" id="file" accept="image/png,image/*"></label>
+  <label>Zoom <input type="range" id="zoom" min="50" max="400" step="10" value="100"> <span id="zoomText">100%</span></label>
+  <button id="undo" title="Ctrl/Cmd + Z">Undo</button>
+  <button id="clear">Clear</button>
+  <span id="status" class="muted">no image loaded</span>
+</header>
+<main>
+  <div id="wrap"><canvas id="canvas" width="400" height="300"></canvas></div>
+  <aside>
+    <div class="muted">
+      Left click: add point &middot; Drag: move point &middot; Right click: delete nearest point.<br>
+      Trace the collar band's <b>inner</b> edge (the hole only, not the band).
+    </div>
+    <div>Cursor: <span id="cursor">-</span> &middot; Points: <span id="count">0</span></div>
+    <textarea id="json" readonly></textarea>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <button id="copy">Copy JSON</button>
+      <input type="text" id="fname" value="40.json" aria-label="file name">
+      <button id="download">Download</button>
+    </div>
+    <div id="msg" class="muted"></div>
+  </aside>
+</main>
+<script>
+"use strict";
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const img = new Image();
+let loaded = false;
+let zoom = 1;               // canvas px per image px
+let points = [];            // [[x, y], ...] in image natural px (floats while editing)
+let history = [];           // snapshots for Undo
+let drag = -1;              // index of the point being dragged, or -1
+let dragMoved = false;
+const HIT = 8;              // screen px: grab radius for a point
+
+const $ = (id) => document.getElementById(id);
+
+function snapshot() { history.push(points.map((p) => p.slice())); if (history.length > 200) history.shift(); }
+
+// Mouse position in image natural px (independent of zoom and CSS scaling).
+function toImage(ev) {
+  const r = canvas.getBoundingClientRect();
+  const sx = canvas.width / r.width, sy = canvas.height / r.height;
+  return [(ev.clientX - r.left) * sx / zoom, (ev.clientY - r.top) * sy / zoom];
+}
+
+function nearest(p) {
+  let best = -1, bd = Infinity;
+  points.forEach((q, i) => { const d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = i; } });
+  return { index: best, dist: bd };
+}
+
+function resize() {
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * zoom));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * zoom));
+  draw();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!loaded) return;
+  ctx.imageSmoothingEnabled = zoom < 1;   // crisp pixels when zoomed in
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  if (points.length) {
+    ctx.beginPath();
+    points.forEach(([x, y], i) => (i ? ctx.lineTo(x * zoom, y * zoom) : ctx.moveTo(x * zoom, y * zoom)));
+    if (points.length > 2) { ctx.closePath(); ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--fill"); ctx.fill(); }
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--line");
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.font = "bold 11px system-ui, sans-serif";
+    points.forEach(([x, y], i) => {
+      const cx = x * zoom, cy = y * zoom;
+      ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = "#e0245e"; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.strokeText(String(i + 1), cx + 6, cy - 6);
+      ctx.fillStyle = "#18181b"; ctx.fillText(String(i + 1), cx + 6, cy - 6);
+    });
+  }
+  output();
+}
+
+function output() {
+  const data = { polygon: points.map(([x, y]) => [Math.round(x), Math.round(y)]) };
+  // one point per line: readable and still valid JSON
+  $("json").value = '{"polygon": [\n' + data.polygon.map((p) => "  [" + p[0] + ", " + p[1] + "]").join(",\n") + "\n]}";
+  $("count").textContent = points.length;
+}
+
+$("file").addEventListener("change", (ev) => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const url = URL.createObjectURL(f);
+  img.onload = () => {
+    loaded = true; points = []; history = [];
+    $("status").textContent = f.name + " - " + img.naturalWidth + " x " + img.naturalHeight + " px";
+    const m = f.name.match(/(\d+)\.png$/i);
+    if (m) $("fname").value = m[1] + ".json";
+    resize();
+    URL.revokeObjectURL(url);
+  };
+  img.src = url;
+});
+
+$("zoom").addEventListener("input", (ev) => {
+  zoom = Number(ev.target.value) / 100;
+  $("zoomText").textContent = ev.target.value + "%";
+  if (loaded) resize();
+});
+
+canvas.addEventListener("mousedown", (ev) => {
+  if (!loaded || ev.button !== 0) return;
+  const p = toImage(ev);
+  const n = nearest(p);
+  if (n.index >= 0 && n.dist * zoom <= HIT) {
+    snapshot(); drag = n.index; dragMoved = false;
+  } else {
+    snapshot(); points.push(p); draw();
+  }
+});
+
+window.addEventListener("mousemove", (ev) => {
+  if (!loaded) return;
+  const p = toImage(ev);
+  const inside = p[0] >= 0 && p[1] >= 0 && p[0] < img.naturalWidth && p[1] < img.naturalHeight;
+  $("cursor").textContent = inside ? Math.round(p[0]) + ", " + Math.round(p[1]) : "-";
+  if (drag >= 0) {
+    points[drag] = [Math.min(Math.max(p[0], 0), img.naturalWidth - 1), Math.min(Math.max(p[1], 0), img.naturalHeight - 1)];
+    dragMoved = true; draw();
+  }
+});
+
+window.addEventListener("mouseup", () => {
+  if (drag >= 0 && !dragMoved) history.pop();   // a click on a point without moving changes nothing
+  drag = -1;
+});
+
+canvas.addEventListener("contextmenu", (ev) => {
+  ev.preventDefault();
+  if (!loaded || !points.length) return;
+  const n = nearest(toImage(ev));
+  snapshot(); points.splice(n.index, 1); draw();
+});
+
+$("undo").addEventListener("click", undo);
+function undo() { if (history.length) { points = history.pop(); draw(); } }
+window.addEventListener("keydown", (ev) => {
+  if ((ev.metaKey || ev.ctrlKey) && ev.key.toLowerCase() === "z") { ev.preventDefault(); undo(); }
+});
+
+$("clear").addEventListener("click", () => { if (points.length) { snapshot(); points = []; draw(); } });
+
+function say(text) { $("msg").textContent = text; setTimeout(() => { $("msg").textContent = ""; }, 2500); }
+
+$("copy").addEventListener("click", async () => {
+  const text = $("json").value;
+  try { await navigator.clipboard.writeText(text); say("Copied."); }
+  catch (e) { $("json").select(); document.execCommand("copy"); say("Copied (fallback)."); }
+});
+
+$("download").addEventListener("click", () => {
+  if (points.length < 3) { say("Add at least 3 points first."); return; }
+  const name = ($("fname").value || "40.json").trim();
+  const blob = new Blob([$("json").value + "\n"], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name.endsWith(".json") ? name : name + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  say("Downloaded " + a.download + ".");
+});
+
+output();
+</script>
+</body>
+</html>

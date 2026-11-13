@@ -21,3 +21,6 @@ tools/warp-benchmark/out/
 /demo_garments/
 # MLS benchmark garment export (cleaned garment PNGs + landmarks, tools/warp-benchmark/run_landmarks.py)
 tools/warp-benchmark/data/
+
+# MLS r7 regression fixture (avatar photos; tools/warp-benchmark/export_r7_regression.py)
+backend/apps/tryon_engine/testdata/

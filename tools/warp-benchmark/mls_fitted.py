@@ -310,3 +310,145 @@ def coverage_metrics(layer, base_mask, info, blm):
             line = b[0] + (b[-1] - b[0]) * (xs - xs[0]) / max(xs[-1] - xs[0], 1)
             curve = round(float(np.nanmax(np.abs(b - line))), 1)
     return {"uncovered_px": uncovered, "excess_px": excess, "gap_px": gap, "hem_curve_px": curve}
+
+
+# ---------- metrics (round 8: sleeves) ----------
+
+def arm_band_quads(pairs, blm):
+    """Per side, the body-target quadrilateral the sleeve should cover: shoulder (acromion) -> outer cuff -> inner
+    cuff -> armpit target (the body armpit edge point when the armpit pair was dropped). None when a cuff is missing.
+    Round 8 passes the r7 run's pairs for every variant (A/B/C do not move these four targets)."""
+    out = {}
+    for side, sx in (("left", "_l"), ("right", "_r")):
+        if "cuff_out" + sx not in pairs or "cuff_in" + sx not in pairs or "shoulder" + sx not in pairs:
+            out[side] = None
+            continue
+        pit = pairs["armpit" + sx][1] if "armpit" + sx in pairs else (_f(blm["armpit"][f"{side}_x"]),
+                                                                      _f(blm["armpit"]["y"]))
+        out[side] = np.array([pairs["shoulder" + sx][1], pairs["cuff_out" + sx][1], pairs["cuff_in" + sx][1], pit],
+                             np.float32)
+    return out
+
+
+def arm_band_skin_px(layer, base_mask, quads):
+    """Figure (body mask) pixels inside the arm-band quadrilaterals not covered by the garment (alpha < 128).
+    Background pixels inside a quadrilateral do not count. {"left", "right", "total"}."""
+    import cv2
+    cover = layer[:, :, 3] >= 128
+    res = {}
+    for side, quad in quads.items():
+        if quad is None:
+            res[side] = None
+            continue
+        poly = np.zeros(cover.shape, np.uint8)
+        cv2.fillPoly(poly, [np.round(quad).astype(np.int32)], 1)
+        res[side] = int(((poly > 0) & base_mask & ~cover).sum())
+    res["total"] = sum(v for v in res.values() if v is not None)
+    return res
+
+
+def cuff_wave_px(layer, pairs, reach=30):
+    """Sleeve bottom-edge waviness: along the straight body cuff line (outer cuff target -> inner cuff target),
+    central 90 %, one sample per px, march along the line's normal towards the hand (away from the shoulder)
+    from -reach to +reach and take the first covered -> uncovered transition as the edge.
+    Returns the max |deviation| of that edge from the straight line through its two end samples, max over sides
+    (None when no side could be measured). A straight cuff scores 0; a slightly curved real hem also scores > 0, so
+    this is not a quality verdict on its own."""
+    cover = layer[:, :, 3] >= 128
+    H, W = cover.shape
+    worst = None
+    for sx in ("_l", "_r"):
+        if "cuff_out" + sx not in pairs or "cuff_in" + sx not in pairs or "shoulder" + sx not in pairs:
+            continue
+        a, b = np.array(pairs["cuff_out" + sx][1], float), np.array(pairs["cuff_in" + sx][1], float)
+        L = float(np.linalg.norm(b - a))
+        if L < 4:
+            continue
+        t_hat = (b - a) / L
+        n = np.array([-t_hat[1], t_hat[0]])
+        sh = np.array(pairs["shoulder" + sx][1], float)
+        if (a + b) @ n / 2 < sh @ n:  # normal must point away from the shoulder (towards the hand)
+            n = -n
+        offs = []
+        for t in np.arange(0.05 * L, 0.95 * L + 1e-6, 1.0):
+            p0 = a + t_hat * t
+            e, seen = np.nan, False
+            for s in range(-reach, reach + 1):
+                x, y = (p0 + n * s).round().astype(int)
+                on = 0 <= x < W and 0 <= y < H and cover[y, x]
+                if on:
+                    seen = True
+                elif seen:
+                    e = s - 0.5
+                    break
+            offs.append(e)
+        o = np.array(offs, float)
+        if len(o) < 3 or np.isnan(o[[0, -1]]).any():
+            continue
+        line = o[0] + (o[-1] - o[0]) * np.arange(len(o)) / (len(o) - 1)
+        dev = float(np.nanmax(np.abs(o - line)))
+        worst = dev if worst is None else max(worst, dev)
+    return None if worst is None else round(worst, 1)
+
+
+# ---------- metrics (round 10: side floor) ----------
+
+def side_strip_px(layer, base_mask, blm, pairs, band_frac=0.03):
+    """Figure (body mask) px not covered by the garment within band_frac x figure height inward of the torso
+    silhouette edge, on every row from the body armpit row to the run's hem target row (the higher of the hem_l /
+    hem_r body targets, as coverage_metrics; keep_shape hems end above the body hem rule by design), both sides.
+    Torso edges = production mls._torso_edges (the side-floor source: mask run through the axis, landmark span when
+    an arm touches the torso). {"left", "right", "total"}."""
+    from apps.tryon_engine import mls as pm
+    cover = layer[:, :, 3] >= 128
+    H, W = cover.shape
+    band = band_frac * (_f(blm["foot_bottom"]["y"]) - _f(blm["head_top"]["y"]))
+    axis = prod._crotch_x(blm)
+    left = right = 0
+    hem_y = min(pairs["hem_l"][1][1], pairs["hem_r"][1][1]) if "hem_l" in pairs and "hem_r" in pairs \
+        else pm.body_hem_y(blm)
+    for y in range(int(_f(blm["armpit"]["y"])), min(int(hem_y), H - 1) + 1):
+        l, r = pm._torso_edges(base_mask, blm, y, axis)
+        xs = np.arange(W)
+        miss = base_mask[y] & ~cover[y]
+        left += int((miss & (xs >= l) & (xs < l + band)).sum())
+        right += int((miss & (xs < r) & (xs >= r - band)).sum())
+    return {"left": left, "right": right, "total": left + right}
+
+
+# ---------- metrics (round 8b: shoulder top) ----------
+
+def shoulder_top_boxes(pairs, blm, quads):
+    """Per side, the shoulder-top band (owner, 2026-11-12): x between the body neck edge and the acromion (the run's
+    shoulder target, adapt puts it on the mask edge), y from the neck landmark row down to the shoulder line +
+    0.08 x the shoulder width; pixels inside the arm-band quadrilateral are excluded (no px counted twice).
+    Returns {side: bool mask or None}; round 8b passes the r7 run's pairs and quads for every variant."""
+    import cv2
+    H, W = 1200, 600
+    span = _f(blm["shoulder"]["right_x"]) - _f(blm["shoulder"]["left_x"])
+    y0, y1 = _f(blm["neck"]["y"]), _f(blm["shoulder"]["y"]) + 0.08 * span
+    out = {}
+    for side, sx in (("left", "_l"), ("right", "_r")):
+        if "shoulder" + sx not in pairs:
+            out[side] = None
+            continue
+        ax = pairs["shoulder" + sx][1][0]
+        nx = _f(blm["neck"][f"{side}_x"])
+        x0, x1 = (ax, nx) if side == "left" else (nx, ax)
+        box = np.zeros((H, W), bool)
+        box[int(np.ceil(y0)):int(np.floor(y1)) + 1, int(np.ceil(x0)):int(np.floor(x1))] = True
+        if quads.get(side) is not None:
+            poly = np.zeros((H, W), np.uint8)
+            cv2.fillPoly(poly, [np.round(quads[side]).astype(np.int32)], 1)
+            box &= poly == 0
+        out[side] = box
+    return out
+
+
+def shoulder_top_skin_px(layer, base_mask, boxes):
+    """Figure (body mask) px in the shoulder-top band not covered by the garment (alpha < 128). {"left", "right",
+    "total"}."""
+    cover = layer[:, :, 3] >= 128
+    res = {side: (None if box is None else int((box & base_mask & ~cover).sum())) for side, box in boxes.items()}
+    res["total"] = sum(v for v in res.values() if v is not None)
+    return res
