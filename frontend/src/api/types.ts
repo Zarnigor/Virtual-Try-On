@@ -117,6 +117,11 @@ export interface TshirtLandmarks {
   collar_bottom?: Point
   /** Legacy (before 2026-11-11), read only. */
   sleeve_end?: { left: Point; right: Point }
+  /**
+   * Neckline hole (docs/09 #102, step 2 of the editor): the inner edge of the collar band, [x, y] in px of the
+   * cleaned PNG, 3..64 points. Used by the MLS try-on only (TRYON_WARP=mls, adapt garments). null = no hole.
+   */
+  neck_hole?: { polygon: [number, number][] } | null
 }
 
 /** Pants landmarks, pixels on the garment's own tight-cropped PNG. */
@@ -244,8 +249,10 @@ export interface Garment {
   width: number | null
   height: number | null
   landmarks: GarmentLandmarks
-  /** True when every point of the current set exists; false: ask the user to add the missing points. */
+  /** True when every point of the MAIN set (step 1) exists; false: ask the user to add the missing points. */
   landmarks_complete: boolean
+  /** T-shirt step 2 done: collar points + collar_bottom + neck_hole polygon. null for pants (docs/09 #102). */
+  neck_complete: boolean | null
   visibility: Visibility
   fit_mode: FitMode
   gender: GarmentGender
@@ -288,6 +295,18 @@ export interface TryOnResponse {
   outfit_id: number
   /** Debug (docs/09 #98): the T-shirt engine asked for; the job result has the one used + quality_warnings. */
   engine: 'parts' | 'mls'
+}
+
+/** job.result of a finished try-on job (docs/04). */
+export interface TryOnJobResult {
+  outfit_id: number
+  /** The T-shirt engine actually used. */
+  engine: 'parts' | 'mls'
+  /** e.g. "mls_fallback", "neck_hole_invalid" (messages: locale TRYON_QUALITY). */
+  quality_warnings: string[]
+  /** Debug (docs/09 #102): per garment id, whether the owner's neckline polygon was used. */
+  neck_hole: Record<string, boolean>
+  demo?: boolean
 }
 
 export interface Outfit {

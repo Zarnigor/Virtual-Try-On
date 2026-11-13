@@ -1487,13 +1487,26 @@ LAYER_ORDER = ("avatar", "pants", "tshirt_torso", "tshirt_sleeves", "shoulder_ca
                "hands_forearms")
 
 
+def _neck_hole_kwargs(g_img, glm, fit_mode, enabled, info) -> dict:
+    """tshirt_layer keywords for the owner-drawn neckline hole (docs/09 #102), or {} (the call as before)."""
+    from apps.garments.landmark_checks import alpha_stats, neck_hole_polygon, neck_hole_problem
+    if not enabled or fit_mode != "adapt" or neck_hole_polygon(glm) is None:
+        return {}
+    alpha = _bgra(g_img)[:, :, 3]
+    bbox, area = alpha_stats(alpha)
+    if neck_hole_problem(glm["neck_hole"], alpha.shape[1], alpha.shape[0], area, bbox):
+        info["quality_warnings"].append("neck_hole_invalid")
+        return {}
+    return {"neckline_variant": "hole", "neck_hole_polygon": [list(p) for p in glm["neck_hole"]["polygon"]]}
+
+
 def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600,
                  shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
                  halo_removal: bool = True, neck_fix: bool = True, neck_gap_fill: bool = True,
                  source: str = "body", dropped_shoulder_single: bool = False, hem_rule: bool = False,
                  hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0,
-                 fit_modes: dict | None = None, warp_engine: str = "parts"):
+                 fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1518,6 +1531,10 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     When MLS cannot run (missing landmarks, failed core pairs) the T-shirt falls back to "parts" and
     debug["quality_warnings"] gets "mls_fallback". Pants always use their own warp. debug["engine"] = the engine
     the T-shirt actually used ("parts" when there is no T-shirt).
+    neck_hole (setting TRYON_NECK_HOLE, docs/09 #102): MLS + adapt only. When the T-shirt landmarks carry
+    `neck_hole.polygon` and it passes landmark_checks.neck_hole_problem (same rules as PATCH), the MLS layer is made
+    with neckline_variant="hole" + that polygon (never neck_clip); a failing polygon is skipped with quality warning
+    "neck_hole_invalid". keep_shape, parts and neck_hole=False ignore the polygon. debug["neck_hole"] = used or not.
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -1538,12 +1555,15 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         layers.append(("pants", warped))
     opening = None
     mls_layer = None
+    info["neck_hole"] = False
     if "tshirt" in by_type and warp_engine == "mls":
         from . import mls as mls_engine
+        hole_kw = _neck_hole_kwargs(*by_type["tshirt"], fit_modes.get("tshirt", "adapt"), neck_hole, info)
         try:
             mls_layer, mls_info = mls_engine.tshirt_layer(
                 *by_type["tshirt"], body_lm, mask, fit_modes.get("tshirt", "adapt"), H, W,
-                (hem_hip_fraction, hem_crotch_margin))
+                (hem_hip_fraction, hem_crotch_margin), **hole_kw)
+            info["neck_hole"] = bool(hole_kw)
             info.update(engine="mls", mls=mls_info, sleeve_hems=mls_info["sleeve_hems"])
             warnings += [f"tshirt: mls dropped {r}" for r in mls_info["rejected"]]
         except mls_engine.MlsUnavailable as e:

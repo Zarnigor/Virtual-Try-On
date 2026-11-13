@@ -322,7 +322,10 @@ class TshirtSetTests(SimpleTestCase):
         self.assertTrue(landmarks_complete("tshirt", FULL))
         self.assertFalse(landmarks_complete("tshirt", TSHIRT))
         self.assertFalse(landmarks_complete("tshirt", LEGACY))
-        self.assertFalse(landmarks_complete("tshirt", with_value(FULL, "collar_bottom.x", _DELETE)))
+        # docs/09 #102: the collar points are step 2 (neck_complete), the main set does not need them
+        self.assertTrue(landmarks_complete("tshirt", with_value(FULL, "collar_bottom.x", _DELETE)))
+        self.assertTrue(landmarks_complete("tshirt", with_value(FULL, "collar", _DELETE)))
+        self.assertFalse(landmarks_complete("tshirt", with_value(FULL, "armpit", _DELETE)))
         self.assertFalse(landmarks_complete("tshirt", {}))
         self.assertTrue(landmarks_complete("pants", PANTS))
 

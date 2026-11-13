@@ -130,9 +130,9 @@ describe('sanity checks (same rules and messages as the server)', () => {
     expect(checkTshirt(set(FULL, 'collar.y', 150)).errors).toEqual([]) // warnings never block
   })
 
-  it('names the missing new groups for the banner', () => {
+  it('names the missing step-1 groups for the banner (collar points are step 2, docs/09 #102)', () => {
     expect(missingTshirtGroups(FULL)).toEqual([])
-    expect(missingTshirtGroups(TSHIRT)).toEqual([N.collar, N.collar_bottom, N.armpit])
-    expect(missingTshirtGroups(LEGACY)).toEqual([N.collar, N.collar_bottom, N.armpit, N.sleeve_cuff_outer, N.sleeve_cuff_inner])
+    expect(missingTshirtGroups(TSHIRT)).toEqual([N.armpit])
+    expect(missingTshirtGroups(LEGACY)).toEqual([N.armpit, N.sleeve_cuff_outer, N.sleeve_cuff_inner])
   })
 })

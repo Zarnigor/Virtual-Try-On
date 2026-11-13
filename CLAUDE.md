@@ -103,7 +103,7 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-Last updated: 2026-11-12. The first task (summary + plan) is done. The owner approved the 10-step plan below.
+Last updated: 2026-11-13. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
 - [ ] 1. Day-1 experiment, properly: 3 real male avatars (avatar-prep + landmark editor), fix sleeves
@@ -168,6 +168,28 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `BODY_SEX_REQUIRED`, `for_sex`); MLS single-field T-shirt warp in `apps/tryon_engine/mls.py` behind
       `TRYON_WARP=parts|mls` (default `parts`, falls back with `mls_fallback`). keep_shape = preset A only on `mls`.
       **Owner to decide: parts vs MLS as default, and the hem rule (#91 / docs/09 "Still open").**
+      **2026-11-12 round 8 (docs/06, NOT production, uncommitted):** MLS sleeve variants r7|A|B|C as the keyword
+      `mls.tshirt_layer(sleeve_variant=)` (default r7, pixel-identical: `MlsR7RegressionTests`, gitignored fixture).
+      Table + sheets in `tools/warp-benchmark/out/` (`run_sleeve8.py`). Owner to review; no winner picked.
+      **2026-11-12 round 10 (docs/06, NOT production, uncommitted):** side coverage floor, keyword
+      `mls.tshirt_layer(side_floor=)` (default False, pixel-identical: `MlsSideFloorOffRegressionTests`). `table10.md` +
+      `sheet_sidefloor_<id>.png` (`run_sidefloor10.py`). Oversized on/off not negligible (see docs/06). No winner picked.
+      **Update:** oversized path restored: default 0 px (#44/#45, 24 renders); side_floor disabled for keep_shape;
+      adapt + side_floor on #44/#45 still differs (owner to decide). Round 10 work paused until the owner says so.
+      **2026-11-12 round 8b (docs/06):** sleeve variants re-measured with re-marked landmarks + `shoulder_top_skin_px`
+      (`run_sleeve8b.py`, `table8b.md`, `sheet_sleeve8b_<id>.png`). No winner picked.
+      **2026-11-12 neckline (docs/06 "V-neck opening"):** `mls.tshirt_layer(neckline_variant=r7|clear|clear_skin)`,
+      default r7 (0 px), `run_neck.py`, `table_neck.md`, `sheet_neck_<id>.png`. No winner picked.
+      **Decided 2026-11-12 (docs/09 #99):** avatars re-shot as real photos in one low round-neck tank; V necks use
+      `hole` + `neck_clip` (benchmark), the skin-fill variants are not used. Waiting for the new avatar photos.
+      **2026-11-13 (docs/09 #100-101):** owner polygon `hole` works for V, crew (#28) and square (#47) necks; `clear` is
+      not used when a polygon exists; `neck_clip` NOT used (clips the crew shoulder). **Collar floor is the MLS default**
+      (`collar_floor_on=True`, regression fixtures pinned with False). 301 backend tests pass. Open: who marks the polygon.
+      **2026-11-13 (docs/09 #102, uncommitted):** neckline hole in the product: every owner marks it, two-step T-shirt
+      editor (step 2 `/garments/{id}/neck`: collar points + polygon), `landmarks.neck_hole.polygon`, `neck_complete`,
+      render wiring MLS + adapt only behind `TRYON_NECK_HOLE` (default 1), `neck_hole_invalid` warning. **The hole works
+      only with TRYON_WARP=mls.** Suggestion: shape buttons V / Dumaloq / Toʻrtburchak, created once, two edit modes.
+      324 backend tests, 78 vitest, tsc clean. Open: keep_shape + hole.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

@@ -15,6 +15,7 @@ export const GARMENT_GROUP_NAMES = {
     chest: 'Koʻkrak',
     waist: 'Bel',
     hem: 'Pastki',
+    neck_hole: 'Yoqa teshigi',
   },
   pants: { waist: 'Bel', hip: 'Son', crotch: 'Qoʻshilish', knee: 'Tizza', hem: 'Pocha' },
 } as const
@@ -31,6 +32,13 @@ export const CHECK_MESSAGES = {
   cuff_side: (g: string) => `${q(g)}: chap yeng nuqtasi rasmning chap yarmida, oʻngi oʻng yarmida boʻlsin.`,
   cuff_order: (g: string) =>
     `${q(g)}: tashqi nuqta yengning tashqi (yelka) tomonida, ichki nuqta qoʻltiq tomonida boʻlsin.`,
+  // neck_hole polygon (docs/09 #102), same strings as backend MESSAGES hole_* / bounds
+  bounds: (g: string) => `${q(g)} nuqtasi rasm chegarasidan chiqib ketgan.`,
+  hole_points: (g: string) => `${q(g)}: 3 tadan 64 tagacha nuqta boʻlsin.`,
+  hole_self: (g: string) => `${q(g)} chizigʻi oʻzini kesib oʻtmasin.`,
+  hole_empty: (g: string) => `${q(g)} yuzasi boʻsh. Nuqtalarni yoqa ichki cheti boʻylab qoʻying.`,
+  hole_area: (g: string) => `${q(g)} juda katta: kiyim yuzasining 25 % idan oshmasin.`,
+  hole_top: (g: string) => `${q(g)} nuqtalari kiyimning yuqori qismida (balandlikning 40 % ida) boʻlsin.`,
 }
 
 export const CHECK_WARNINGS = {
@@ -47,6 +55,49 @@ export const LANDMARK_EDITOR = {
   optionalCount: (placed: number, total: number) => `+ ${placed} / ${total} qoʻshimcha`,
   checksTitle: 'Tekshiruv',
   warningsTitle: 'Eslatma',
+  step: (n: number, total: number) => `${n} / ${total}`,
+  next: 'Keyingi',
+  save: 'Saqlash',
+  saving: 'Saqlanmoqda…',
+  back: '← Orqaga',
+}
+
+/** Garment editor step 2 (T-shirts): collar points + the neckline hole polygon (docs/09 #102, docs/10 screen 9). */
+export const NECK_EDITOR = {
+  heading: 'Yoqa va boʻyin teshigi · Futbolka',
+  subheading: 'Avval yoqaning 3 nuqtasini qoʻying, keyin yoqa teshigini toʻgʻrilang.',
+  polygonTitle: 'Yoqa teshigi',
+  polygonHint:
+    'Teshik yoqa bandining ICHKI cheti boʻylab oʻtsin va kiyimning eng yuqori chetigacha chiqsin: ' +
+    'orqa tomonning ichki qismi (yorliq ham) teshik ichida qolsin. Band oʻzi teshikdan tashqarida boʻlsin.',
+  polygonWaiting: 'Yoqa teshigi yoqaning 3 nuqtasi qoʻyilgach chiziladi.',
+  polygonHelp: 'Nuqtani suring. Chiziq ustiga bosing: yangi nuqta. Tanlangan nuqtani oʻchirish mumkin (kamida 3 ta).',
+  pointsModeHelp: 'Yoqa nuqtalarini surganda teshik oʻzgarmaydi. Yangi nuqtalardan qayta chizish uchun shaklni tanlang.',
+  modeLabel: 'Nimani tahrirlash',
+  modePoints: 'Yoqa nuqtalari',
+  modeHole: 'Yoqa teshigi',
+  shapeLabel: 'Yoqa shakli',
+  shapes: { v: 'V', round: 'Dumaloq', square: 'Toʻrtburchak' },
+  polygonCount: (n: number) => `${n} nuqta`,
+  deleteVertex: 'Nuqtani oʻchirish',
+  resetPolygon: 'Qayta tiklash',
+  skip: 'Oʻtkazib yuborish',
+  skipHint: 'Oʻtkazib yuborsangiz, boʻyin atrofi yomonroq koʻrinishi mumkin. Keyinroq qaytib belgilash mumkin.',
+  needStep1: 'Avval 1-qadamdagi asosiy nuqtalarni belgilang.',
+  goStep1: '1-qadamga oʻtish',
+  saved: 'Muvaffaqiyatli saqlandi',
+  vertexLabel: (i: number) => `Yoqa teshigi nuqtasi ${i + 1}`,
+}
+
+/** Garment card chips (Wardrobe). */
+export const GARMENT_CHIPS = {
+  neckUnmarked: 'Boʻyin belgilanmagan',
+}
+
+/** Try-on job result quality warnings (job.result.quality_warnings). */
+export const TRYON_QUALITY: Record<string, string> = {
+  neck_hole_invalid: 'Yoqa teshigi notoʻgʻri belgilangan, shu sababli hisobga olinmadi. Kiyimning yoqasini qayta belgilang.',
+  mls_fallback: 'Kiyim uchun barcha nuqtalar topilmadi, oddiy usulda kiydirildi.',
 }
 
 /** Garment settings (screen 9) and list badges/filters (docs/09 #93). */

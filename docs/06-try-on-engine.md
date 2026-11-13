@@ -560,3 +560,248 @@ passed through docker-compose to the backend and the Celery worker. T-shirt only
   job result adds `engine` (actually used) and `quality_warnings`.
 - Hem row: hip + 0.35 x (crotch - hip), at most crotch - 10 px (`TRYON_HEM_HIP_FRACTION` / `TRYON_HEM_CROTCH_MARGIN`),
   still the benchmark assumption (docs/09 "Still open").
+
+### MLS sleeve variants, round 8 (2026-11-12, NOT production, no winner picked)
+Problem (round 7, fitted / `adapt`, k 1.0): bare skin between the shoulder and the sleeve, and a wavy sleeve bottom
+edge. Suspected causes: the `smid_out` target (extrapolated arm centre line + half width) lies inside the deltoid;
+the cuff has only two control points. Variants are a keyword argument of `mls.tshirt_layer(..., sleeve_variant=)`
+(default `"r7"`; no env var, no flag, `render_tryon` never passes it, so production is unchanged):
+- **r7**: round 7 as shipped behind `TRYON_WARP=mls`.
+- **A**: no `smid_out|in` pairs (round 6 sleeve).
+- **B**: `smid_out` target = the arm's outer silhouette edge on its row (outermost mask run, the deltoid edge) + the
+  existing `CUFF_ARM_EASE` share of the arm width measured lower down (`_arm_at`); `smid_in` unchanged. No edge found
+  -> r7 target kept (noted in `rejected`).
+- **C**: B + `cuff_mid` pair (garment cuff-corner midpoint -> body cuff-target midpoint), computed after
+  `_validate_fitted` and `validate`; dropped when the corners are < 2 px apart, it is not strictly between cuff_out and
+  cuff_in in x, or it crosses the armpit in x order.
+Torso sides, hem, keep_shape preset A, pants and the parts engine untouched. No new landmarks.
+
+Runner `tools/warp-benchmark/run_sleeve8.py` (production `tshirt_layer`, #28, #43, #40 x 6 avatars x 4 variants);
+outputs `out/results8.json`, `out/table8.md`, `out/sheet_sleeve8_<id>.png` (rows = avatars, r7 | A | B | C, grey =
+measured arm band), `out/crop_sleeve8_worst_<v>.png` (2x). Metrics (`mls_fitted.py`):
+- `arm_band_skin_px`: figure (body mask) px not covered by the garment inside the body-target quadrilateral
+  shoulder (acromion) -> cuff_out -> cuff_in -> armpit, per side; the r7 run's quad for every variant (A/B/C do not
+  move those targets); background px do not count. Skin ABOVE the shoulder point (top of the shoulder near the neck,
+  visible on #43 female slim/average in every variant) is outside the quad and not counted.
+- `cuff_wave_px`: max deviation of the sleeve bottom edge from the straight line through its end samples, along the
+  body cuff line (central 90 %). Rewards a straight cuff; a real hem may be slightly curved, so not a verdict alone.
+- gap / excess (round 6 `coverage_metrics`), fold (`debug_map=True`), runtime.
+
+| variant | arm-band skin px (sum / max) | gap px (sum) | excess px (sum) | fold (max) | cuff wave px (median / max) | runtime s (max) | dropped |
+|---|---|---|---|---|---|---|---|
+| r7 | 21838 / 2070 | 14328 | 4278 | 0.00688 | 14.4 / 27.4 | 0.07 | - |
+| A | 13687 / 1518 | 11773 | 7930 | 0.00890 | 14.1 / 28.9 | 0.07 | - |
+| B | 16312 / 1555 | 13778 | 4623 | 0.00676 | 12.9 / 28.7 | 0.07 | - |
+| C | 11113 / 1154 | 8831 | 4284 | 0.00660 | 10.2 / 27.0 | 0.08 | - |
+
+Per run: `out/table8.md`. Observations (not a decision), counted over the 18 runs: every variant has less
+arm-band skin than r7 on every run; lowest skin: C 14, A 4 (all four on #40: male slim, female slim/average/plus).
+Lowest gap: C 11, A 7. A has 1.85x the r7 excess in total (sleeves pushed past the arm, mostly #40); excess is
+lowest with r7 on 13 runs. Waviness: C lowest on 9 runs but worse than r7 on 6 (#28 male average/plus, #43 male
+slim, female slim/average/plus); every variant still shows a jagged cuff edge on the sheets. Regression: `tests_mls.MlsR7RegressionTests` checks that the
+default (r7) stays pixel-identical to the layer exported before this change (#28, #43, #40 x 6 avatars; fixture
+`backend/apps/tryon_engine/testdata/mls_r7/`, gitignored because it holds the avatar photos; the test skips without
+it; export with `tools/warp-benchmark/export_r7_regression.py` on the pre-change code only).
+
+### MLS side coverage floor, round 10 (2026-11-12, NOT production, no winner picked)
+Problem: on plus avatars the garment is narrower than the torso and the avatar's grey top shows in strips from the
+armpit to the hem (keep_shape k 0.3 pulls the side targets back to the garment's own width; adapt has side points only
+at the armpit, chest, waist and hem rows). Keyword `mls.tshirt_layer(..., side_floor=False)` (default off; no env var,
+no flag; `render_tryon` never passes it, test `SideFloorTests.test_render_tryon_does_not_pass_it`).
+- **Floor** at body row y = torso silhouette edge -/+ `SIDE_EASE` (1.5 %, round 7) x the torso width
+  (`_torso_floor`; edge = the mask run through the axis, or the landmark span `prod.body_span` when the run is > 1.3x
+  the span, i.e. an arm touches the torso).
+- **keep_shape:** the x targets of armpit, chest, waist and hem are clamped to the floor at their target row; k still
+  sets y; preset A values unchanged.
+- **Both modes, two stages:** solve 1 with the pairs above (keep_shape: already clamped). Garment points at 1/3 and 2/3
+  of the way from max(armpit, chest) to the hem row, plus the body hip row's fraction, on the garment's measured alpha
+  edge (run through the garment centre; landmark span when the run is > 1.3x it, a sleeve joined to the torso). Where
+  solve 1 puts each point (nearest body px, at most 3 garment px off, else dropped) gives the new pair
+  `side_a|side_b|side_hip` + `_l|_r` with x = max(landing, floor) (left: min). Solve 2 with them. New pairs that break
+  the vertical order of the side pairs (garment vs body, > 1 px apart) or left < right are dropped
+  (`_validate_side_floor`). Shoulder, sleeve, neck pairs, pants and the parts engine untouched. No new landmarks.
+
+Runner `tools/warp-benchmark/run_sidefloor10.py`: production `tshirt_layer`, #28, #43, #40 (fitted) and #44, #45
+(oversized) x 6 avatars x {adapt k 1.0, keep_shape A} x floor {off, on} = 120 runs. Outputs `out/results10.json`,
+`out/table10.md` (every run), `out/sheet_sidefloor_<id>.png` (rows = avatars; adapt off | on | keep_shape off | on;
+armpit-to-hem crop, grey dots = the floor), `out/crop_sidefloor_worst_<mode>.png` (2x, off | on).
+New metric `side_strip_px` (`mls_fitted.py`): figure px not covered by the garment within 3 % of the figure height
+inward of the torso silhouette edge (same edge source as the floor), from the body armpit row to the run's hem target
+row (keep_shape hems end above the body hem rule by design: counting down to the body hem row measured garment
+length, not side coverage).
+
+| garment | mode | floor | side strip px | uncovered px | excess px | fold | print dist | hem curve px (max) | changed px (max %) | runtime s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| #28 | adapt | off / on | 16863 / 11043 | 38305 / 32808 | 720 / 760 | 0.0028 / 0.0026 | - | 13.2 / 12.2 | 9424 (4.01 %) | 0.07 / 0.12 |
+| #28 | keep_shape | off / on | 26746 / 6984 | 44586 / 26148 | 2879 / 3277 | 0 / 0 | - | 9.0 / 10.6 | 27927 (12.99 %) | 0.06 / 0.11 |
+| #43 | adapt | off / on | 21030 / 12790 | 56952 / 49255 | 14 / 40 | 0.0036 / 0.0041 | - | 18.7 / 18.8 | 13004 (4.41 %) | 0.07 / 0.13 |
+| #43 | keep_shape | off / on | 24152 / 4379 | 50543 / 32820 | 2035 / 2256 | 0 / 0.0001 | - | 11.0 / 13.0 | 27426 (13.59 %) | 0.06 / 0.11 |
+| #40 | adapt | off / on | 6025 / 4336 | 34465 / 32626 | 3544 / 4719 | 0.0069 / 0.0072 | - | 10.0 / 7.8 | 7457 (2.39 %) | 0.07 / 0.13 |
+| #40 | keep_shape | off / on | 5902 / 1085 | 19781 / 14909 | 20381 / 21331 | 0.0003 / 0.0004 | - | 13.6 / 11.6 | 10258 (6.14 %) | 0.06 / 0.12 |
+| #44 (oversized) | adapt | off / on | 8210 / 6416 | 36675 / 35644 | 15608 / 17465 | 0.0182 / 0.0186 | 0.132 / 0.147 | 25.3 / 25.0 | 12190 (3.38 %) | 0.07 / 0.13 |
+| #44 (oversized) | keep_shape | off / on | 2780 / 3356 | 22042 / 24379 | 56167 / 56087 | 0 / 0 | 0.029 / 0.028 | 19.5 / 20.5 | 6654 (2.1 %) | 0.06 / 0.10 |
+| #45 (oversized) | adapt | off / on | 8441 / 6109 | 31781 / 30137 | 11513 / 12851 | 0.0155 / 0.0166 | - | 17.8 / 17.8 | 9977 (2.78 %) | 0.08 / 0.14 |
+| #45 (oversized) | keep_shape | off / on | 4058 / 1395 | 16532 / 15319 | 33210 / 34031 | 0.0007 / 0.0030 | - | 16.0 / 16.0 | 9417 (4.59 %) | 0.07 / 0.12 |
+
+Sums over the 6 avatars (fold, print distortion, hem curve, runtime: max). Observations (not a decision):
+- Fitted garments: side strip and uncovered drop in both modes, most in keep_shape (#28 -74 %, #43 -82 %, #40 -82 %);
+  the grey strip is mostly gone on the plus avatars; what is left sits just under the armpit (the floor there follows
+  the arm/torso junction).
+- **Oversized: on/off is NOT negligible everywhere.** #44 / #45 keep_shape: on the 7 runs where the floor moved no
+  target at all (#44 all but female plus, #45 male slim/average), 564-1132 alpha px still change (on 5 of the 7 mostly
+  removed: the garment gets slightly narrower): a pair that
+  "confirms" the first solve is exact only at its own point; it still changes the rigid fits around it. #44
+  keep_shape gets slightly worse (side strip 2780 -> 3356, uncovered +2337). Where the floor did move targets
+  (female plus on #44 / #45, female slim on #45: one target 38.6 px) the change is a real fix (#45 female plus side
+  strip 3584 -> 768). #45 keep_shape fold rises 0.0007 -> 0.0030. Not tried: adding a new pair only when the floor
+  actually moves its target (would leave oversized garments that need no floor pixel-identical).
+- The visible garment edge lands about 3-4 px inside a floored target (outer-contour halo fix + alpha boundary), so the
+  1.5 % ease is mostly used up.
+- Runtime: two solves, max 0.15 s.
+Regression: `tests_mls.MlsSideFloorOffRegressionTests`, default off pixel-identical to the layers exported before the
+change (#28, #43, #40, #44, #45 x 6 avatars x adapt + keep_shape; gitignored fixture `testdata/mls_r10/`, export
+`tools/warp-benchmark/export_r10_regression.py` on pre-change code only). 282 backend tests pass.
+**Update 2026-11-12 (owner: oversized path restored):** (1) a new side pair is added only where the floor moves its
+target (the garment already reaching the floor adds no pair; the second solve runs only when a pair was added);
+(2) **side_floor is disabled for keep_shape for now** (`tshirt_layer` ignores it). Default output: #44 / #45 x 6
+avatars x adapt + keep_shape = 0 px from the pre-round-10 export (24 renders, also 0 px against the committed HEAD
+`mls.py`); keep_shape with side_floor=True = 0 px (12). **Open:** adapt with side_floor=True still changes #44 / #45
+on 8 of 12 renders (the floor really pushes there: #44 avatars 1/3/4/6, #45 avatars 3-6, mostly the left side). The
+round 10 table above was measured before this update and is stale (`run_sidefloor10.py` not re-run).
+
+### MLS sleeve variants, round 8b: re-marked landmarks + shoulder-top skin (2026-11-12, NOT production, no winner)
+Round 8 re-measured after the owner re-marked landmarks. Export `tools/warp-benchmark/export_sleeve8b.py` ->
+`data/sleeve8b/` (gitignored; the regression fixtures in `testdata/` are untouched); runner `run_sleeve8b.py` reads the
+export, production `tshirt_layer`, adapt k 1.0, side_floor off, r7 | A | B | C, 72 runs. Outputs
+`out/results8b.json`, `out/table8b.md` (every run), `out/sheet_sleeve8b_<id>.png` (grey = arm band, blue =
+shoulder-top band), `out/crop_sleeve8b_worst_<v>.png`. Round 8 files (`results8.json`, `table8.md`, `sheet_sleeve8_*`)
+kept, stale.
+Landmarks that differ from the round 8 snapshot: avatar 2 (chest), avatar 3 (hip, crotch), #28 chest, #40 chest
+(now y 343, ABOVE its armpit 355: the #40 chest pairs are dropped on every avatar, as #28's). Avatars 1, 4, 5, 6 and
+#43 are unchanged.
+New metric `shoulder_top_skin_px` (`mls_fitted.py`, owner 2026-11-12): figure px not covered by the garment in the
+band from the body neck edge to the acromion (the run's shoulder target), from the NECK landmark row down to the
+shoulder line + 0.08 x shoulder width, arm-band quadrilateral excluded; r7 boxes for every variant; left and right
+reported separately.
+
+| variant | arm-band skin px (sum / max) | shoulder-top skin px (sum L / R, max) | gap px | excess px | fold (max) | cuff wave px (median / max) | runtime s |
+|---|---|---|---|---|---|---|---|
+| r7 | 21920 / 2070 | 3519 / 4233, 898 | 14412 | 3741 | 0.0066 | 14.4 / 25.9 | 0.07 |
+| A | 12936 / 1513 | 3413 / 4111, 828 | 10971 | 6703 | 0.0109 | 11.7 / 27.4 | 0.07 |
+| B | 16141 / 1524 | 3464 / 4153, 871 | 13771 | 4204 | 0.0068 | 12.5 / 27.4 | 0.07 |
+| C | 10850 / 1111 | 3518 / 4213, 896 | 8457 | 3976 | 0.0071 | 9.6 / 29.7 | 0.08 |
+
+Observations over the 18 runs (not a decision): arm-band skin lower than r7 for A, B and C on every run; lowest: C 12,
+A 6. Shoulder-top skin barely moves between variants (at most 91 px apart on a run; the variants only touch the
+sleeve), so none of them addresses it; it is larger on the right on 12 of 18 runs and largest on #43 (female
+slim/average, male average: 780-900 px). Gap lowest: A 9, C 9. Excess lowest with r7 on 14 runs; A has 1.8x the r7
+excess. Cuff wave: C lowest on 9 runs but worse than r7 on 7. Arm-band numbers changed vs round 8 on 35 of 72 runs
+(#40 all avatars, #28 male plus, #43 male average/plus).
+
+### V-neck opening: neckline variants (2026-11-12, NOT production, no winner picked)
+Problem: on #40 (V neck, ghost-mannequin photo) the inside of the V shows the garment's inner back; the r7 back-collar
+clearing runs only for crew-sized rims that are >= 10 % darker inside, so V necks are never cleared. Keywords
+`mls.tshirt_layer(..., neckline_variant="r7" | "clear" | "clear_skin", source="body", base=None)` (default r7; no env
+var or flag; `render_tryon` passes none of them, tested). Owner decisions 2026-11-12:
+- **clear:** r7 back-collar clearing kept, union with the new opening: between the collar line (neck_l -> neck_r body
+  targets) and the sides (V: triangle through neck_l -> neck_c -> neck_r when the garment's collar depth / width >=
+  `NECKLINE_V_RATIO` 0.45; else the parabola through the same three targets), the sides inset by `NECKLINE_INSET` 6 % of
+  the collar width (the collar landmarks sit on the band's outer edge on #40), alpha 0 inside, ~1.5 px ramp
+  (`NECKLINE_AA`). Neck pairs missing or out of order -> nothing (r7). Alpha only; RGB untouched.
+- **clear_skin:** clear + the avatar's own non-skin pixels inside the opening (`warp.skin_like` against the neck-centre
+  median skin colour, as the neck-gap fill samples it) painted in that colour, feathered (`NECK_GAP_FEATHER`), returned
+  as `info["neck_fill"]` (BGRA overlay, composited under the head/neck overlay). `source != "avatar"` -> exactly clear.
+Depth / width: #40 0.819 (V; 0.686 before the owner re-marked its collar on 2026-11-12), #28 0.188, #43 0.188 (curve).
+Runner `tools/warp-benchmark/run_neck.py` (adapt k 1.0, 6 avatars; re-run 2026-11-12 on `data/neck/`, the DB after
+#40's collar was re-marked: collar y 21 -> 10, x 247/527 -> 241/529, collar_bottom y 213 -> 246; #28, #43 and the
+avatars unchanged, their rows identical; the first run is kept in `out/neck_before_40/`): `out/results_neck.json`,
+`out/table_neck.md`, `out/sheet_neck_<id>.png` (r7 | clear | clear_skin, 3x; thin grey = the un-inset opening outline,
+drawn by the runner), `out/crop_neck_worst_<v>.png`.
+
+| garment | shape | variant | fabric in opening px (sum, all = visible) | changed vs r7 px | changed outside neck zone px | skin fill px | runtime s (max) |
+|---|---|---|---|---|---|---|---|
+| #40 | V | r7 / clear / clear_skin | 28240 / 0 / 0 | 0 / 29085 / 29314 | 0 / 0 / 0 | 0 / 0 / 11581 | 0.08 / 0.08 / 0.13 |
+| #28 | curve | r7 / clear / clear_skin | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0.08 / 0.09 / 0.09 |
+| #43 | curve | r7 / clear / clear_skin | 1971 / 0 / 0 | 0 / 2285 / 2285 | 0 / 0 / 0 | 0 / 0 / 0 | 0.09 / 0.09 / 0.10 |
+
+Observations (not a decision):
+- #40: clear removes all fabric in the opening (the label and inner back gone, the rib band kept); the avatar's own grey
+  tank then shows in the V on 4 of 6 avatars (male slim/average/plus, female average). clear_skin covers it with ONE flat
+  colour (no shading or texture): a large flat triangle on male average / female average / male plus; on male slim the
+  colour is visibly darker than the neck.
+- #28 (black crew): 0 px difference: the r7 back-collar clearing runs on #28 (inside darker) and already covers the
+  whole inset opening, so the union equals r7.
+- #43 (white crew): the r7 clearing does NOT run (the inside is not 10 % darker), so r7 leaves 254-492 px of inner back
+  per avatar; clear removes them. Its collar_bottom sits on the band's INNER edge, so the inset leaves a visible strip of
+  inner fabric above the front band: 6-8 px thick at the centre column, 553-839 px per avatar, all of it visible.
+- Default (r7) stays 0 px against the r7 and round 10 fixtures, incl. #44 / #45 (24 renders); 292 backend tests pass.
+**neck_clip (2026-11-12, benchmark, keyword `tshirt_layer(neck_clip=False)`):** in the box rows neck-zone top .. body
+shoulder row x columns between the shoulder (acromion) targets, the finished layer's alpha is clipped to the figure mask
+dilated by `NECK_CLIP_DILATE` 2 px (~0.7 px soft edge; never lowered over the figure itself, alpha only). #40 (collar
+y 31, x 210/557), clear, 6 avatars: garment px over the background beyond the 2 px ring in the box 151-844 -> 0; nothing
+changes outside the box. Collar band fragments that sit over the avatar's own neck/shoulder skin (top corners, cut off
+by the opening's collar line) are NOT removed by the clip.
+**Hole mask, step 1 (2026-11-12, benchmark):** `neckline_variant="hole" | "hole_skin"`: the neckline interior as a mask
+in garment px, warped with the garment's own field (`cv2.remap` with mx, my), cleared in union with the r7 back collar.
+(a) GrabCut restricted to a `NECK_HOLE_BELT` 15 px belt around the landmark polygon (`neckline_hole`): **failed the
+owner's check on #40**: the hole eats the rib band in the lower V and at the V tip, with stepped edges (overlays
+`out/overlay_hole_40_garment.png`, `out/overlay_hole_40.png`); on #28 it cannot run (the crew polygon, ~16 px deep, is
+thinner than the belt). Per the owner's rule the fallback is (b): an owner-drawn polygon, keyword `neck_hole_polygon`
+(garment px), benchmark file `tools/warp-benchmark/data/neck_hole/<id>.json` `{"polygon": [[x, y], ...]}` read by
+`run_neck_hole.py`; a zero-area polygon = no hole (r7). No polygon files exist yet.
+**Hole mask (b), owner polygon (2026-11-12):** `data/neck_hole/40.json` (29 points, drawn with
+`tools/warp-benchmark/pick_neck_hole.html` along the band's inner edge; top edge along the back band's lower edge).
+#40 (collar y 30, x 208/557, collar_bottom 386, 247), 6 avatars: fabric left in the warped hole 0-5 px (edge rounding),
+band px removed 0, changes outside the neck zone 0, 0.07-0.08 s; the landmark V `clear` leaves 847-1582 px inside the
+same hole. Seen on the overlays: the V band edge is clean and the V tip is kept; the BACK neck band (excluded by the
+polygon) now stays as a horizontal strip across the avatar's neck base on all 6 avatars (most visible on male plus,
+female plus); neck_clip does not remove it (it lies over the figure). The avatar's grey tank still shows in the V.
+**Owner polygon v2 (2026-11-12):** `data/neck_hole/40-2.json` (19 points; top edge at the garment's top, y 13, so the
+back band is part of the hole), run with `NECK_HOLE_NAME={gid}-2.json`. 6 avatars: fabric left in the hole 1-4 px, band
+px removed 0, changes outside the neck zone 0, 0.07-0.08 s. On the overlays the back-band strip across the neck is gone,
+the V band is clean on both sides and at the tip, and no band fragments float at the top corners (the landmark `clear`
+still shows them). The avatar's grey tank still shows in the V (male slim/average/plus, female slim/average).
+**Decision (owner, 2026-11-12, docs/09 #99):** the avatars are re-shot in one low round-neck tank; `clear_skin` /
+`hole_skin` are not used; the V-neck direction is `hole` + `neck_clip` (still benchmark only).
+
+### Neckline hole for every shape + collar floor (2026-11-13, docs/09 #100-101)
+Polygons (garment px of the cleaned PNG, `tools/warp-benchmark/data/neck_hole/<id>.json`): #28 (crew, black) and #47
+(square neck, new garment) were drawn by the owner on the ORIGINAL photos (`40-4.json`, `40-3.json`) and moved to the
+cleaned image by template matching (scale 1, offset #28 (57, 22), #47 (143, 267)). Runner `run_neck_hole.py`: with a
+polygon the `clear` column is dropped (r7 | hole | hole+clip); `NECK_COLLAR_FLOOR` (default 1). Out:
+`out/overlay_hole_<id>.png`, `out/table_neck_hole_floor.md`; before the floor `out/neck_hole_no_floor/`, with the
+clear column `out/neck_hole_with_clear/`.
+
+| garment | shape | hole: fabric left px | hole: band px removed | hole+clip: changed outside neck zone px | collar raised px |
+|---|---|---|---|---|---|
+| #47 | square | 3-6 | 0 | 14-407 | 1.5-10.7 |
+| #28 | crew | 0 | 0-2 | 859-2043 | 0.3-9.8 |
+| #40 | V (polygon v1) | 0-4 | 0 | 111-871 | 0 |
+
+- The hole is shape-agnostic: the polygon is filled in garment px and warped with the garment's own field; the square
+  corners stay sharp, the label and the inner back are gone.
+- `clear` (landmark triangle/curve) on #47 guesses a V and leaves 7618-12379 px inside the square opening.
+- **Collar floor:** the collar targets are placed by the shoulder alignment only (`control_points`). #47's collar sits
+  only 32 garment px above its shoulder points (x 0.46-0.57 = ~15 px on the canvas), the body's contour is higher, so
+  the collar corners landed 5-9 px BELOW the contour (#40: 9-17 px above). Now raised onto the contour; the garment's
+  top corners reach the shoulder, the tank strap above them is covered.
+- `neck_clip` removes the crew T-shirt's shoulder overhang (wavy shoulder line, #28); not used (#101).
+- Seen, not fixed: the square opening is wide and deep, the avatar's grey tank shows as a large block (accepted,
+  #99); on female slim / average the opening's lower edge reaches mid-chest.
+
+### Neckline hole in the product (2026-11-13, docs/09 #102)
+`warp.render_tryon` -> `_neck_hole_kwargs` -> `mls.tshirt_layer(neckline_variant="hole", neck_hole_polygon=...)` when
+`TRYON_WARP=mls`, `TRYON_NECK_HOLE=1`, fit_mode adapt and `landmark_checks.neck_hole_problem` passes (same rules as
+PATCH, alpha from the garment image). Otherwise the call is exactly as before (tested: no keyword passed). **Works only
+with `TRYON_WARP=mls`; the default `parts` engine ignores the polygon.** Never `neck_clip` (#101). Regression fixture
+`backend/apps/tryon_engine/testdata/tryon_neck/` (gitignored, `export_neck_hole_regression.py`, exported before the
+wiring): 108 renders (6 garments x 6 avatars x mls adapt / mls keep_shape / parts), all 0 px without a polygon, with
+the flag off, for keep_shape and for parts. Manual check `tools/warp-benchmark/run_tryon_neck.py` ->
+`out/tryon_neck_<id>.png` (before | after, 3x neck crop), `out/tryon_neck.md`:
+
+| garment | changed px after vs before | fabric left in the hole px | runtime s |
+|---|---|---|---|
+| #40 (V, `40-2.json`) | 6733-10523 | 1-4 | 0.11-0.12 |
+| #28 (crew) | 6-91 | 0 | 0.11-0.12 |
+| #43 (crew, no polygon) | 0 | - | 0.10-0.12 |
+| #47 (square) | 12063-18947 | 3-6 | 0.11-0.12 |

@@ -12,6 +12,7 @@ import Measurements from './pages/Measurements'
 import Wardrobe from './pages/Wardrobe'
 import GarmentUpload from './pages/GarmentUpload'
 import LandmarkEditor from './pages/LandmarkEditor'
+import GarmentNeck from './pages/GarmentNeck'
 import TryOn from './pages/TryOn'
 import Outfits from './pages/Outfits'
 import StaffRoute from './components/StaffRoute'
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/wardrobe" element={<Wardrobe />} />
           <Route path="/garments/upload" element={<GarmentUpload />} />
           <Route path="/garments/:id/landmarks" element={<LandmarkEditor />} />
+          <Route path="/garments/:id/neck" element={<GarmentNeck />} />
           <Route path="/tryon" element={<TryOn />} />
           <Route path="/outfits" element={<Outfits />} />
           <Route path="/staff/avatars" element={<StaffRoute><StaffAvatars /></StaffRoute>} />

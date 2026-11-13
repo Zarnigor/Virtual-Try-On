@@ -4,7 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .landmark_checks import LandmarksInvalid, for_storage, validate_garment_landmarks
+from .landmark_checks import LandmarksInvalid, alpha_stats, for_storage, validate_garment_landmarks
 from .models import Garment
 from .serializers import GarmentSerializer, GarmentUploadSerializer
 from apps.images import ImageRejected, validate_image_upload
@@ -139,8 +139,9 @@ def update_landmarks(request, pk):
     if not isinstance(landmarks, dict) or not landmarks:
         return Response({"code": "LANDMARKS_REQUIRED", "detail": "Chiziqlarni belgilang."}, status=400)
     try:
+        bbox, alpha_area = _alpha_info(g)
         warnings = validate_garment_landmarks(g.type, landmarks, g.image.width, g.image.height,
-                                              bbox=_alpha_bbox(g), mode="write")
+                                              bbox=bbox, mode="write", alpha_area=alpha_area)
     except LandmarksInvalid as e:  # detail is our own fixed Uzbek message, never an exception text
         return Response({"code": "LANDMARKS_INVALID", "detail": e.detail}, status=400)
     g.landmarks = for_storage(g.type, landmarks)  # as sent (extra keys kept), legacy sleeve_end never written
@@ -148,17 +149,18 @@ def update_landmarks(request, pk):
     return Response({**GarmentSerializer(g, context={"request": request}).data, "landmark_warnings": warnings})
 
 
-def _alpha_bbox(g):
-    """(x0, y0, x1, y1) of the cleaned PNG's visible pixels (alpha > 0), or None (no alpha / unreadable)."""
+def _alpha_info(g):
+    """(bbox, solid alpha px) of the cleaned PNG (landmark_checks.alpha_stats); (None, None) without alpha."""
     try:
+        import numpy as np
         from PIL import Image
         with Image.open(g.image.path) as im:
             if im.mode not in ("RGBA", "LA"):
-                return None
-            box = im.getchannel("A").getbbox()
+                return None, None
+            alpha = np.asarray(im.getchannel("A"))
     except Exception:
-        return None
-    return (box[0], box[1], box[2] - 1, box[3] - 1) if box else None
+        return None, None
+    return alpha_stats(alpha)
 
 
 def _update_settings(request, pk):

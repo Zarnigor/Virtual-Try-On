@@ -30,11 +30,12 @@ def run_tryon(job_pk: int):
 
 
 def _do_warp(outfit):
-    """Renders and saves the result. Returns {engine: "parts" | "mls", quality_warnings: [...]} for the job result."""
+    """Renders and saves the result. Returns {engine: "parts" | "mls", quality_warnings: [...], neck_hole: {garment
+    id: bool}} for the job result (neck_hole: the owner polygon was used, debug, docs/09 #102)."""
     import cv2
     from django.core.files.base import ContentFile
     from django.conf import settings
-    from apps.garments.landmark_checks import engine_landmarks, landmarks_complete
+    from apps.garments.landmark_checks import engine_landmarks, mls_ready
     from apps.tryon_engine.flags import render_flags
     from apps.tryon_engine.warp import render_tryon
 
@@ -53,8 +54,8 @@ def _do_warp(outfit):
         garments.append((garment.type, g_img, engine_landmarks(garment.type, garment.landmarks)))
         fit_modes[garment.type] = garment.fit_mode
         if garment.type == "tshirt" and flags.get("warp_engine") == "mls" and \
-                not landmarks_complete(garment.type, garment.landmarks):
-            flags["warp_engine"] = "parts"  # MLS needs the full landmark set (docs/09 #98)
+                not mls_ready(garment.type, garment.landmarks):
+            flags["warp_engine"] = "parts"  # MLS needs the main set + the collar points (docs/09 #98, #102)
             quality.append("mls_fallback")
 
     final_bgr, warns, debug = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W,
@@ -66,4 +67,6 @@ def _do_warp(outfit):
     _, buf = cv2.imencode(".png", final_bgr)
     outfit.result_image.save(f"result_{outfit.pk}.png", ContentFile(buf.tobytes()), save=True)
     quality += [w for w in debug.get("quality_warnings", []) if w not in quality]
-    return {"engine": debug.get("engine", "parts"), "quality_warnings": quality}
+    used = bool(debug.get("neck_hole"))
+    return {"engine": debug.get("engine", "parts"), "quality_warnings": quality,
+            "neck_hole": {str(g.pk): used and g.type == "tshirt" for g in outfit.garments.all()}}

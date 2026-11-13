@@ -69,6 +69,14 @@ export const TSHIRT_GROUPS: GroupDef[] = [
   { id: 'hem', name: T.hem, ...C.blue, yPaths: ['hem.y'], defY: 0.9, points: pair(T.hem, 'hem', 0.325, 0.675) },
 ]
 
+/** Collar groups: step 2 of the T-shirt editor (docs/09 #102). Required there (not optional). */
+const NECK_IDS = new Set(['collar', 'collar_bottom'])
+/** Step 1: every T-shirt group except the collar points (they move to step 2 with the neckline hole). */
+export const TSHIRT_MAIN_GROUPS: GroupDef[] = TSHIRT_GROUPS.filter((g) => !NECK_IDS.has(g.id))
+/** Step 2: collar left/right + collar_bottom, all three needed for Save. */
+export const TSHIRT_NECK_GROUPS: GroupDef[] = TSHIRT_GROUPS.filter((g) => NECK_IDS.has(g.id))
+  .map((g) => ({ ...g, optional: false }))
+
 export const PANTS_GROUPS: GroupDef[] = [
   {
     id: 'waist', name: 'Bel', ...C.green, yPaths: ['waist.y'], defY: 0.05,
@@ -138,4 +146,21 @@ export const PANTS_RULES: Rules = {
 }
 
 export const rulesFor = (type: GarmentType): Rules => (type === 'pants' ? PANTS_RULES : TSHIRT_RULES)
+
+const touches = (ids: Set<string>, r: { a: string; b: string }) =>
+  [r.a, r.b].some((v) => ids.has(v) || ids.has(v.split('.')[0]))
+/** Rules between the step-1 groups only (no collar rule: those points are not in step 1). */
+export const TSHIRT_MAIN_RULES: Rules = {
+  x: TSHIRT_RULES.x.filter((r) => !touches(NECK_IDS, r)),
+  y: TSHIRT_RULES.y.filter((r) => !touches(NECK_IDS, r)),
+}
+/** Rules between the collar points (step 2): left < bottom < right, collar above collar_bottom. */
+export const TSHIRT_NECK_RULES: Rules = {
+  x: TSHIRT_RULES.x.filter((r) => touches(NECK_IDS, r) && [r.a, r.b].every((v) => NECK_IDS.has(v.split('.')[0]))),
+  y: TSHIRT_RULES.y.filter((r) => NECK_IDS.has(r.a) && NECK_IDS.has(r.b)),
+}
+
+/** Groups and rules of the main editor (step 1 for T-shirts; pants have one step). */
+export const mainGroupsFor = (type: GarmentType): GroupDef[] => (type === 'pants' ? PANTS_GROUPS : TSHIRT_MAIN_GROUPS)
+export const mainRulesFor = (type: GarmentType): Rules => (type === 'pants' ? PANTS_RULES : TSHIRT_MAIN_RULES)
 

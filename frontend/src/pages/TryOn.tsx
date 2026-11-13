@@ -11,7 +11,7 @@ import DevAiWarning from '../components/DevAiWarning'
 import StatusChip from '../components/StatusChip'
 import { GenderBadge, Segmented } from '../components/GarmentSettingsPanel'
 import type { Sex } from '../api/types'
-import { SEX_LABELS, TRYON_GENDER } from '../locale/uz'
+import { SEX_LABELS, TRYON_GENDER, TRYON_QUALITY } from '../locale/uz'
 
 const TRYON_ERRORS: Record<string, string> = {
   GENDER_MISMATCH: TRYON_GENDER.mismatch,
@@ -343,6 +343,11 @@ export default function TryOn() {
                   <strong>DEMO:</strong> bu natija oldindan tayyorlangan (demo rejimi).
                 </p>
               )}
+              {qualityMessages(job?.result).length > 0 && (
+                <ul className="banner banner-warning" role="status" style={{ marginBottom: 8 }}>
+                  {qualityMessages(job?.result).map((m) => <li key={m}>{m}</li>)}
+                </ul>
+              )}
               <img
                 src={resultUrl}
                 alt="Natija"
@@ -372,4 +377,10 @@ export default function TryOn() {
       </div>
     </div>
   )
+}
+
+/** Known quality warnings of the job result as Uzbek messages (unknown codes are debug only, not shown). */
+function qualityMessages(result: Record<string, unknown> | null | undefined): string[] {
+  const codes = Array.isArray(result?.quality_warnings) ? (result.quality_warnings as unknown[]) : []
+  return codes.filter((c): c is string => typeof c === 'string' && c in TRYON_QUALITY).map((c) => TRYON_QUALITY[c])
 }

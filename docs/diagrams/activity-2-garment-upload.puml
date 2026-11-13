@@ -19,7 +19,15 @@ repeat
         |Foydalanuvchi|
         :Natijani koʻrish;
         if (Saqlaysizmi?) then (ha)
-          :Chiziqlarni belgilash,\nfit_mode va jins tanlash;
+          :1-qadam: asosiy nuqtalarni belgilash\n(yoqasiz), fit_mode va jins tanlash;
+          if (Futbolkami?) then (ha)
+            if (2-qadam: yoqa?) then (belgilash)
+              :Yoqaning 3 nuqtasi +\n«Yoqa teshigi» polygoni\n(tavsiya qilingan shakl, tahrirlash);
+            else (oʻtkazib yuborish)
+              :Yoqa belgilanmagan\n(«Boʻyin belgilanmagan»);
+            endif
+          else (shim)
+          endif
           |Tizim|
           :Kiyimni saqlash\n(egasiga darhol koʻrinadi);
           if (Hamma uchunmi?) then (ha)

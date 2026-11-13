@@ -403,3 +403,62 @@ _(none blocking P0)_
     k 1.0; it falls back to `parts` with quality warning `mls_fallback` when landmarks are incomplete or pair
     validation fails. **The warp method is NOT decided** (parts vs MLS stays the owner's choice); the hem rule is still
     the benchmark assumption ("Still open"). `POST tryon/` and the job result report the engine for debugging.
+
+## Decided 2026-11-12: avatar photos in one low round-neck tank (owner decision)
+99. **2026-11-12: all 6 avatars are re-shot as real photos in the same tank top with a low round (scoop) neckline**
+    (neutral colour, e.g. grey; tight and thin, sleeveless or short-sleeved; shorts or tight leggings, as before). Under
+    a V-neck the little tank that shows reads as an undershirt, so the avatar's own clothes are never painted over:
+    the skin fill variants (`clear_skin`, `hole_skin`, docs/06 "V-neck opening") are NOT used. The V-neck direction is
+    the neckline hole (`hole`) + `neck_clip` (benchmark, NOT production yet; the hole is an owner-drawn polygon per
+    garment, `data/neck_hole/<id>.json`; how a hole gets marked in the product is still open). Same rule as the own-body
+    path (docs/02 rule 12): the user's own top shows in the V. Real photos, not edited: no photo-editor lowering of the
+    old tanks. Next: new photos -> `tools/avatar-prep` -> `seed_avatars --from /avatars` -> staff editor landmarks ->
+    re-run the benchmarks (round 8b, neck); the regression fixtures in `testdata/` stay as frozen snapshots.
+
+## Decided 2026-11-13: neckline = hole + polygon for every shape; collar floor default (owner decision)
+100. **2026-11-13: collar floor is the MLS default** (`mls.collar_floor`, `tshirt_layer(collar_floor_on=True)`):
+    the `neck_l` / `neck_r` targets (placed by the shoulder alignment only) are raised to 2 px
+    (`COLLAR_FLOOR_MARGIN`) above the body's shoulder contour when they land below it (first background -> figure
+    step under the neck row, in that column); never lowered, at most 40 px (`COLLAR_FLOOR_MAX`). Why: on #47 (square
+    neck, collar only 32 garment px above its shoulder points) the collar landed 5-9 px below the contour and the
+    avatar's tank strap and skin showed above the garment. Raised: #47 1.5-10.7 px, #28 0.3-9.8 px, #40 0 px. Only
+    the MLS engine (`TRYON_WARP=mls`); the default `parts` engine is unchanged. The frozen fixtures (`testdata/mls_r7`,
+    `mls_r10`) are compared with `collar_floor_on=False`.
+101. **2026-11-13: the neckline opening is the owner-drawn polygon (`hole`) for every neck shape** (V #40, crew #28,
+    square #47; docs/06 "Neckline hole for every shape"). Fabric left in the hole 0-6 px, band untouched. When a
+    polygon exists the landmark triangle/curve (`clear`) is not used (it guesses a V on the square neck and leaves
+    7.6-12.4 k px of fabric). **`neck_clip` is NOT used as built:** its box reaches the shoulder targets and clips the
+    crew T-shirt's shoulder overhang (#28: 301-2043 px changed outside the neck zone, wavy shoulder line). Still open:
+    who marks the polygon in the product (every uploader or staff only), its editor (proposal: start from the collar
+    landmarks, user drags points) and server checks; the hole is still benchmark only (`neck_hole_polygon` keyword,
+    `render_tryon` passes none).
+
+## Decided 2026-11-13: neckline hole in the product (owner decision)
+102. **2026-11-13: every garment owner marks the neckline hole** (not staff only), stored in the existing landmarks
+    JSON as `landmarks.neck_hole.polygon` (no new model field, no new endpoint: PATCH garments/{id}/landmarks/).
+    - **Editor = two steps for T-shirts** (docs/10 screen 9): step 1 `/garments/{id}/landmarks` = every point except
+      the collar ("Keyingi", sends the full object, the stored collar / neck_hole are kept); step 2
+      `/garments/{id}/neck` = the 3 collar points + the polygon, auto-zoomed to the top centre,
+      "Oʻtkazib yuborish" keeps the r7 neckline. Pants: one step.
+      **Suggestion (owner 2026-11-13, replaces the first V-triangle / curve version):** shape buttons **V | Dumaloq |
+      Toʻrtburchak**, default guessed from collar depth / width (< 0.35 round, < 0.65 square, else V; #47 0.56 ->
+      square, #40 0.82 -> V, crews 0.19 -> round). The hole follows the band's INNER edge (sides and bottom inset by
+      6 % of the collar width, at least 3 px) and closes along the garment's top edge (alpha box top), so the inner
+      back is inside it; square = straight sides with corners plus side / bottom handles. The hole is created ONCE
+      (after the last collar point is released) and never moves by itself: moving the collar points does not touch it,
+      a shape button or "Qayta tiklash" rebuilds it from the current points. Two edit modes, "Yoqa nuqtalari" /
+      "Yoqa teshigi", so collar handles and polygon handles never steal each other's clicks (the first version put the
+      polygon corners exactly on the collar points, which took the drag).
+    - **Rules** (`landmark_checks.neck_hole_problem`, single source, also at render time): 3..64 finite points inside
+      the image, no self-intersection, area > 0, area <= 25 % of the solid alpha (#47 square neck is 18.6 %), every
+      vertex in the top 40 % of the alpha box height, up to 3 px above the box accepted. 400 `LANDMARKS_INVALID`.
+    - `landmarks_complete` = the main set only; new `neck_complete` (collar + collar_bottom + polygon; null for pants).
+      MLS still needs the collar points (`mls_ready`); without them it falls back to parts as before.
+    - **Try-on:** `render_tryon` passes `neckline_variant="hole"` + the polygon to `mls.tshirt_layer` (never
+      `neck_clip`, #101) only when `TRYON_WARP=mls`, `TRYON_NECK_HOLE=1` (new flag, default 1), the T-shirt is
+      **adapt** and the polygon passes the rules; a failing polygon is skipped with quality warning
+      `neck_hole_invalid` (no fallback to parts). **keep_shape garments and the `parts` engine ignore the polygon**
+      (0 px, tested on #28, #40, #43, #44, #45, #47 x 6 avatars). Job result: `neck_hole: {garment id: bool}`.
+    - Measured (production path, `run_tryon_neck.py`): #40 with `40-2.json` fabric left in the hole 1-4 px, band
+      0 px, outside the neck zone 0 px; #47 3-6 px; #28 0 px (only 6-91 px change: r7 already cleared most of it).
+    Open: whether keep_shape should get the hole too (excluded now to keep keep_shape pixel-identical).

@@ -11,6 +11,13 @@ Optional for now: `armpit {y, left_x, right_x}`, `collar {y, left_x, right_x}` (
 `collar_bottom {x, y}` (lowest centre point of the neckline). Legacy `sleeve_end.left|right {x, y}` is accepted on
 read instead of the cuffs (records marked before 2026-11-11) and is never written: `for_storage` drops it.
 Unknown extra keys are allowed and kept.
+
+Neckline hole (docs/09 #102, T-shirt only, optional): `neck_hole {polygon: [[x, y], ...]}`, the owner-drawn inner edge
+of the collar band in cleaned-garment px. Checked here once for PATCH and again at render time
+(`neck_hole_problem`): 3..64 finite points inside the image, no self-intersection, area > 0, area <= 25 % of the
+garment's alpha area, every vertex inside the top 40 % of the alpha bounding-box height (up to 3 px above the box is
+accepted). `neck_hole: null` = no hole. `landmarks_complete` counts the MAIN set only; `neck_complete` = the collar
+points + collar_bottom + a polygon (the two-step editor, docs/10 screen 9).
 """
 import math
 
@@ -19,7 +26,7 @@ GROUP_NAMES = {
     "tshirt": {
         "collar": "Yoqa", "shoulder": "Yelka", "collar_bottom": "Yoqa pasti", "armpit": "Qoʻltiq",
         "sleeve_cuff_outer": "Yeng uchi (tashqi)", "sleeve_cuff_inner": "Yeng uchi (ichki)",
-        "chest": "Koʻkrak", "waist": "Bel", "hem": "Pastki", "sleeve_end": "Yeng",
+        "chest": "Koʻkrak", "waist": "Bel", "hem": "Pastki", "sleeve_end": "Yeng", "neck_hole": "Yoqa teshigi",
     },
     "pants": {"waist": "Bel", "hip": "Son", "crotch": "Qoʻshilish", "knee": "Tizza", "hem": "Pocha"},
 }
@@ -35,6 +42,8 @@ TSHIRT_GROUPS = {
 TSHIRT_REQUIRED = ("shoulder", "chest", "waist", "hem", "sleeve_cuff_outer", "sleeve_cuff_inner")
 TSHIRT_OPTIONAL = ("armpit", "collar", "collar_bottom")
 TSHIRT_NEW = ("armpit", "collar", "collar_bottom", "sleeve_cuff_outer", "sleeve_cuff_inner")
+TSHIRT_MAIN = ("shoulder", "armpit", "chest", "waist", "hem", "sleeve_cuff_outer", "sleeve_cuff_inner")  # step 1
+TSHIRT_NECK = ("collar", "collar_bottom")  # step 2, with neck_hole
 LEGACY_SLEEVE = ("sleeve_end", _SIDES)
 
 REQUIRED = {
@@ -53,6 +62,11 @@ REQUIRED = {
 CENTER_HIP_MARGIN = 5
 COLLAR_NEAR_SHOULDER = 0.15  # x shoulder span: collar edges further from the shoulder line -> warning
 BBOX_TOLERANCE = 2  # px outside the garment's alpha bounding box still accepted without a warning
+NECK_HOLE_MIN_POINTS, NECK_HOLE_MAX_POINTS = 3, 64
+NECK_HOLE_MAX_AREA = 0.25  # x the garment's alpha area (owner 2026-11-13: #47 square neck is 18.6 %)
+NECK_HOLE_TOP = 0.40  # every vertex within the top 40 % of the alpha bounding-box height
+NECK_HOLE_ABOVE = 3  # px above the alpha bounding box still accepted (the hole reaches the garment's top edge)
+ALPHA_SOLID = 128  # alpha above this counts as garment for the area rule (same as the try-on engine)
 
 MESSAGES = {
     "missing": "«{g}» belgisi toʻliq emas. Barcha nuqtalarni qoʻying.",
@@ -64,6 +78,11 @@ MESSAGES = {
     "y_order": "«{g}» chizigʻi «{other}» chizigʻidan pastda boʻlsin.",
     "cuff_side": "«{g}»: chap yeng nuqtasi rasmning chap yarmida, oʻngi oʻng yarmida boʻlsin.",
     "cuff_order": "«{g}»: tashqi nuqta yengning tashqi (yelka) tomonida, ichki nuqta qoʻltiq tomonida boʻlsin.",
+    "hole_points": "«{g}»: 3 tadan 64 tagacha nuqta boʻlsin.",
+    "hole_self": "«{g}» chizigʻi oʻzini kesib oʻtmasin.",
+    "hole_empty": "«{g}» yuzasi boʻsh. Nuqtalarni yoqa ichki cheti boʻylab qoʻying.",
+    "hole_area": "«{g}» juda katta: kiyim yuzasining 25 % idan oshmasin.",
+    "hole_top": "«{g}» nuqtalari kiyimning yuqori qismida (balandlikning 40 % ida) boʻlsin.",
 }
 WARNINGS = {
     "collar_far": "«{g}» nuqtalari yelka chizigʻidan uzoq. Yoqa chetlarini yelka chizigʻida belgilang.",
@@ -93,11 +112,12 @@ def _is_number(v) -> bool:
 
 
 def validate_garment_landmarks(gtype: str, landmarks, width: int, height: int, bbox=None,
-                               mode: str = "write") -> list[dict]:
+                               mode: str = "write", alpha_area=None) -> list[dict]:
     """Raise LandmarksInvalid (reason, group, Uzbek detail) on the first broken rule. Returns the warnings
     [{code, group, detail}] (ranges: collar far from the shoulder line, points outside the garment's alpha
     bounding box `bbox` = (x0, y0, x1, y1) when given). mode "read": a stored T-shirt may carry the legacy
-    `sleeve_end` instead of the cuff corners."""
+    `sleeve_end` instead of the cuff corners. alpha_area: the garment's solid alpha px for the neck_hole area rule
+    (None = the whole image)."""
     names = GROUP_NAMES[gtype]
 
     def fail(reason, group, other=None):
@@ -140,6 +160,10 @@ def validate_garment_landmarks(gtype: str, landmarks, width: int, height: int, b
 
     if gtype == "tshirt":
         _tshirt_order(v, lt, fail)
+        if landmarks.get("neck_hole") is not None:
+            reason = neck_hole_problem(landmarks["neck_hole"], width, height, alpha_area, bbox)
+            if reason:
+                fail(reason, "neck_hole")
         return _tshirt_warnings(v, bbox, names)
 
     # pants
@@ -228,21 +252,113 @@ def _bbox_warnings(v, bbox, names):
     return out
 
 
+def neck_hole_polygon(landmarks):
+    """The stored polygon as a list of [x, y], or None (no neck_hole / null / no polygon key)."""
+    hole = landmarks.get("neck_hole") if isinstance(landmarks, dict) else None
+    return hole.get("polygon") if isinstance(hole, dict) else None
+
+
+def neck_hole_problem(neck_hole, width, height, alpha_area=None, bbox=None):
+    """None when `neck_hole` ({polygon: [[x, y], ...]}) passes every rule, else the MESSAGES reason. Pure: PATCH
+    and render time (warp.render_tryon) share it. bbox = (x0, y0, x1, y1) of the alpha; None = the whole image."""
+    poly = neck_hole.get("polygon") if isinstance(neck_hole, dict) else None
+    if not isinstance(poly, list) or not NECK_HOLE_MIN_POINTS <= len(poly) <= NECK_HOLE_MAX_POINTS:
+        return "hole_points"
+    if not all(isinstance(p, (list, tuple)) and len(p) == 2 and all(_is_number(c) for c in p) for p in poly):
+        return "hole_points"
+    pts = [(float(x), float(y)) for x, y in poly]
+    if not all(0 <= x <= width and 0 <= y <= height for x, y in pts):
+        return "bounds"
+    if _self_intersects(pts):
+        return "hole_self"
+    area = abs(sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(pts, pts[1:] + pts[:1]))) / 2
+    if not area > 0:
+        return "hole_empty"
+    if area > NECK_HOLE_MAX_AREA * (alpha_area if alpha_area else width * height):
+        return "hole_area"
+    bx0, by0, bx1, by1 = bbox if bbox else (0, 0, width - 1, height - 1)
+    top = by0 + NECK_HOLE_TOP * (by1 - by0 + 1)
+    if not all(by0 - NECK_HOLE_ABOVE <= y <= top for _, y in pts):
+        return "hole_top"
+    return None
+
+
+def _self_intersects(pts) -> bool:
+    """True when two non-adjacent edges of the closed polygon touch or cross (collinear overlap included)."""
+    n = len(pts)
+
+    def orient(a, b, c):
+        v = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+        return (v > 0) - (v < 0)
+
+    def on_seg(a, b, c):  # c collinear with a-b: inside the box
+        return min(a[0], b[0]) <= c[0] <= max(a[0], b[0]) and min(a[1], b[1]) <= c[1] <= max(a[1], b[1])
+
+    def cross(p1, p2, p3, p4):
+        d1, d2, d3, d4 = orient(p3, p4, p1), orient(p3, p4, p2), orient(p1, p2, p3), orient(p1, p2, p4)
+        if d1 * d2 < 0 and d3 * d4 < 0:
+            return True
+        return (d1 == 0 and on_seg(p3, p4, p1)) or (d2 == 0 and on_seg(p3, p4, p2)) or \
+            (d3 == 0 and on_seg(p1, p2, p3)) or (d4 == 0 and on_seg(p1, p2, p4))
+
+    edges = [(pts[i], pts[(i + 1) % n]) for i in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            if j == i + 1 or (i == 0 and j == n - 1):  # adjacent edges share a vertex
+                continue
+            if cross(*edges[i], *edges[j]):
+                return True
+    # a repeated vertex (zero-length or folded-back edge) also counts
+    return len(set(pts)) < n
+
+
+def alpha_stats(alpha) -> tuple:
+    """(bbox (x0, y0, x1, y1) or None, solid px) of a uint8 alpha array (numpy, garment image)."""
+    solid = alpha > ALPHA_SOLID
+    area = int(solid.sum())
+    vis = alpha > 0
+    if not vis.any():
+        return None, area
+    ys, xs = vis.nonzero()
+    return (int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())), area
+
+
 def for_storage(gtype: str, landmarks: dict) -> dict:
     """What PATCH stores: the payload as sent (extra keys kept), without the legacy `sleeve_end` (never written)."""
     if gtype != "tshirt":
         return landmarks
-    return {k: val for k, val in landmarks.items() if k != "sleeve_end"}
+    return {k: val for k, val in landmarks.items()
+            if k != "sleeve_end" and not (k == "neck_hole" and val is None)}  # null = no hole
+
+
+def _groups_present(landmarks, groups) -> bool:
+    return all(_is_number(_get(landmarks, f"{g}.{f}")) for g in groups for f in TSHIRT_GROUPS[g])
 
 
 def landmarks_complete(gtype: str, landmarks) -> bool:
-    """True when every point of the current set exists (T-shirt: the new points too; pants: no new points)."""
+    """True when every point of the MAIN set exists (T-shirt step 1: shoulder, armpit, chest, waist, hem, cuff
+    corners; the collar points and neck_hole are step 2, see neck_complete). Pants: their full set."""
     if not isinstance(landmarks, dict) or not landmarks:
         return False
-    groups = TSHIRT_GROUPS if gtype == "tshirt" else None
-    if groups is None:
+    if gtype != "tshirt":
         return all(_is_number(_get(landmarks, p)) for p in REQUIRED[gtype])
-    return all(_is_number(_get(landmarks, f"{g}.{f}")) for g in groups for f in groups[g])
+    return _groups_present(landmarks, TSHIRT_MAIN)
+
+
+def neck_complete(gtype: str, landmarks):
+    """T-shirt step 2 (docs/10 screen 9): collar left/right + collar_bottom + a neck_hole polygon. None for pants."""
+    if gtype != "tshirt":
+        return None
+    if not isinstance(landmarks, dict) or not landmarks:
+        return False
+    poly = neck_hole_polygon(landmarks)
+    return _groups_present(landmarks, TSHIRT_NECK) and isinstance(poly, list) and len(poly) >= NECK_HOLE_MIN_POINTS
+
+
+def mls_ready(gtype: str, landmarks) -> bool:
+    """Every point the MLS T-shirt warp needs: the main set + the collar points (mls.REQUIRED). The polygon is
+    optional (no polygon = the r7 neckline)."""
+    return gtype == "tshirt" and landmarks_complete(gtype, landmarks) and _groups_present(landmarks, TSHIRT_NECK)
 
 
 def engine_landmarks(gtype: str, landmarks: dict) -> dict:

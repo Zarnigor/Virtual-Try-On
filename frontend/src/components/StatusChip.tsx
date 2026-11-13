@@ -20,6 +20,7 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; bor
   confirmed: { label: 'Nuqtalar tasdiqlangan', color: 'var(--accent)', bg: 'var(--accent-soft)', border: 'var(--accent-border)' },
   auto:      { label: 'Avtomatik aniqlangan', color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'rgba(245,184,75,.3)' },
   unmarked:  { label: 'Belgilanmagan',  color: 'var(--muted)',   bg: 'var(--inset)',       border: 'var(--border)' },
+  neck_unmarked: { label: 'Boʻyin belgilanmagan', color: 'var(--warning)', bg: 'var(--warning-bg)', border: 'rgba(245,184,75,.3)' },
 }
 
 export default function StatusChip({ status }: StatusChipProps) {

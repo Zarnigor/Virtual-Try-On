@@ -122,3 +122,21 @@
 .le-checks ul { margin: 4px 0 0; padding-left: 16px; }
 .le-checks.is-error { background: rgba(214, 58, 90, 0.12); color: #9b1c36; }
 .le-checks.is-warning { background: rgba(217, 115, 13, 0.12); color: #8a4a08; }
+
+/* Step indicator and the neckline hole polygon (docs/09 #102). */
+.le-step {
+  padding: 6px 12px; border-radius: var(--radius-pill); background: var(--inset); border: 1px solid var(--border-strong);
+  font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.le-hole-edge { cursor: copy; }
+.le-hole-vertex { cursor: grab; outline: none; }
+.le-hole-vertex:active { cursor: grabbing; }
+.le-hole-panel {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 10px;
+  background: var(--inset); border: 1px solid var(--border-strong);
+}
+.le-hole-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.le-hole-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.le-actions { flex-wrap: wrap; }
+.le-mode, .le-shapes { grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+.le-segment button:disabled { opacity: 0.45; cursor: not-allowed; }

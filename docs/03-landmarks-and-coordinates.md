@@ -42,7 +42,7 @@ Optional later: `bust` (fullest chest, armpit + 5-8%) separate from `chest` (und
 MVP types:
 | Garment type | Landmarks |
 |---|---|
-| tshirt | collar_left/right, shoulder_left/right, collar_bottom, armpit_left/right, sleeve_cuff_outer_left/right, sleeve_cuff_inner_left/right, chest, waist, hem (etak). Optional for now: collar_*, collar_bottom, armpit_*. Legacy `sleeve_end` read only (docs/09 #92) |
+| tshirt | Step 1 (main set): shoulder_left/right, armpit_left/right, sleeve_cuff_outer_left/right, sleeve_cuff_inner_left/right, chest, waist, hem (etak). Step 2 (neck, docs/09 #102): collar_left/right, collar_bottom + the `neck_hole` polygon. Optional on write: armpit_*, collar_*, collar_bottom, neck_hole. Legacy `sleeve_end` read only (docs/09 #92) |
 | pants | waist, hip, crotch, knee (per leg), hem (per leg) |
 Later (not MVP): skirt, dress, outerwear, long sleeves.
 Deformation pairs garment and body landmarks by identical names.
@@ -52,6 +52,10 @@ hem = lowest edge of the garment. T-shirt only: shoulder = the shoulder seam whe
 underarm corner where sleeve and torso meet; collar_left/right = the collar edges at the shoulder line;
 collar_bottom = the lowest centre point of the neckline; sleeve_cuff_outer = the cuff corner on the sleeve's outer
 (shoulder) side, sleeve_cuff_inner = the one on the underarm side. Left/right = image left/right.
+**neck_hole** (T-shirt, docs/09 #102): `neck_hole {polygon: [[x, y], ...]}`, the neckline opening drawn by the garment's
+owner along the INNER edge of the collar band, reaching the garment's top edge so the inner back (and the label) is
+inside it, the band itself outside (like the owner polygon `40-2.json`). Pixels of the cleaned PNG, any shape (V, crew,
+square). `neck_hole: null` = no hole (not stored). Used only by the MLS try-on (`TRYON_WARP=mls`, adapt garments).
 
 ## Sanity checks (frontend AND backend)
 - Vertical order: head_top < neck < shoulder < armpit <= chest < waist < hip < crotch < knee < ankle < foot_bottom
@@ -89,6 +93,14 @@ Rules (backend strict `<`; the editor keeps a 4 px gap and stops a drag at the n
   on the side of the line shoulder point -> cuff midpoint away from the torso centre (centre x, chest y).
 - warnings (saved anyway, returned as `landmark_warnings`): collar edges more than 15 % of the shoulder span from the
   shoulder line; tshirt chest above the armpit (oversized); any point more than 2 px outside the bounding box of the garment's visible (alpha > 0) pixels.
+- tshirt `neck_hole.polygon` (optional, docs/09 #102; same rules in the editor `neckHole.ts` and again at render
+  time, where a failing polygon is skipped with quality warning `neck_hole_invalid`): 3..64 finite `[x, y]` points
+  inside the image; no self-intersection (non-adjacent edges never touch, no repeated vertex); area > 0; area <= 25 %
+  of the garment's solid alpha area (alpha > 128); every vertex inside the top 40 % of the alpha bounding-box height
+  (`y0 - 3 <= y <= y0 + 0.4 x box height`). Messages name the group «Yoqa teshigi».
+- completeness: `landmarks_complete` = the main set (shoulder, armpit, chest, waist, hem, cuff corners);
+  `neck_complete` = collar + collar_bottom + a polygon (null for pants). The MLS engine needs the main set + the
+  collar points (`mls_ready`); the polygon is optional (no polygon = the r7 neckline).
 - unknown extra keys are kept untouched. Failure: 400 `LANDMARKS_INVALID`.
 
 ## Previous bugs to never reintroduce

@@ -50,6 +50,7 @@ services:
       - TRYON_DROPPED_SHOULDER_SINGLE=${TRYON_DROPPED_SHOULDER_SINGLE:-0}
       - TRYON_HEM_RULE=${TRYON_HEM_RULE:-1}
       - TRYON_WARP=${TRYON_WARP:-parts}  # T-shirt warp engine: parts | mls (docs/09 #98)
+      - TRYON_NECK_HOLE=${TRYON_NECK_HOLE:-1}  # owner-drawn neckline hole, MLS only (docs/09 #102)
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
@@ -88,6 +89,7 @@ services:
       - TRYON_DROPPED_SHOULDER_SINGLE=${TRYON_DROPPED_SHOULDER_SINGLE:-0}
       - TRYON_HEM_RULE=${TRYON_HEM_RULE:-1}
       - TRYON_WARP=${TRYON_WARP:-parts}  # T-shirt warp engine: parts | mls (docs/09 #98)
+      - TRYON_NECK_HOLE=${TRYON_NECK_HOLE:-1}  # owner-drawn neckline hole, MLS only (docs/09 #102)
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}

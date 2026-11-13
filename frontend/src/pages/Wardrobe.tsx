@@ -117,6 +117,7 @@ export default function Wardrobe() {
                 ) : (
                   <StatusChip status="unmarked" />
                 )}
+                {g.image_url && g.neck_complete === false && <StatusChip status="neck_unmarked" />}
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>

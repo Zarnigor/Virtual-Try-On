@@ -1,99 +1,38 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { getGarment, updateLandmarks, type Garment } from '../api/garments'
+import { updateLandmarks } from '../api/garments'
 import type { GarmentLandmarks } from '../api/types'
 import DevAiWarning from '../components/DevAiWarning'
 import GarmentSettingsPanel from '../components/GarmentSettingsPanel'
 import Spinner from '../components/Spinner'
 import LandmarkEditor from '../components/landmark-editor/LandmarkEditor'
-import { groupsFor, rulesFor } from '../components/landmark-editor/garmentGroups'
-import { checkGarment, missingTshirtGroups, type BBox } from '../components/landmark-editor/garmentChecks'
+import { mainGroupsFor, mainRulesFor } from '../components/landmark-editor/garmentGroups'
+import { checkGarment, missingTshirtGroups } from '../components/landmark-editor/garmentChecks'
 import { LANDMARK_EDITOR } from '../locale/uz'
+import { saveErrorText, useGarmentImage } from './useGarmentImage'
 
-/** Visible pixels (alpha > 0) of the loaded image, or null when the canvas cannot read it (cross-origin). */
-function alphaBBox(img: HTMLImageElement): BBox | null {
-  try {
-    const c = document.createElement('canvas')
-    c.width = img.naturalWidth
-    c.height = img.naturalHeight
-    const ctx = c.getContext('2d')
-    if (!ctx) return null
-    ctx.drawImage(img, 0, 0)
-    const { data } = ctx.getImageData(0, 0, c.width, c.height)
-    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1
-    for (let y = 0; y < c.height; y++) {
-      for (let x = 0; x < c.width; x++) {
-        if (data[(y * c.width + x) * 4 + 3] > 0) {
-          if (x < x0) x0 = x
-          if (x > x1) x1 = x
-          if (y < y0) y0 = y
-          if (y > y1) y1 = y
-        }
-      }
-    }
-    return x1 < 0 ? null : { x0, y0, x1, y1 }
-  } catch {
-    return null // tainted canvas: the server still checks the bounding box
-  }
-}
-
-/** Screen 9: mark the garment landmarks. The image and landmarks come from the backend. */
+/**
+ * Screen 9, step 1 (docs/10, docs/09 #102): the main garment landmarks. T-shirts: everything except the collar
+ * points, "Keyingi" saves and opens step 2 (/garments/{id}/neck). Pants: one step, Save -> wardrobe.
+ * The saved payload is the FULL landmarks object: the stored collar / collar_bottom / neck_hole are kept untouched.
+ */
 export default function GarmentLandmarksPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { garment, setGarment, size, alpha, loading, error, setError } = useGarmentImage(id)
 
-  const [garment, setGarment] = useState<Garment | null>(null)
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [bbox, setBbox] = useState<BBox | null>(null)
   const [serverWarnings, setServerWarnings] = useState<string[]>([])
 
-  useEffect(() => {
-    if (!id) return
-    let alive = true
-    getGarment(Number(id))
-      .then(({ data }) => {
-        if (!alive) return
-        setGarment(data)
-        if (!data.image_url) {
-          setError('Kiyim hali tayyorlanmoqda. Biroz kuting va sahifani yangilang.')
-          setLoading(false)
-          return
-        }
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => {
-          if (!alive) return
-          setSize({ w: img.naturalWidth, h: img.naturalHeight })
-          setBbox(alphaBBox(img))
-          setLoading(false)
-        }
-        img.onerror = () => {
-          if (!alive) return
-          setError('Kiyim rasmini yuklab boʻlmadi')
-          setLoading(false)
-        }
-        img.src = data.image_url
-      })
-      .catch(() => {
-        if (!alive) return
-        setError('Kiyim topilmadi')
-        setLoading(false)
-      })
-    return () => { alive = false }
-  }, [id])
-
-  const groups = useMemo(() => (garment ? groupsFor(garment.type) : []), [garment])
-  const rules = useMemo(() => (garment ? rulesFor(garment.type) : undefined), [garment])
+  const isTshirt = garment?.type === 'tshirt'
+  const groups = useMemo(() => (garment ? mainGroupsFor(garment.type) : []), [garment])
+  const rules = useMemo(() => (garment ? mainRulesFor(garment.type) : undefined), [garment])
   const check = useCallback(
-    (lm: Record<string, unknown>) => checkGarment(garment?.type ?? 'tshirt', lm, bbox),
-    [garment, bbox],
+    (lm: Record<string, unknown>) => checkGarment(garment?.type ?? 'tshirt', lm, alpha.bbox, 'main'),
+    [garment, alpha],
   )
-  const missing = garment?.type === 'tshirt' && !garment.landmarks_complete
-    ? missingTshirtGroups(garment.landmarks) : []
+  const missing = isTshirt && !garment?.landmarks_complete ? missingTshirtGroups(garment?.landmarks) : []
 
   const handleSave = async (landmarks: Record<string, unknown>) => {
     if (!id) return
@@ -107,11 +46,10 @@ export default function GarmentLandmarksPage() {
       const warnings = (data.landmark_warnings ?? []).map((w) => w.detail)
       setServerWarnings(warnings)
       setSuccess(true)
-      setTimeout(() => navigate('/wardrobe'), warnings.length ? 3500 : 1200)
+      const next = isTshirt ? `/garments/${id}/neck` : '/wardrobe'
+      setTimeout(() => navigate(next), warnings.length ? 3500 : isTshirt ? 400 : 1200)
     } catch (err: unknown) {
-      // LANDMARKS_INVALID carries a short Uzbek message naming the group; show it as is.
-      const data = (err as { response?: { data?: { code?: string; detail?: string } } })?.response?.data
-      setError(data?.code === 'LANDMARKS_INVALID' && data.detail ? data.detail : 'Saqlashda xato. Qayta urinib koʻring.')
+      setError(saveErrorText(err))
     } finally {
       setSaving(false)
     }
@@ -129,7 +67,7 @@ export default function GarmentLandmarksPage() {
     <div className="page">
       <div style={{ marginBottom: 16 }}>
         <button className="btn btn-secondary btn-sm" onClick={() => navigate('/wardrobe')}>
-          ← Orqaga
+          {LANDMARK_EDITOR.back}
         </button>
       </div>
 
@@ -162,6 +100,8 @@ export default function GarmentLandmarksPage() {
           landmarks={garment.landmarks}
           heading={`Belgi nuqtalari · ${garment.type === 'pants' ? 'Shim' : 'Futbolka'}`}
           subheading="Bitta chiziq tanlanadi, lupa bilan aniq joylanadi. Qolganlari xiralashadi."
+          stepLabel={isTshirt ? LANDMARK_EDITOR.step(1, 2) : undefined}
+          saveLabel={isTshirt ? LANDMARK_EDITOR.next : undefined}
           saving={saving}
           onSave={handleSave}
           check={check}
