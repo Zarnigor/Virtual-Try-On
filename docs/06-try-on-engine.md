@@ -791,7 +791,8 @@ clear column `out/neck_hole_with_clear/`.
 
 ### Neckline hole in the product (2026-11-13, docs/09 #102)
 `warp.render_tryon` -> `_neck_hole_kwargs` -> `mls.tshirt_layer(neckline_variant="hole", neck_hole_polygon=...)` when
-`TRYON_WARP=mls`, `TRYON_NECK_HOLE=1`, fit_mode adapt and `landmark_checks.neck_hole_problem` passes (same rules as
+`TRYON_WARP=mls`, `TRYON_NECK_HOLE=1` and `landmark_checks.neck_hole_problem` passes (adapt and keep_shape since
+2026-11-13, docs/09 #103; keep_shape was excluded at first) (same rules as
 PATCH, alpha from the garment image). Otherwise the call is exactly as before (tested: no keyword passed). **Works only
 with `TRYON_WARP=mls`; the default `parts` engine ignores the polygon.** Never `neck_clip` (#101). Regression fixture
 `backend/apps/tryon_engine/testdata/tryon_neck/` (gitignored, `export_neck_hole_regression.py`, exported before the

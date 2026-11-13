@@ -76,14 +76,14 @@ class NeckHoleRegressionTests(SimpleTestCase):
                         n += 1
         self.assertEqual(n, 108)
 
-    def test_polygon_is_ignored_by_keep_shape_parts_and_the_flag(self):
+    def test_polygon_is_ignored_by_parts_and_the_flag(self):
         for gid in WITH_POLYGON:
             g, glm = self.gm[gid]
             lm = {**glm, "neck_hole": {"polygon": self.polys[gid]}}
             for pk in AVATARS:
                 base, blm = self.av[pk]
-                for engine, mode, over in (("mls", "keep_shape", {}), ("parts", "adapt", {}),
-                                           ("mls", "adapt", {"neck_hole": False})):
+                for engine, mode, over in (("parts", "adapt", {}), ("mls", "adapt", {"neck_hole": False}),
+                                           ("mls", "keep_shape", {"neck_hole": False})):
                     with self.subTest(garment=gid, avatar=pk, engine=engine, mode=mode, **over):
                         rgb, _, dbg = _render(base, blm, g, lm, mode, engine, **over)
                         self.assertEqual(self._diff(rgb, _want(engine, mode, gid, pk)), 0)
@@ -101,27 +101,37 @@ class NeckHoleRegressionTests(SimpleTestCase):
                     self.assertEqual(dbg["engine"], "mls")  # no fallback to parts
                     self.assertEqual(self._diff(rgb, _want("mls", "adapt", "28", pk)), 0)
 
-    def test_40_with_owner_polygon_v2_on_6_avatars(self):
-        """docs/09 #101: fabric left in the warped hole <= 5 px, band px removed 0, changes outside the neck zone 0."""
-        g, glm = self.gm["40"]
-        lm = {**glm, "neck_hole": {"polygon": self.polys["40"]}}
-        for pk in AVATARS:
-            base, blm = self.av[pk]
-            with self.subTest(avatar=pk):
-                on_rgb, _, on = _render(base, blm, g, lm)
-                off_rgb, _, off = _render(base, blm, g, glm)
-                self.assertTrue(on["neck_hole"])
-                self.assertEqual(on["mls"]["neckline"]["variant"], "hole")
-                w = on["mls"]["neck_weight"]
-                a_on, a_off = on["tshirt_layer"][:, :, 3], off["tshirt_layer"][:, :, 3]
-                fabric = int(((a_on >= 128) & (w >= 0.5)).sum())
-                band = int(((a_off >= 128) & (a_on < 128) & (w < 0.5)).sum())
-                zone = cv2.dilate((w > 0).astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
-                outside = int(((on_rgb != off_rgb).any(2) & ~zone).sum())
-                self.assertLessEqual(fabric, 5)
-                self.assertEqual(band, 0)
-                self.assertEqual(outside, 0)
-                self.assertGreater(int((on_rgb != off_rgb).any(2).sum()), 0)  # the hole did change the neck
+    def test_owner_polygons_adapt_and_keep_shape_on_6_avatars(self):
+        """docs/09 #101, #103, adapt AND keep_shape: fabric left in the warped hole <= 5 px (#40) / 6 px (#28, #47);
+        band px removed 0 for #40 adapt (the spec), elsewhere 0 off the hole and <= 4 px on its antialiased edge
+        (already partial alpha 129-199, w 0.28-0.49: alpha x (1 - w) drops them under 128); outside the neck zone 0."""
+        for gid, mode in [(gid, mode) for gid in WITH_POLYGON for mode in ("adapt", "keep_shape")]:
+            g, glm = self.gm[gid]
+            lm = {**glm, "neck_hole": {"polygon": self.polys[gid]}}
+            for pk in AVATARS:
+                base, blm = self.av[pk]
+                with self.subTest(garment=gid, mode=mode, avatar=pk):
+                    strict = (gid, mode) == ("40", "adapt")
+                    self._check_hole(base, blm, g, glm, lm, mode, 5 if gid == "40" else 6, 0 if strict else 4)
+
+    def _check_hole(self, base, blm, g, glm, lm, mode, max_fabric, max_edge):
+        on_rgb, _, on = _render(base, blm, g, lm, mode)
+        off_rgb, _, off = _render(base, blm, g, glm, mode)
+        self.assertTrue(on["neck_hole"])
+        self.assertEqual(on["mls"]["neckline"]["variant"], "hole")
+        w = on["mls"]["neck_weight"]
+        a_on, a_off = on["tshirt_layer"][:, :, 3], off["tshirt_layer"][:, :, 3]
+        fabric = int(((a_on >= 128) & (w >= 0.5)).sum())
+        removed = (a_off >= 128) & (a_on < 128) & (w < 0.5)
+        band_off_hole = int((removed & (w == 0)).sum())
+        band_edge = int((removed & (w > 0)).sum())
+        zone = cv2.dilate((w > 0).astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+        outside = int(((on_rgb != off_rgb).any(2) & ~zone).sum())
+        self.assertLessEqual(fabric, max_fabric)
+        self.assertEqual(band_off_hole, 0)
+        self.assertLessEqual(band_edge, max_edge)
+        self.assertEqual(outside, 0)
+        self.assertGreater(int((on_rgb != off_rgb).any(2).sum()), 0)  # the hole did change the neck
 
     def test_hole_keywords_and_never_neck_clip(self):
         g, glm = self.gm["47"]

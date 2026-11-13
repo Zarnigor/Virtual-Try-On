@@ -461,4 +461,15 @@ _(none blocking P0)_
       (0 px, tested on #28, #40, #43, #44, #45, #47 x 6 avatars). Job result: `neck_hole: {garment id: bool}`.
     - Measured (production path, `run_tryon_neck.py`): #40 with `40-2.json` fabric left in the hole 1-4 px, band
       0 px, outside the neck zone 0 px; #47 3-6 px; #28 0 px (only 6-91 px change: r7 already cleared most of it).
-    Open: whether keep_shape should get the hole too (excluded now to keep keep_shape pixel-identical).
+    (keep_shape: see #103.)
+
+## Decided 2026-11-13: neckline hole for keep_shape too (owner decision)
+103. **2026-11-13: a keep_shape T-shirt with a valid polygon gets the hole as well** (supersedes the keep_shape
+    exclusion in #102). Diagnosis: `warp._neck_hole_kwargs` returned {} for every fit_mode but adapt, so #45
+    (keep_shape, valid 16-point polygon) rendered the r7 neckline (job 241 `neck_hole: false`, job 242 after a switch to
+    adapt `true`). The engine needs no change: `mls.tshirt_layer(keep_shape, hole)` on #45 / avatar 2 left 1 px of
+    fabric in the hole (3000 before), 0 px outside the neck zone. Without a polygon keep_shape stays pixel-identical
+    (#44, #45 x 6 avatars against the pre-wiring export); `parts` and `TRYON_NECK_HOLE=0` still ignore the polygon.
+    Tests (#28, #40, #47 x 6 avatars x adapt + keep_shape): fabric left <= 5 px (#40) / 6 px (#28, #47); band 0 px off
+    the hole; on the hole's antialiased edge 0 px for #40 adapt and <= 4 px elsewhere (pixels already partly
+    transparent, alpha 129-199, at w 0.28-0.49, which alpha x (1 - w) takes under 128; measured 1-4 px).

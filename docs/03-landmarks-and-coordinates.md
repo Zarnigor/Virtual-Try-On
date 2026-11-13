@@ -55,7 +55,7 @@ collar_bottom = the lowest centre point of the neckline; sleeve_cuff_outer = the
 **neck_hole** (T-shirt, docs/09 #102): `neck_hole {polygon: [[x, y], ...]}`, the neckline opening drawn by the garment's
 owner along the INNER edge of the collar band, reaching the garment's top edge so the inner back (and the label) is
 inside it, the band itself outside (like the owner polygon `40-2.json`). Pixels of the cleaned PNG, any shape (V, crew,
-square). `neck_hole: null` = no hole (not stored). Used only by the MLS try-on (`TRYON_WARP=mls`, adapt garments).
+square). `neck_hole: null` = no hole (not stored). Used only by the MLS try-on (`TRYON_WARP=mls`; adapt and keep_shape, docs/09 #103).
 
 ## Sanity checks (frontend AND backend)
 - Vertical order: head_top < neck < shoulder < armpit <= chest < waist < hip < crotch < knee < ankle < foot_bottom

@@ -158,7 +158,7 @@ TRYON_NECK_FIX = os.environ.get("TRYON_NECK_FIX", "1") == "1"
 TRYON_NECK_GAP_FILL = os.environ.get("TRYON_NECK_GAP_FILL", "1") == "1"
 TRYON_DROPPED_SHOULDER_SINGLE = os.environ.get("TRYON_DROPPED_SHOULDER_SINGLE", "0") == "1"
 # Owner-drawn neckline hole (landmarks.neck_hole.polygon, docs/09 #102): used by the MLS engine only (TRYON_WARP=mls),
-# adapt garments only; 0 = never pass the hole (the r7 neckline as before).
+# adapt and keep_shape (owner 2026-11-13); 0 = never pass the hole (the r7 neckline as before).
 TRYON_NECK_HOLE = os.environ.get("TRYON_NECK_HOLE", "1") == "1"
 # T-shirt hem rule (docs/09 #91): hem row = hip + FRACTION x (crotch - hip), at most crotch - MARGIN px
 TRYON_HEM_RULE = os.environ.get("TRYON_HEM_RULE", "1") == "1"

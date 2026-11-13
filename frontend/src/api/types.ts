@@ -119,7 +119,7 @@ export interface TshirtLandmarks {
   sleeve_end?: { left: Point; right: Point }
   /**
    * Neckline hole (docs/09 #102, step 2 of the editor): the inner edge of the collar band, [x, y] in px of the
-   * cleaned PNG, 3..64 points. Used by the MLS try-on only (TRYON_WARP=mls, adapt garments). null = no hole.
+   * cleaned PNG, 3..64 points. Used by the MLS try-on only (TRYON_WARP=mls; adapt and keep_shape). null = no hole.
    */
   neck_hole?: { polygon: [number, number][] } | null
 }

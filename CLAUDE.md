@@ -189,7 +189,9 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       editor (step 2 `/garments/{id}/neck`: collar points + polygon), `landmarks.neck_hole.polygon`, `neck_complete`,
       render wiring MLS + adapt only behind `TRYON_NECK_HOLE` (default 1), `neck_hole_invalid` warning. **The hole works
       only with TRYON_WARP=mls.** Suggestion: shape buttons V / Dumaloq / Toʻrtburchak, created once, two edit modes.
-      324 backend tests, 78 vitest, tsc clean. Open: keep_shape + hole.
+      324 backend tests, 78 vitest, tsc clean.
+      **2026-11-13 (docs/09 #103, uncommitted):** the hole applies to keep_shape too (the adapt-only check in
+      `warp._neck_hole_kwargs` removed); no polygon = pixel-identical as before.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.
