@@ -21,8 +21,10 @@ but the frontend must fully work too (React is required). The owner works and re
   Auth: email + password only (no Google sign-in). Image model: **Nano Banana 2 (standard)** via the official Gemini API.
 - **Garment fit is per garment** (`fit_mode`: `adapt` default | `keep_shape`, docs/09 #93); `gender` female|male|unisex.
   Garment real size is NOT entered. No tight/loose fit label. **keep_shape = MLS per-point k preset A** (docs/09 #96,
-  shoulder_* marked at the sleeve seam); wired only in the MLS engine (`TRYON_WARP=mls`, docs/09 #98); the default
-  `parts` engine still warps keep_shape like adapt. **Warp method (parts vs MLS) and hem rule are NOT decided.**
+  shoulder_* marked at the sleeve seam); wired only in the MLS engine (docs/09 #98). **MLS is the default T-shirt
+  engine (`TRYON_WARP=mls`, docs/09 #105);** adapt T-shirts = sleeve C + tube + armpit r14 + side floor "mask" +
+  garment hem (flags `TRYON_MLS_*`); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
+  **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
 - Garment AI cleaning (hanger/background removal, prompt 04) is in P0 but **off for now** (`AI_CLEANING_ENABLED=0`, no prepaid
@@ -71,6 +73,7 @@ but the frontend must fully work too (React is required). The owner works and re
 | `docs/08-roadmap-and-testing.md` | P0/P1/P2, day plan, tests, definition of done |
 | `docs/09-open-questions.md` | Decisions log, proposed defaults, what is still open |
 | `docs/10-frontend-and-design.md` | Screen map, what comes from the backend, states the design does not show |
+| `docs/11-session-handoff.md` | End-of-session handoff: git state, done / not done, next steps, commands |
 | `design/` | UI reference: 12 desktop screens (`previews/*.png`, `artboards/*.dc.html`), `tokens.md` |
 | `docs/diagrams/` | UML activity diagrams (.puml source, .png/.svg rendered) |
 | `prompts/` | The 5 AI prompts (raw .txt), config and Uzbek error-message table |
@@ -103,7 +106,9 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-Last updated: 2026-11-13. The first task (summary + plan) is done. The owner approved the 10-step plan below.
+**Latest handoff: `docs/11-session-handoff.md` (2026-11-15): uncommitted rounds 11-14, open problems, next
+steps, how to run. Read it first.**
+Last updated: 2026-11-15. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
 - [ ] 1. Day-1 experiment, properly: 3 real male avatars (avatar-prep + landmark editor), fix sleeves
@@ -196,6 +201,25 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `shoulder_variant`, `shoulder_fractions`, `shoulder_ease`, `shoulder_edge_alpha`, all default off / round 9).
       **Decided (docs/09 #104): production MLS uses sleeve variant C** (`TRYON_MLS_SLEEVE`, default C), shoulder line
       not used. 335 backend tests pass.
+      **2026-11-15 rounds 11 / 12 / 12b (docs/06, NOT production, uncommitted):** benchmark keywords `sleeve_mode`,
+      `side_floor_mode`, `hem_mode` (smooth | garment), `tube_arm` (r11 | fit), `hem_c_pair`, all default off. "mask"
+      now never uncovers the landmark floor layer (local map blend + last guard). Runner `run_hem12b.py`. No winner
+      picked; owner reviews the 12b sheets. 353 backend tests pass.
+      **2026-11-15 round 13 (docs/06, NOT production, uncommitted):** `tube_arm` finished (a + b) failed the gate
+      (18 / 18, cuff-edge halo band); fallback finished_a: 0 new holes. `run_tube13.py`. 355 backend tests pass.
+      **Round 13b:** a + b kept, cut edge out of remove_halo, enclosed sleeve holes filled: GATE 0 / 18.
+      **Round 13c (armpit):** armpit_zone + inner widening + zone inpaint: GATE 0 / 18; slim wedge below the cuff
+      (arm side) and a seam line along the tube inner edge still open. 356 backend tests pass.
+      **2026-11-15 round 14 (docs/06 "Armpit wedge, round 14", NOT production, uncommitted):** keyword
+      `armpit_mode` (off | r13c | r14, default off; replaces `armpit_fix`, so "finished" = 13b again). r14 = the
+      garment's torso seam pinned to the arm/torso boundary (cuff row -> crease) in a local window + arm-side cut:
+      #28 wedge 0 px on 12 / 12 sides; gate fails 8 / 18 (#43 arm skin under its curved cuff, 1 px on #40).
+      `run_armpit14.py`, `debug_armpit14.py`. Owner agreed to delete r13c after the review. 363 backend tests pass.
+      **2026-11-15 production wiring (docs/09 #105, docs/06 "Production wiring"):** `TRYON_WARP` default `mls`; adapt
+      T-shirts get the round 14 config through `render_tryon`; flags `TRYON_MLS_TUBE` / `_SIDE_FLOOR` / `_ARMPIT` /
+      `_HEM` (off = before); `tube_fallback`; job result `tshirt_config` + `render_ms`; r13c deleted. Gates: production
+      = benchmark 0 px (18 pairs), keep_shape 0 px. Known issues in #105 (gate 8 / 18, ~1.1 s render, demo results
+      stale). Check tools: `tools/tryon_check/prod_vs_bench.py`, `post_path.py`. 369 backend tests, 78 vitest, tsc.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

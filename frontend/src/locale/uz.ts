@@ -98,6 +98,7 @@ export const GARMENT_CHIPS = {
 export const TRYON_QUALITY: Record<string, string> = {
   neck_hole_invalid: 'Yoqa teshigi notoʻgʻri belgilangan, shu sababli hisobga olinmadi. Kiyimning yoqasini qayta belgilang.',
   mls_fallback: 'Kiyim uchun barcha nuqtalar topilmadi, oddiy usulda kiydirildi.',
+  tube_fallback: 'Yengni qoʻlga moslab boʻlmadi, yenglar oddiy usulda kiydirildi.',
 }
 
 /** Garment settings (screen 9) and list badges/filters (docs/09 #93). */

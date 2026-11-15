@@ -164,13 +164,14 @@ TRYON_NECK_HOLE = os.environ.get("TRYON_NECK_HOLE", "1") == "1"
 TRYON_HEM_RULE = os.environ.get("TRYON_HEM_RULE", "1") == "1"
 TRYON_HEM_HIP_FRACTION = float(os.environ.get("TRYON_HEM_HIP_FRACTION", "0.35"))
 TRYON_HEM_CROTCH_MARGIN = float(os.environ.get("TRYON_HEM_CROTCH_MARGIN", "10"))
-# T-shirt warp engine (docs/09 #98): "parts" (default, torso row warp + rigid sleeves) or "mls" (one rigid MLS field,
-# apps/tryon_engine/mls.py; keep_shape -> preset A, adapt -> fitted). An invalid value stops startup.
+# T-shirt warp engine (docs/09 #98, default "mls" since docs/09 #105): "mls" (one rigid MLS field,
+# apps/tryon_engine/mls.py; keep_shape -> preset A, adapt -> fitted) or "parts" (torso row warp + rigid sleeves, the
+# default before #105; pants always use parts). An invalid value stops startup.
 TRYON_WARP_CHOICES = ("parts", "mls")
 
 
 def parse_tryon_warp(value):
-    value = (value or "parts").strip().lower()
+    value = (value or "mls").strip().lower()
     if value not in TRYON_WARP_CHOICES:
         from django.core.exceptions import ImproperlyConfigured
         raise ImproperlyConfigured(f"TRYON_WARP must be one of {', '.join(TRYON_WARP_CHOICES)}, got {value!r}")
@@ -192,6 +193,30 @@ def parse_mls_sleeve(value):
 
 
 TRYON_MLS_SLEEVE = parse_mls_sleeve(os.environ.get("TRYON_MLS_SLEEVE"))
+# Adapt T-shirts on the MLS engine (docs/09 #105, docs/06 rounds 11-14); each flag's off value = the behaviour before
+# #105; keep_shape garments ignore all four. An invalid value stops startup.
+#   TRYON_MLS_TUBE        1 (default) = tube sleeves "finished" (round 13b) | 0 = MLS sleeves
+#   TRYON_MLS_SIDE_FLOOR  mask (default) = side coverage floor from the figure mask (round 12 / 12b) | off
+#   TRYON_MLS_ARMPIT      r14 (default) = torso seam on the arm/torso boundary (round 14; needs the tube and the
+#                         side floor, otherwise it is off and tshirt_config says so) | off
+#   TRYON_MLS_HEM         garment (default) = the garment's own hem shape (round 12b) | mls = no hem post-processing
+TRYON_MLS_CHOICES = {"TRYON_MLS_TUBE": ("1", "0"), "TRYON_MLS_SIDE_FLOOR": ("mask", "off"),
+                     "TRYON_MLS_ARMPIT": ("r14", "off"), "TRYON_MLS_HEM": ("garment", "mls")}
+
+
+def parse_mls_choice(name, value):
+    choices = TRYON_MLS_CHOICES[name]
+    value = (value or choices[0]).strip().lower()
+    if value not in choices:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(f"{name} must be one of {', '.join(choices)}, got {value!r}")
+    return value
+
+
+TRYON_MLS_TUBE = parse_mls_choice("TRYON_MLS_TUBE", os.environ.get("TRYON_MLS_TUBE")) == "1"
+TRYON_MLS_SIDE_FLOOR = parse_mls_choice("TRYON_MLS_SIDE_FLOOR", os.environ.get("TRYON_MLS_SIDE_FLOOR"))
+TRYON_MLS_ARMPIT = parse_mls_choice("TRYON_MLS_ARMPIT", os.environ.get("TRYON_MLS_ARMPIT"))
+TRYON_MLS_HEM = parse_mls_choice("TRYON_MLS_HEM", os.environ.get("TRYON_MLS_HEM"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

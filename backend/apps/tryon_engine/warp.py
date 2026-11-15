@@ -1501,6 +1501,20 @@ def _neck_hole_kwargs(g_img, glm, enabled, info) -> dict:
     return {"neckline_variant": "hole", "neck_hole_polygon": [list(p) for p in glm["neck_hole"]["polygon"]]}
 
 
+def _mls_adapt_kwargs(cfg: dict) -> dict:
+    """mls.tshirt_layer keywords of an adapt T-shirt for a tshirt_config (docs/09 #105). Every option off = {}."""
+    kw = {}
+    if cfg["side_floor"] == "mask":
+        kw.update(side_floor=True, side_floor_mode="mask")
+    if cfg["tube"]:
+        kw.update(sleeve_mode="tube", tube_arm="finished")
+    if cfg["armpit"] == "r14":
+        kw["armpit_mode"] = "r14"
+    if cfg["hem"] == "garment":
+        kw["hem_mode"] = "garment"
+    return kw
+
+
 def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600,
                  shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
@@ -1508,7 +1522,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  source: str = "body", dropped_shoulder_single: bool = False, hem_rule: bool = False,
                  hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0,
                  fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True,
-                 mls_sleeve: str = "C"):
+                 mls_sleeve: str = "C", mls_tube: bool = False, mls_side_floor: str = "off",
+                 mls_armpit: str = "off", mls_hem: str = "mls"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1534,6 +1549,15 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     debug["quality_warnings"] gets "mls_fallback". Pants always use their own warp. debug["engine"] = the engine
     the T-shirt actually used ("parts" when there is no T-shirt).
     mls_sleeve (setting TRYON_MLS_SLEEVE, default "C", docs/09 #104): the MLS sleeve variant (adapt only).
+    Adapt T-shirts on MLS (docs/09 #105; the settings default to the first value, the defaults here are the off values
+    so direct calls keep the behaviour before #105; keep_shape ignores all four and is called as before):
+    mls_tube (TRYON_MLS_TUBE): tube sleeves "finished" (docs/06 rounds 11-13b). When the tube skips a side the
+    T-shirt is rendered again with MLS sleeves (and without the armpit mode) and gets quality warning "tube_fallback".
+    mls_side_floor (TRYON_MLS_SIDE_FLOOR) "mask" | "off": the side coverage floor from the figure mask (round 12 / 12b).
+    mls_armpit (TRYON_MLS_ARMPIT) "r14" | "off": the torso seam on the arm/torso boundary (round 14); needs the tube
+    and the side floor, otherwise it is off. mls_hem (TRYON_MLS_HEM) "garment" | "mls": the garment's own hem shape
+    (round 12b) or no hem post-processing. debug["tshirt_config"] = what was actually used: {fit_mode, engine, sleeve,
+    tube, side_floor, armpit, hem} (engine "parts": {fit_mode, engine} only).
     neck_hole (setting TRYON_NECK_HOLE, docs/09 #102): MLS only, adapt and keep_shape. When the T-shirt landmarks carry
     `neck_hole.polygon` and it passes landmark_checks.neck_hole_problem (same rules as PATCH), the MLS layer is made
     with neckline_variant="hole" + that polygon (never neck_clip); a failing polygon is skipped with quality warning
@@ -1543,6 +1567,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     """
     if warp_engine not in ("parts", "mls"):
         raise ValueError(f"unknown warp engine: {warp_engine!r}")
+    if mls_side_floor not in ("mask", "off") or mls_armpit not in ("r14", "off") or mls_hem not in ("garment", "mls"):
+        raise ValueError(f"unknown MLS T-shirt option: {mls_side_floor!r}, {mls_armpit!r}, {mls_hem!r}")
     fit_modes = fit_modes or {}
     base = cv2.resize(_bgra(base), (W, H))
     mask = figure_mask(base)
@@ -1562,10 +1588,29 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     if "tshirt" in by_type and warp_engine == "mls":
         from . import mls as mls_engine
         hole_kw = _neck_hole_kwargs(*by_type["tshirt"], neck_hole, info)
+        fit = fit_modes.get("tshirt", "adapt")
+        cfg = {"fit_mode": fit, "engine": "mls", "sleeve": None, "tube": False, "side_floor": "off", "armpit": "off",
+               "hem": "mls"}
+        adapt_kw = {}
+        if fit != "keep_shape":  # docs/09 #105; keep_shape is called exactly as before
+            cfg.update(sleeve=mls_sleeve, tube=bool(mls_tube), side_floor=mls_side_floor, hem=mls_hem,
+                       armpit=mls_armpit if mls_tube and mls_side_floor == "mask" else "off")
+            adapt_kw = _mls_adapt_kwargs(cfg)
         try:
             mls_layer, mls_info = mls_engine.tshirt_layer(
-                *by_type["tshirt"], body_lm, mask, fit_modes.get("tshirt", "adapt"), H, W,
-                (hem_hip_fraction, hem_crotch_margin), sleeve_variant=mls_sleeve, **hole_kw)
+                *by_type["tshirt"], body_lm, mask, fit, H, W,
+                (hem_hip_fraction, hem_crotch_margin), sleeve_variant=mls_sleeve, **adapt_kw, **hole_kw)
+            skipped = [s for s, r in (mls_info.get("tube") or {}).items() if isinstance(r, dict) and "skipped" in r]
+            if skipped:  # the tube could not be built on a side: the whole T-shirt with MLS sleeves
+                cfg.update(tube=False, armpit="off")
+                info["quality_warnings"].append("tube_fallback")
+                warnings.append(f"tshirt: tube fallback to MLS sleeves ({', '.join(skipped)}: "
+                                f"{mls_info['tube'][skipped[0]]['skipped']})")
+                mls_layer, mls_info = mls_engine.tshirt_layer(
+                    *by_type["tshirt"], body_lm, mask, fit, H, W,
+                    (hem_hip_fraction, hem_crotch_margin), sleeve_variant=mls_sleeve, **_mls_adapt_kwargs(cfg),
+                    **hole_kw)
+            info["tshirt_config"] = cfg
             info["neck_hole"] = bool(hole_kw)
             info.update(engine="mls", mls=mls_info, sleeve_hems=mls_info["sleeve_hems"])
             warnings += [f"tshirt: mls dropped {r}" for r in mls_info["rejected"]]
@@ -1578,6 +1623,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         info["tshirt_layer"] = mls_layer
         layers.append(("tshirt", mls_layer))
     elif "tshirt" in by_type:
+        info["tshirt_config"] = {"fit_mode": fit_modes.get("tshirt", "adapt"), "engine": "parts"}
         hem_over, under = None, None
         if "pants" in by_type:
             under = layers[0][1][:, :, 3] > 128

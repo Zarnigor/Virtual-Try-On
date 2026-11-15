@@ -481,3 +481,29 @@ _(none blocking P0)_
     same layer there, tested). The shoulder line of round 9 / 9b is **not** used (stays a benchmark keyword, default
     off). `mls.tshirt_layer`'s own default stays `r7` so the frozen fixtures keep their meaning; the neck-hole fixture
     tests pin `mls_sleeve="r7"`. Only with `TRYON_WARP=mls`; the default engine is still `parts` (#98, not decided).
+
+## Decided 2026-11-15: MLS is the default T-shirt engine; adapt config in production (owner decision)
+105. **2026-11-15: `TRYON_WARP` defaults to `mls`** (settings, docker-compose, `.env.example`; `parts` stays
+    selectable and is still the engine for pants and the fallback behind `mls_fallback`). This closes "parts vs MLS"
+    (#98). **Adapt T-shirts on MLS are rendered with the config of benchmark rounds 11-14** (docs/06): sleeve C (#104)
+    + tube sleeves "finished" (round 13b) + armpit mode r14 (round 14) + side floor "mask" (round 12 / 12b) + garment
+    hem (round 12b). keep_shape garments are called exactly as before (0 px on #44, #45). Flags, each off value =
+    the behaviour before this change, an invalid value stops startup: `TRYON_MLS_TUBE` (1 | 0), `TRYON_MLS_SIDE_FLOOR`
+    (mask | off), `TRYON_MLS_ARMPIT` (r14 | off), `TRYON_MLS_HEM` (garment | mls = no hem post-processing);
+    `TRYON_MLS_SLEEVE` unchanged. r14 needs the tube and the side floor: with either off the armpit mode is off (owner
+    OK), reported in the job result. A tube that cannot be built on a side: the whole T-shirt is rendered with MLS
+    sleeves, quality warning `tube_fallback` (Uzbek message in the locale file). Job result: `tshirt_config` per
+    T-shirt (what was actually used), `render_ms` (docs/04, `types.ts`). `render_tryon`'s own defaults stay the off
+    values (direct calls and the frozen fixtures keep their meaning); the settings switch the config on.
+    **Round 13c is deleted** (`armpit_mode="r13c"`, `armpit_zone`, `_widen_inner`, `_inpaint_armpit`, its tests and
+    runner). Gates passed: production layer = the benchmark call, 0 px, #28 / #43 / #40 x 6 avatars (DB data:
+    `tools/tryon_check/prod_vs_bench.py`; fixture: `ProductionTshirtConfigTests`); keep_shape #44 / #45 x 6 = 0 px; all
+    flags off = the previous production call, each single flag off = the benchmark call without that keyword; 369
+    backend tests, 78 vitest, tsc. Check through the real `POST tryon/` path: `tools/tryon_check/post_path.py`
+    (21 renders; #28 on female avatars and #43 / #40 on male avatars are refused by the gender rule #97).
+    **Known issues, recorded, not blockers (owner 2026-11-15):** (1) the round 14 gate fails on 8 of 18 benchmark
+    runs: arm skin 2.5-5.8 px above the nominal cuff line under the garment's curved cuff on #43 (6 runs) and #40
+    m-plus, 1 px on #40 m-slim (docs/06 "Armpit wedge, round 14"); (2) render time of an adapt T-shirt about 1.0-1.5 s
+    (before: about 0.15 s), to optimize later, likely the "mask" last guard's comparison layer; (3) a stepped torso
+    edge (2-5 px) beside the gap below the armpit on #28; (4) demo-mode results were built with `parts` and are
+    stale (owner: do not rebuild now). Still open: the hem rule (#91, proposed).

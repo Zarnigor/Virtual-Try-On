@@ -297,15 +297,34 @@ export interface TryOnResponse {
   engine: 'parts' | 'mls'
 }
 
+/** What a T-shirt render actually used (docs/09 #105). engine "parts": only fit_mode and engine are present. */
+export interface TshirtConfig {
+  fit_mode: 'adapt' | 'keep_shape'
+  engine: 'parts' | 'mls'
+  /** MLS sleeve variant; null for keep_shape. */
+  sleeve?: 'r7' | 'A' | 'B' | 'C' | null
+  /** Tube sleeves; false after a tube_fallback. */
+  tube?: boolean
+  side_floor?: 'mask' | 'off'
+  /** "off" also when the tube or the side floor is off. */
+  armpit?: 'r14' | 'off'
+  /** "mls" = no hem post-processing. */
+  hem?: 'garment' | 'mls'
+}
+
 /** job.result of a finished try-on job (docs/04). */
 export interface TryOnJobResult {
   outfit_id: number
   /** The T-shirt engine actually used. */
   engine: 'parts' | 'mls'
-  /** e.g. "mls_fallback", "neck_hole_invalid" (messages: locale TRYON_QUALITY). */
+  /** e.g. "mls_fallback", "neck_hole_invalid", "tube_fallback" (messages: locale TRYON_QUALITY). */
   quality_warnings: string[]
   /** Debug (docs/09 #102): per garment id, whether the owner's neckline polygon was used. */
   neck_hole: Record<string, boolean>
+  /** Debug (docs/09 #105): per T-shirt garment id, the config used. Absent in demo results. */
+  tshirt_config?: Record<string, TshirtConfig>
+  /** Debug (docs/09 #105): time of the render call in ms. Absent in demo results. */
+  render_ms?: number
   demo?: boolean
 }
 

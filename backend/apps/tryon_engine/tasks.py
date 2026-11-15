@@ -31,7 +31,10 @@ def run_tryon(job_pk: int):
 
 def _do_warp(outfit):
     """Renders and saves the result. Returns {engine: "parts" | "mls", quality_warnings: [...], neck_hole: {garment
-    id: bool}} for the job result (neck_hole: the owner polygon was used, debug, docs/09 #102)."""
+    id: bool}, tshirt_config: {garment id: {...}}, render_ms} for the job result (neck_hole: the owner polygon was
+    used, debug, docs/09 #102; tshirt_config: what the T-shirt render actually used, docs/09 #105; render_ms: the
+    render_tryon call, without file I/O)."""
+    import time
     import cv2
     from django.core.files.base import ContentFile
     from django.conf import settings
@@ -58,8 +61,10 @@ def _do_warp(outfit):
             flags["warp_engine"] = "parts"  # MLS needs the main set + the collar points (docs/09 #98, #102)
             quality.append("mls_fallback")
 
+    t0 = time.perf_counter()
     final_bgr, warns, debug = render_tryon(base_img, base_lm, garments, settings.CANVAS_H, settings.CANVAS_W,
                                            fit_modes=fit_modes, **flags)
+    render_ms = int(round((time.perf_counter() - t0) * 1000))
     debug = debug or {}
     if warns:
         logger.warning("Warp warnings for outfit %d: %s", outfit.pk, warns)
@@ -68,5 +73,8 @@ def _do_warp(outfit):
     outfit.result_image.save(f"result_{outfit.pk}.png", ContentFile(buf.tobytes()), save=True)
     quality += [w for w in debug.get("quality_warnings", []) if w not in quality]
     used = bool(debug.get("neck_hole"))
+    cfg = debug.get("tshirt_config")
     return {"engine": debug.get("engine", "parts"), "quality_warnings": quality,
-            "neck_hole": {str(g.pk): used and g.type == "tshirt" for g in outfit.garments.all()}}
+            "neck_hole": {str(g.pk): used and g.type == "tshirt" for g in outfit.garments.all()},
+            "tshirt_config": {str(g.pk): cfg for g in outfit.garments.all() if g.type == "tshirt" and cfg},
+            "render_ms": render_ms}

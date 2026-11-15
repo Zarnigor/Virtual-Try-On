@@ -49,9 +49,13 @@ services:
       - TRYON_NECK_GAP_FILL=${TRYON_NECK_GAP_FILL:-1}
       - TRYON_DROPPED_SHOULDER_SINGLE=${TRYON_DROPPED_SHOULDER_SINGLE:-0}
       - TRYON_HEM_RULE=${TRYON_HEM_RULE:-1}
-      - TRYON_WARP=${TRYON_WARP:-parts}  # T-shirt warp engine: parts | mls (docs/09 #98)
+      - TRYON_WARP=${TRYON_WARP:-mls}  # T-shirt warp engine: mls (default, docs/09 #105) | parts
       - TRYON_NECK_HOLE=${TRYON_NECK_HOLE:-1}  # owner-drawn neckline hole, MLS only (docs/09 #102)
       - TRYON_MLS_SLEEVE=${TRYON_MLS_SLEEVE:-C}  # MLS sleeve variant r7|A|B|C (docs/09 #104)
+      - TRYON_MLS_TUBE=${TRYON_MLS_TUBE:-1}  # adapt T-shirts on MLS (docs/09 #105): tube sleeves, 0 = MLS sleeves
+      - TRYON_MLS_SIDE_FLOOR=${TRYON_MLS_SIDE_FLOOR:-mask}  # mask | off
+      - TRYON_MLS_ARMPIT=${TRYON_MLS_ARMPIT:-r14}  # r14 | off (needs the tube and the side floor)
+      - TRYON_MLS_HEM=${TRYON_MLS_HEM:-garment}  # garment | mls (no hem post-processing)
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
@@ -89,9 +93,13 @@ services:
       - TRYON_NECK_GAP_FILL=${TRYON_NECK_GAP_FILL:-1}
       - TRYON_DROPPED_SHOULDER_SINGLE=${TRYON_DROPPED_SHOULDER_SINGLE:-0}
       - TRYON_HEM_RULE=${TRYON_HEM_RULE:-1}
-      - TRYON_WARP=${TRYON_WARP:-parts}  # T-shirt warp engine: parts | mls (docs/09 #98)
+      - TRYON_WARP=${TRYON_WARP:-mls}  # T-shirt warp engine: mls (default, docs/09 #105) | parts
       - TRYON_NECK_HOLE=${TRYON_NECK_HOLE:-1}  # owner-drawn neckline hole, MLS only (docs/09 #102)
       - TRYON_MLS_SLEEVE=${TRYON_MLS_SLEEVE:-C}  # MLS sleeve variant r7|A|B|C (docs/09 #104)
+      - TRYON_MLS_TUBE=${TRYON_MLS_TUBE:-1}  # adapt T-shirts on MLS (docs/09 #105): tube sleeves, 0 = MLS sleeves
+      - TRYON_MLS_SIDE_FLOOR=${TRYON_MLS_SIDE_FLOOR:-mask}  # mask | off
+      - TRYON_MLS_ARMPIT=${TRYON_MLS_ARMPIT:-r14}  # r14 | off (needs the tube and the side floor)
+      - TRYON_MLS_HEM=${TRYON_MLS_HEM:-garment}  # garment | mls (no hem post-processing)
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}

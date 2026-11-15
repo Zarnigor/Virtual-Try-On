@@ -41,9 +41,16 @@ def _fixture():
 def _render(base, blm, g, glm, mode="adapt", engine="mls", **over):
     # the fixture was exported with the r7 sleeves (before docs/09 #104 made C the default): pin them here, these
     # tests check the neck-hole wiring, not the sleeve variant
-    flags = {**render_flags("avatar"), "warp_engine": engine, "mls_sleeve": "r7", **over}
+    # (and the docs/09 #105 adapt options off: the fixture predates them)
+    flags = {**render_flags("avatar"), "warp_engine": engine, "mls_sleeve": "r7", "mls_tube": False,
+             "mls_side_floor": "off", "mls_armpit": "off", "mls_hem": "mls", **over}
     return render_tryon(base, blm, [("tshirt", g, engine_landmarks("tshirt", glm))], 1200, 600,
                         fit_modes={"tshirt": mode}, **flags)
+
+
+def _core(report):
+    """The job result without the docs/09 #105 debug fields (tshirt_config, render_ms: tests_mls.TaskTests)."""
+    return {k: v for k, v in report.items() if k not in ("tshirt_config", "render_ms")}
 
 
 def _want(engine, mode, gid, pk):
@@ -176,19 +183,19 @@ class NeckHoleTaskTests(MediaTestCase):
     def test_job_result_reports_the_hole(self):
         poly = json.loads((FIXTURE / "polygons" / "40.json").read_text())["polygon"]
         outfit, gid = self._outfit(poly)
-        self.assertEqual(tasks._do_warp(outfit), {"engine": "mls", "quality_warnings": [], "neck_hole": {gid: True}})
+        self.assertEqual(_core(tasks._do_warp(outfit)), {"engine": "mls", "quality_warnings": [], "neck_hole": {gid: True}})
         outfit, gid = self._outfit(BAD)
-        self.assertEqual(tasks._do_warp(outfit),
+        self.assertEqual(_core(tasks._do_warp(outfit)),
                          {"engine": "mls", "quality_warnings": ["neck_hole_invalid"], "neck_hole": {gid: False}})
 
     @override_settings(TRYON_WARP="mls", TRYON_NECK_HOLE=False)
     def test_flag_off(self):
         poly = json.loads((FIXTURE / "polygons" / "40.json").read_text())["polygon"]
         outfit, gid = self._outfit(poly)
-        self.assertEqual(tasks._do_warp(outfit), {"engine": "mls", "quality_warnings": [], "neck_hole": {gid: False}})
+        self.assertEqual(_core(tasks._do_warp(outfit)), {"engine": "mls", "quality_warnings": [], "neck_hole": {gid: False}})
 
     @override_settings(TRYON_WARP="parts")
     def test_parts_ignores_it(self):
         poly = json.loads((FIXTURE / "polygons" / "40.json").read_text())["polygon"]
         outfit, gid = self._outfit(poly)
-        self.assertEqual(tasks._do_warp(outfit), {"engine": "parts", "quality_warnings": [], "neck_hole": {gid: False}})
+        self.assertEqual(_core(tasks._do_warp(outfit)), {"engine": "parts", "quality_warnings": [], "neck_hole": {gid: False}})

@@ -43,7 +43,8 @@ These come from the product owner. Do not change them without asking. Log: `09-o
     `adapt` (default) = the garment is fully deformed to the body's landmarks; `keep_shape` = the garment keeps its own
     proportions (oversized, wide-leg) and only its anchors fit the body. There is no tight/fits/loose label.
     `keep_shape` = MLS per-point k preset A (docs/09 #96); wired in the MLS engine (`TRYON_WARP=mls`, docs/09 #98).
-    The default `parts` engine warps keep_shape like adapt. The warp method (parts vs MLS) is NOT decided.
+    `mls` is the default T-shirt engine since docs/09 #105 (owner 2026-11-15); the `parts` engine (pants, MLS
+    fallback, `TRYON_WARP=parts`) warps keep_shape like adapt.
 21a. **Garment gender is enforced in try-on** (docs/09 #97): a male body/avatar sees `male` and `unisex` garments, a
     female one `female` and `unisex`; the backend refuses a mismatch (`GENDER_MISMATCH`). Garment size classes are
     NOT decided.

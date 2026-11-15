@@ -2,8 +2,10 @@
 TRYON_EDGE_FEATHER. Structural steps (default 1): TRYON_SHOULDER_CAP, TRYON_HEM_SNAP, TRYON_HALO_REMOVAL,
 TRYON_NECK_FIX, TRYON_NECK_GAP_FILL. TRYON_DROPPED_SHOULDER_SINGLE (default 0, docs/09 #90).
 T-shirt hem rule: TRYON_HEM_RULE (default 1), TRYON_HEM_HIP_FRACTION, TRYON_HEM_CROTCH_MARGIN (docs/09 #91).
-TRYON_WARP: "parts" (default) | "mls" for the T-shirt (docs/09 #98). TRYON_NECK_HOLE (default 1, MLS only, docs/09 #102).
-TRYON_MLS_SLEEVE: MLS sleeve variant, default "C" (docs/09 #104)."""
+TRYON_WARP: "mls" (default, docs/09 #105) | "parts" for the T-shirt (docs/09 #98). TRYON_NECK_HOLE (default 1, MLS
+only, docs/09 #102). TRYON_MLS_SLEEVE: MLS sleeve variant, default "C" (docs/09 #104). Adapt T-shirts on MLS (docs/09
+#105): TRYON_MLS_TUBE (default 1), TRYON_MLS_SIDE_FLOOR (mask | off), TRYON_MLS_ARMPIT (r14 | off), TRYON_MLS_HEM
+(garment | mls); each off value = the behaviour before #105."""
 from django.conf import settings
 
 
@@ -19,4 +21,6 @@ def render_flags(source: str = "body") -> dict:
             "dropped_shoulder_single": settings.TRYON_DROPPED_SHOULDER_SINGLE,
             "hem_rule": settings.TRYON_HEM_RULE, "hem_hip_fraction": settings.TRYON_HEM_HIP_FRACTION,
             "hem_crotch_margin": settings.TRYON_HEM_CROTCH_MARGIN, "warp_engine": settings.TRYON_WARP,
-            "neck_hole": settings.TRYON_NECK_HOLE, "mls_sleeve": settings.TRYON_MLS_SLEEVE}
+            "neck_hole": settings.TRYON_NECK_HOLE, "mls_sleeve": settings.TRYON_MLS_SLEEVE,
+            "mls_tube": settings.TRYON_MLS_TUBE, "mls_side_floor": settings.TRYON_MLS_SIDE_FLOOR,
+            "mls_armpit": settings.TRYON_MLS_ARMPIT, "mls_hem": settings.TRYON_MLS_HEM}
