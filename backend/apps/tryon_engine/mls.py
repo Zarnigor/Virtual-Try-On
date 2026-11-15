@@ -53,6 +53,35 @@ skin fill like "clear_skin" (admin avatars only; source != "avatar" -> exactly "
 
 shoulder_variant (keyword only, benchmark round 9, default "off"; render_tryon never passes it): "line" adds 3 pairs
 per side on the shoulder LINE (`shoulder_line`, adapt only, a no-op in keep_shape), docs/06 "Shoulder line fit, round 9".
+hem_mode (keyword only, benchmark round 12, default "off"; adapt only): "smooth" = `smooth_hem` on the finished layer;
+"garment" (round 12b) = `garment_hem`: the bottom edge follows the garment's own hem curve between the hem targets.
+hem_c_pair (keyword only, round 12b, default False; adapt only): one extra pair, the garment's hem centre (bottom edge
+at the middle column between the hem corners) -> the midpoint of the hem targets, weight 1.0.
+
+side_floor_mode (keyword only, benchmark round 12, default "landmarks" = round 10; only with side_floor=True, adapt):
+"mask" places floor pairs every SIDE_FLOOR_STEP px from armpit to hem from the mask's torso edge (arm-touch rows
+interpolated, `torso_side_edges`), garment edge at the HARD_EDGE alpha, docs/06 "Side coverage, round 12". Round 12b:
+"mask" blends its map back to the landmark floor map (`_blend_new_holes`) around every figure px it uncovers that the
+landmark floor solve covered, until no such px is left (ANCHOR_ITERS rounds at most); last guard: the finished
+landmark floor layer (same keywords, side_floor_mode "landmarks", tube_arm "r11") is built too and any figure px it
+covers that the "mask" layer does not (outside the px cleared beyond a fit tube's cuff) takes its px
+(info["side_floor_mask"]["patched_px"]).
+
+sleeve_mode (keyword only, benchmark round 11, default "mls"; render_tryon never passes it): "tube" / "tube_perp"
+re-map each sleeve as a strip widened to the arm (`tube_sleeves`, adapt only, a no-op in keep_shape), docs/06 "Tube sleeve, round 11".
+tube_arm (keyword only, round 12b / 13, default "r11"; only with a tube sleeve_mode): "finished" (round 13) = the
+"fit" widths; leftover MLS sleeve px cleared only (a) over the background beyond the arm + ease or (b) over the arm
+below the tube's cuff line, never in the underarm zone (`_underarm_zone`) or the torso; "finished_a" = rule (a) only
+(the gate fallback). Round 13b ("finished"): the rule (b) cut is kept out of remove_halo (clean fabric, no photo
+fringe: the cuff edge stays on the cuff line) and enclosed holes of the final contour in `sleeve_zone` are filled
+(rule #63, info["tube"]["filled_px"]). armpit_mode="r14" (round 14,
+benchmark, with side_floor, docs/06 "Armpit wedge, round 14"): the garment's torso side seam is pinned to the
+arm/torso boundary (`arm_torso_boundary`) from the cuff row down to the crease, in a second solve used only in a
+window around the armpits (`_add_armpit_pairs`); tube rule (b) and the seam ease are cut on that boundary; a local
+guard puts back figure px the map without those pairs covers. "fit" = the arm floor also from the
+straight arm fit (`_arm_at`, the real arm width, not cut at the armhole line), output half-widths clamped to
+[arm x CUFF_ARM_EASE, arm x TUBE_ARM_MAX], and the MLS sleeve px beyond the tube's cuff line cleared.
+
 shoulder_fractions (benchmark, default SHOULDER_LINE_FRACTIONS = 25 / 50 / 75 %): which fractions get a pair;
 shoulder_ease (default SHOULDER_LINE_EASE = 2 px) and shoulder_edge_alpha (default 128; round 9b uses HARD_EDGE - 1):
 the target lift and the garment-edge alpha threshold. All ignored when shoulder_variant is "off".
@@ -85,6 +114,36 @@ HARD_EDGE = int(0.9 * 255)
 SLEEVE_VARIANTS = ("r7", "A", "B", "C")
 NECKLINE_VARIANTS = ("r7", "clear", "clear_skin", "hole", "hole_skin")
 SHOULDER_VARIANTS = ("off", "line")
+SLEEVE_MODES = ("mls", "tube", "tube_perp")
+SIDE_FLOOR_MODES = ("landmarks", "mask")
+SIDE_FLOOR_STEP = 12  # px between the body rows of side_floor_mode="mask"
+SIDE_FLOOR_EASE_PX = 2  # px: the "mask" floor target sits this far outward of the torso edge
+SIDE_FLOOR_HEM_BAND = 0.08  # x torso length (shoulder -> hem target): no "mask" floor rows in this band above the hem
+HEM_MODES = ("off", "smooth", "garment")
+HEM_GARMENT_WARN_STRETCH = 1.25  # hem_mode="garment": a vertical stretch above this in the hem band is reported
+TUBE_ARMS = ("r11", "fit", "finished", "finished_a")
+ARMPIT_MODES = ("off", "r14")  # keyword armpit_mode (round 14; round 13c "r13c" was deleted 2026-11-15)
+ARMPIT_STEP = 4  # px between the body rows of the round 14 torso-seam pairs (cuff row -> crease)
+ARMPIT_INSIDE = 20  # px inside the arm/torso boundary where the first solve gives the garment row of a body row
+ARMPIT_LEAD = 4  # px: the pinned seam starts this far above the point where the cuff line meets the boundary
+ARMPIT_RUN = 24  # px: and runs at least this far down (the last row keeps the first solve's garment row)
+ARMPIT_EASE = 4  # px: the seam target sits this far on the arm side of the boundary (clipped back with a tube)
+ARMPIT_CRUMB = 8  # px: detached garment pieces up to this size inside the window are removed
+ARMPIT_KEEP = 14  # px around those pairs where the round 14 solve is used in full
+ARMPIT_SIGMA = 6.0  # px: Gaussian ramp of that window; outside it the map is the one without the armpit pairs
+TUBE_ARM_MAX = 1.25  # tube_arm="fit": output half-width <= arm extent x this (ghost-mannequin sleeves follow the arm)
+ANCHOR_ITERS = 4  # side_floor_mode="mask": rounds of the local blend back to the landmark floor map
+BLEND_GROW = 4  # px: the uncovered area grows by this x the round number before it is blended
+BLEND_SIGMA = 4.0  # px: Gaussian ramp of the blend weight around that area
+HEM_SMOOTH_WAVE = 0.15  # x the hem width: waves shorter than this are smoothed out (hem_mode="smooth")
+HEM_SMOOTH_BAND = 0.08  # x torso length: the vertical remap of hem_mode="smooth" stays inside this band
+HEM_SMOOTH_NEAR = 60  # px: only columns whose bottom edge is this close to the hem target row are smoothed
+SIDE_TOUCH = 1.3  # a side's mask edge farther from the axis than this x the landmark half-span = an arm touching
+TUBE_SECTIONS = 6  # cross-sections along the sleeve (a parameter: long sleeves would reuse the tube with more)
+TUBE_BLEND_PX = 10  # px from the body armhole segment over which the tube map is blended into the torso MLS map
+TUBE_U_MARGIN = 0.15  # the strip extends this x the half-width beyond each edge (antialiased edges, no clipping)
+TUBE_SUB = 6  # mesh steps per section interval (t) for the piecewise-affine inverse map
+TUBE_RAMP_T = 0.33  # garment widths ramp (smoothstep) from the t = 0 width to garment x s over t <= this
 SHOULDER_LINE_FRACTIONS = (0.25, 0.5, 0.75)  # of collar edge -> shoulder seam (garment) / neck edge -> acromion (body)
 SHOULDER_LINE_EASE = 2  # px: the body target sits this far ABOVE the figure's top edge (fabric on the shoulder)
 SHOULDER_LINE_WEIGHT = 1.0  # same as the shoulder pair
@@ -435,6 +494,395 @@ def _add_side_floor_pairs(pairs, glm, blm, mask, alpha, mx, my, rejected):
                 continue
             pairs[name + sx] = ((gx, gy), p, 1.0)
     _validate_side_floor(pairs, rejected)
+
+
+
+def torso_side_edges(mask, blm, ys, axis):
+    """Round 12 (docs/06 "Side coverage, round 12"): per body row in `ys` and side, the torso edge x and its source:
+    "mask" (the torso run through the axis; per side clean when its distance from the axis is <= SIDE_TOUCH x the
+    landmark half-span), else "interp" (an arm touches: linear between the nearest clean rows of that side above and
+    below; the body armpit landmark is the anchor above when no clean row is above), or None (no anchor below).
+    Returns {side: [(y, x or None, src)]}."""
+    out = {}
+    raw = {}
+    for y in ys:
+        bl, br = prod.body_span(blm, y)
+        run = _torso_run(mask, y, axis)
+        raw[y] = (run, bl, br)
+    for i, side in enumerate(("left", "right")):
+        clean = {}
+        for y in ys:
+            run, bl, br = raw[y]
+            if run is None:
+                continue
+            e = float(run[0]) if side == "left" else float(run[1] + 1)
+            half = (axis - bl) if side == "left" else (br - axis)
+            if abs(e - axis) <= SIDE_TOUCH * max(half, 1.0):
+                clean[y] = e
+        anchor = (float(blm["armpit"]["y"]), _f(blm["armpit"][f"{side}_x"]))
+        rows = []
+        for y in ys:
+            if y in clean:
+                rows.append((y, clean[y], "mask"))
+                continue
+            above = [(yy, clean[yy]) for yy in clean if yy < y]
+            below = [(yy, clean[yy]) for yy in clean if yy > y]
+            a = max(above) if above else anchor
+            if not below:
+                rows.append((y, None, None))
+                continue
+            b = min(below)
+            t = (y - a[0]) / max(b[0] - a[0], 1e-6)
+            rows.append((y, a[1] + t * (b[1] - a[1]), "interp"))
+        out[side] = rows
+    return out
+
+
+def _add_side_floor_mask_pairs(pairs, blm, mask, img, mx, my, rejected, report):
+    """side_floor_mode="mask" (round 12, adapt only): IN ADDITION to the 3 landmark-row floor pairs (side_a, side_b,
+    side_hip: replacing them opened the hem corners, 2242 new hole px on #28 f-plus), every SIDE_FLOOR_STEP px from
+    armpit + 2 to the hem target, skipping rows within SIDE_FLOOR_STEP / 2 of a landmark floor pair, per side: torso edge from `torso_side_edges`; garment edge = the outermost
+    px of the first solve's covered run through the axis, alpha at the HARD_EDGE threshold; when that edge is inside
+    the torso edge a pair is added: q = that px's garment point (first-solve map), p = torso edge moved
+    SIDE_FLOOR_EASE_PX outward, weight 1.0. Pairs keep the vertical order of their side (garment and body)."""
+    H, W = mask.shape
+    axis = prod._crotch_x(blm)
+    a_y, hem_y = _f(blm["armpit"]["y"]), pairs["hem_l"][1][1]
+    band = SIDE_FLOOR_HEM_BAND * (hem_y - _f(blm["shoulder"]["y"]))
+    ys_all = list(range(int(a_y) + 2, int(hem_y), SIDE_FLOOR_STEP))
+    ys = [y for y in ys_all if y < hem_y - band]  # owner 2026-11-13: rows in the hem band pulled a tongue down
+    report["hem_band_removed_rows"] = [y for y in ys_all if y not in ys]
+    edges = torso_side_edges(mask, blm, ys, axis)
+    f = img[:, :, 3].astype(np.float32)
+    wa = cv2.remap(f, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    solid = wa >= HARD_EDGE
+    rows_rep = []
+    for side, sx in (("left", "_l"), ("right", "_r")):
+        last_q = last_p = None
+        taken = [pairs[n + sx][1][1] for n in SIDE_FLOOR_NAMES if n + sx in pairs]
+        for y, e, src in edges[side]:
+            rec = {"y": y, "side": side, "edge": None if e is None else round(e, 1), "src": src}
+            rows_rep.append(rec)
+            if e is None or any(abs(y - t) < SIDE_FLOOR_STEP / 2 for t in taken):
+                continue
+            run = next((q for q in prod._runs(solid[y]) if q[0] <= axis <= q[1]), None)
+            if run is None:
+                continue
+            ge = run[0] if side == "left" else run[1]
+            rec["garment_edge"] = int(ge)
+            inside = ge > e if side == "left" else ge + 1 < e
+            if not inside:
+                continue
+            q = (float(mx[y, ge]), float(my[y, ge]))
+            if q[0] < 0 or q[1] < 0:
+                continue
+            p = (e - SIDE_FLOOR_EASE_PX if side == "left" else e + SIDE_FLOOR_EASE_PX, float(y))
+            if last_q is not None and not (q[1] > last_q[1] + 1 and p[1] > last_p[1] + 1):
+                rejected.append(f"sfm{y}{sx} (order)")
+                continue
+            clash = False
+            for r in SIDE_ROWS:  # same vertical order as every existing side pair of this side (garment and body)
+                o = pairs.get(r + sx)
+                if o is not None and ((q[1] > o[0][1]) != (p[1] > o[1][1]) or abs(q[1] - o[0][1]) <= 1 or
+                                      abs(p[1] - o[1][1]) <= 1):
+                    clash = True
+                    break
+            if clash:
+                rejected.append(f"sfm{y}{sx} (order vs {r}{sx})")
+                continue
+            pairs[f"sfm{y}{sx}"] = (q, p, 1.0)
+            rec["pair"] = True
+            last_q, last_p = q, p
+    report["rows"] = rows_rep
+
+
+def arm_torso_boundary(mask, blm, side):
+    """Round 14: ({row: x}, crease (x, y) or None). The arm/torso boundary on the rows where the arm touches the
+    torso, from the body armpit landmark row down to the crease = the first row where the mask separates arm and
+    torso (`torso_side_edges`: "interp" rows, linear from the armpit landmark to the torso edge on the crease row;
+    measured 2026-11-15: within -1.5 .. +3 px of the top of the background gap on all 6 avatars). Empty when the arm
+    is separated at the armpit row already or never separates."""
+    axis = prod._crotch_x(blm)
+    y0 = int(_f(blm["armpit"]["y"]))
+    rows, crease = {}, None
+    for y, e, src in torso_side_edges(mask, blm, list(range(y0, min(y0 + 250, mask.shape[0]))), axis)[side]:
+        if src == "mask":
+            crease = (float(e), float(y))
+            break
+        if e is None:
+            return {}, None
+        rows[y] = float(e)
+    if crease is None:
+        return {}, None
+    return rows, crease
+
+
+def garment_notch(alpha, glm, side):
+    """Round 14: the garment's own underarm corner (x, y) = the top of the transparent gap between the sleeve
+    underside and the torso side, on the alpha at HARD_EDGE; None when the garment has no such gap."""
+    solid = alpha >= HARD_EDGE
+    gH, gW = solid.shape
+    cx = (_f(glm["armpit"]["left_x"]) + _f(glm["armpit"]["right_x"])) / 2
+    y = int(min(max(_f(glm["sleeve_cuff_inner"][side]["y"]), _f(glm["armpit"]["y"])) + 12, gH - 1))
+    torso = next((q for q in prod._runs(solid[y]) if q[0] <= cx <= q[1]), None)
+    if torso is None:
+        return None
+    x = torso[0] - 1 if side == "left" else torso[1] + 1
+    g = next((q for q in prod._runs(~solid[y]) if q[0] <= x <= q[1]), None) if 0 <= x < gW else None
+    if g is None:
+        return None
+    while y > 0:
+        bg = [q for q in prod._runs(~solid[y - 1]) if q[0] <= g[1] and q[1] >= g[0]]
+        if not bg:
+            break
+        g, y = (max(bg, key=lambda q: q[0]) if side == "left" else min(bg, key=lambda q: q[0])), y - 1
+    return ((g[0] + g[1]) / 2, float(y))
+
+
+def _cuff_line(pairs, blm, side, tube):
+    """(point c, unit d towards the hand) of the sleeve's cuff line on the body: the tube's cuff (through the
+    midpoint of the cuff targets, perpendicular to the tube axis) or the line through the MLS cuff targets."""
+    sx = "_l" if side == "left" else "_r"
+    co, ci = np.array(pairs["cuff_out" + sx][1], float), np.array(pairs["cuff_in" + sx][1], float)
+    c = (co + ci) / 2
+    B0 = np.array(pairs["shoulder" + sx][1], float)
+    if tube:
+        B1 = np.array(pairs["armpit" + sx][1], float) if "armpit" + sx in pairs else \
+            np.array([_f(blm["armpit"][f"{side}_x"]), _f(blm["armpit"]["y"])])
+        return c, _unit(c - (B0 + B1) / 2)
+    d = _unit(np.array([-(ci - co)[1], (ci - co)[0]]))
+    return c, (d if (c - B0) @ d > 0 else -d)
+
+
+def _add_armpit_pairs(pairs, glm, blm, mask, img, mx, my, rejected, report, tube=True):
+    """armpit_mode="r14" (round 14, adapt only, with side_floor). The garment splits into sleeve underside and torso
+    side at its notch; the body splits into arm and torso at the crease, which is lower: the first solve puts the
+    notch 1-74 px above the crease, and on the rows between, where the body is one silhouette, the transparent px
+    between the two garment edges lie over the figure (the open wedge). Here, per side:
+    - J = the point where the sleeve's cuff line meets the arm/torso boundary (the crease when the cuff is lower);
+    - the garment's torso side seam is pinned to the boundary from ARMPIT_LEAD px above J downward: body rows every
+      ARMPIT_STEP px, garment rows linear from the notch row + 2 (at the first body row) to the first solve's garment
+      row ARMPIT_INSIDE px inside the boundary at the last body row (>= ARMPIT_RUN px below J and never above the
+      crease: the fabric's vertical placement is kept there), q = the torso edge of the garment alpha on that row,
+      p = the boundary moved ARMPIT_EASE px outward, weight 1.0;
+    - "mask" floor pairs on those rows and side pairs out of order with the new ones (a chest pair that holds the
+      seam inside the boundary) are left out of this solve;
+    - the inner cuff target is moved onto the boundary when it lies inside the torso (the straight arm fit is
+      extrapolated above the crease).
+    `pairs` is a copy: the solve from it is used inside report["window"] only (1 around the new pairs, Gaussian
+    ramp to 0), so nothing moves elsewhere."""
+    H, W = mask.shape
+    solid = img[:, :, 3] >= HARD_EDGE
+    gH, gW = solid.shape
+    cx = (_f(glm["armpit"]["left_x"]) + _f(glm["armpit"]["right_x"])) / 2
+    axis = prod._crotch_x(blm)
+    a_y = int(_f(blm["armpit"]["y"]))
+    zone = np.zeros((H, W), np.float32)
+    report["window"] = None
+    for side, sx, sgn in (("left", "_l", 1), ("right", "_r", -1)):
+        rep = {}
+        report[side] = rep
+        rows, crease = arm_torso_boundary(mask, blm, side)
+        notch = garment_notch(img[:, :, 3], glm, side)
+        if not rows or notch is None or "cuff_in" + sx not in pairs or "cuff_out" + sx not in pairs:
+            rep["skipped"] = "no arm-touch rows" if not rows else "garment has no underarm notch" \
+                if notch is None else "cuff pair dropped"
+            continue
+        edge = {y: e for y, e, src in torso_side_edges(mask, blm, list(range(a_y, min(a_y + 250, H))), axis)[side]
+                if e is not None}
+        c, d = _cuff_line(pairs, blm, side, tube)  # before any pair of this copy is changed
+        j_y = next((y for y in sorted(rows) if (np.array([rows[y], y]) - c) @ d >= 0), int(crease[1]))
+        rep["crease"], rep["notch"], rep["junction_y"] = crease, notch, j_y
+        q_in, t_in, w_in = pairs["cuff_in" + sx]
+        e = rows.get(int(round(t_in[1])))
+        lim = None if e is None else e - sgn * (ARMPIT_EASE + 1)  # 1 px on the arm side of the pinned torso seam
+        if tube:  # the tube draws the sleeve: its inner MLS pairs would only fight the pinned seam in the window
+            rep["sleeve_pairs_left_out"] = [k for k in ("cuff_in" + sx, "smid_in" + sx) if pairs.pop(k, None)]
+        elif lim is not None and (t_in[0] - lim) * sgn > 0:
+            pairs["cuff_in" + sx] = (q_in, (float(lim), t_in[1]), w_in)
+            rep["cuff_in_moved_px"] = round(abs(t_in[0] - lim), 1)
+            if "smid_in" + sx in pairs and "armpit" + sx in pairs:
+                pairs["smid_in" + sx] = (pairs["smid_in" + sx][0], tuple(
+                    (np.array(pairs["armpit" + sx][1]) + np.array(pairs["cuff_in" + sx][1])) / 2), 1.0)
+        # the seam starts above J, and above the inner cuff target by the length of the garment's sleeve underside
+        under = max(_f(glm["sleeve_cuff_inner"][side]["y"]) - notch[1], 0.0) * report.get("s", 1.0)
+        y0 = max(int(min(j_y - ARMPIT_LEAD, t_in[1] - under)), a_y + 2)
+        g0 = notch[1] + 2
+        y1 = gy1 = None
+        for yb in range(max(int(crease[1]), y0 + ARMPIT_RUN), min(y0 + ARMPIT_RUN + 61, H), 12):
+            if yb not in edge:
+                break
+            xi = int(round(edge[yb] + sgn * ARMPIT_INSIDE))
+            if not (0 <= xi < W and mx[yb, xi] >= 0 and my[yb, xi] >= 0):
+                continue
+            slope = (float(my[yb, xi]) - g0) / (yb - y0)  # garment px per body px along the seam
+            if 0.4 / max(report.get("s", 1.0), 1e-6) <= slope <= 2.5 / max(report.get("s", 1.0), 1e-6):
+                y1, gy1 = yb, float(my[yb, xi])
+                break
+        if y1 is None:
+            rep["skipped"] = "no row below the crease with a usable garment row"
+            continue
+        added = []
+        for y in list(range(y0, y1, ARMPIT_STEP)) + [y1]:
+            gy = g0 + (y - y0) / (y1 - y0) * (gy1 - g0)
+            if y not in edge or not 0 <= int(round(gy)) < gH:
+                continue
+            run = next((q for q in prod._runs(solid[int(round(gy))]) if q[0] <= cx <= q[1]), None)
+            if run is None:
+                continue
+            ease = ARMPIT_EASE if y in rows else SIDE_FLOOR_EASE_PX  # below the crease: the "mask" floor ease
+            ex = edge[y] - 1 if side == "left" else edge[y]  # left: the first torso px; right: one past the last
+            added.append((y, (float(run[0] if side == "left" else run[1]), gy), (ex - sgn * ease, float(y))))
+        if len(added) < 2:
+            rep["skipped"] = "no garment seam rows"
+            continue
+        gone = [k for k in pairs if k.endswith(sx) and k[:-2] not in ("armpit", "hem") and (
+            k.startswith("sfm") or k[:-2] in SIDE_ROWS) and (
+                y0 - ARMPIT_STEP <= pairs[k][1][1] <= y1 + ARMPIT_STEP or
+                (pairs[k][0][1] > g0) != (pairs[k][1][1] > y0) or (pairs[k][0][1] > gy1) != (pairs[k][1][1] > y1))]
+        for k in gone:
+            del pairs[k]
+        for y, q, p in added:
+            pairs[f"apit{y}{sx}"] = (q, p, 1.0)
+            x_ = int(round(edge[y]))
+            zone[max(y - ARMPIT_KEEP, 0):y + ARMPIT_KEEP + 1, max(x_ - ARMPIT_KEEP, 0):x_ + ARMPIT_KEEP + 1] = 1
+        rep.update({"rows": [a_[0] for a_ in added], "left_out": gone})
+    if zone.any():
+        report["window"] = np.maximum(np.clip(cv2.GaussianBlur(zone, (0, 0), ARMPIT_SIGMA), 0, 1), zone)
+
+
+WEDGE_TORSO = 25  # px: the wedge metric looks this far into the torso from the arm/torso boundary
+WEDGE_ARM = 12  # px: and this far onto the arm, above the cuff line only
+WEDGE_CUFF_MARGIN = 2  # px: arm px closer than this to the cuff line count as below it (never counted)
+RAGGED_BOX = 45  # px: half-width of the armpit box of the ragged-edge metric
+RAGGED_OPEN = 5  # px: garment parts thinner than this (opening with an ellipse of this size) are spikes
+
+
+def armpit_wedge(layer, mask, blm, hems):
+    """Round 14 metric (benchmark / tests): per side the open wedge = figure px with alpha < 128 (a) on the torso
+    side of the arm/torso boundary, at most WEDGE_TORSO px from it, rows armpit landmark -> crease + 2, or (b) on
+    the arm side, at most WEDGE_ARM px from it, rows armpit landmark -> crease, ABOVE the layer's own cuff line
+    (`info["sleeve_hems"]`; arm skin at or below the cuff line is correct and never counted). Independent of the
+    tube's zones. Returns {side: {"px", "torso_px", "arm_px", "map"}}."""
+    H, W = mask.shape
+    Y, X = np.mgrid[0:H, 0:W]
+    open_ = mask & (layer[:, :, 3] < 128)
+    out = {}
+    for side in ("left", "right"):
+        rows, crease = arm_torso_boundary(mask, blm, side)
+        torso, arm, arm_h = np.zeros((H, W), bool), np.zeros((H, W), bool), 0.0
+        if rows:
+            ex = np.full((H, 1), np.nan, np.float32)
+            for y, e in rows.items():
+                ex[y, 0] = e
+            arm_rows = ~np.isnan(ex)
+            for y in range(int(crease[1]), min(int(crease[1]) + 3, H)):
+                ex[y, 0] = crease[0]
+            d = (X - ex) * (1 if side == "left" else -1)  # > 0 = torso side
+            ok = ~np.isnan(ex)
+            torso = ok & (d >= 0) & (d < WEDGE_TORSO)
+            arm = arm_rows & (d < 0) & (d >= -WEDGE_ARM)
+            if side in hems:
+                a, b, sh = (np.asarray(v, float) for v in hems[side])
+                n = np.array([-(b - a)[1], (b - a)[0]])
+                n = n / max(float(np.linalg.norm(n)), 1e-9)
+                if (sh - a) @ n > 0:
+                    n = -n  # n points from the shoulder to the hand
+                above = -((X - a[0]) * n[0] + (Y - a[1]) * n[1])
+                arm &= above > WEDGE_CUFF_MARGIN
+                if (open_ & arm).any():
+                    arm_h = float(above[open_ & arm].max())
+            else:
+                arm[:] = False
+        m = open_ & (torso | arm)
+        out[side] = {"px": int(m.sum()), "torso_px": int((open_ & torso).sum()), "arm_px": int((open_ & arm).sum()),
+                     "arm_max_above_cuff": round(arm_h, 1), "map": m}
+    return out
+
+
+def armpit_ragged(layer, mask, blm):
+    """Round 14 metric (benchmark / tests): ragged garment edges in the armpit box (rows armpit landmark - 10 ->
+    crease + 15, RAGGED_BOX px each side of the boundary), per side: fragment_px = garment px (alpha >= 128) of
+    the box that are not connected to the garment's largest piece; spike_px = garment px of the box removed by a
+    morphological opening with a RAGGED_OPEN px ellipse (teeth, spikes, 1-4 px wide slivers).
+    Returns {side: {"fragment_px", "spike_px", "box"}}."""
+    H, W = mask.shape
+    cov = (layer[:, :, 3] >= 128).astype(np.uint8)
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(cov, connectivity=8)
+    main = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA])) if n > 1 else 0
+    frag = (cov > 0) & (lab != main)
+    spike = (cov > 0) & (cv2.morphologyEx(cov, cv2.MORPH_OPEN, cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE, (RAGGED_OPEN, RAGGED_OPEN))) == 0)
+    out = {}
+    for side in ("left", "right"):
+        rows, crease = arm_torso_boundary(mask, blm, side)
+        box = np.zeros((H, W), bool)
+        if rows:
+            xs = list(rows.values()) + [crease[0]]
+            y0, y1 = max(min(rows) - 10, 0), min(int(crease[1]) + 15, H - 1)
+            box[y0:y1 + 1, max(int(min(xs)) - RAGGED_BOX, 0):int(max(xs)) + RAGGED_BOX + 1] = True
+        out[side] = {"fragment_px": int((frag & box).sum()), "spike_px": int((spike & box).sum()), "box": box}
+    return out
+
+
+def _add_hem_c_pair(pairs, glm, alpha):
+    """Round 12b (hem_c_pair=True, adapt only): q = the garment's hem centre (middle column between the hem corners,
+    its lowest px at alpha >= HARD_EDGE), p = the midpoint of the hem_l / hem_r targets, weight 1.0. adapt already has
+    a hem_c pair (round 7: garment hem LANDMARK row at the centre -> the torso centre on the hem target row; dropped
+    when out of order): this one replaces it (the old pair is reported). Returns a report."""
+    gx = int(round((_f(glm["hem"]["left_x"]) + _f(glm["hem"]["right_x"])) / 2))
+    b = int(hem_bottom(alpha, gx, gx)[0]) if 0 <= gx < alpha.shape[1] else -1
+    if b < 0:
+        return {"skipped": "no garment px in the centre column"}
+    hl, hr = pairs["hem_l"][1], pairs["hem_r"][1]
+    p = ((hl[0] + hr[0]) / 2, (hl[1] + hr[1]) / 2)
+    prev = pairs.get("hem_c")
+    pairs["hem_c"] = ((float(gx), float(b)), p, 1.0)
+    return {"q": [gx, b], "p": [round(p[0], 1), round(p[1], 1)], "garment_drop_px": round(b - _f(glm["hem"]["y"]), 1),
+            "replaced": None if prev is None else [[round(v, 1) for v in prev[0]], [round(v, 1) for v in prev[1]]]}
+
+
+def _blend_new_holes(H, W, alpha, mask, ref_map, mx, my, report, iters=ANCHOR_ITERS, hole=None):
+    """Round 12b (owner 2026-11-15, side_floor_mode="mask"): figure px the landmark floor solve (`ref_map`) covers at
+    alpha >= HARD_EDGE after the remove_halo erosion and the owner's neck hole (`hole`, garment px; what the
+    finished adapt layer keeps) and the "mask" solve does not get the landmark floor map back, locally: the uncovered px (grown by
+    BLEND_GROW px per round) get weight 1, a Gaussian ramp (sigma BLEND_SIGMA) around them, map = (1 - w) x mask map
+    + w x landmark map; repeated (the region grows) until no such px is left, at most `iters` rounds. Tried first and
+    dropped (2026-11-15): anchor pairs at the holes (did not converge, opened holes at the shoulders). Returns
+    (mx, my); report: blend_px (w > 0), rounds, residual px."""
+    f = alpha.astype(np.float32)
+    rx, ry = ref_map
+    ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * prod.HALO_ERODE + 1,) * 2)
+
+    def covered(x_, y_):  # as the finished layer: warped alpha, eroded like remove_halo, >= HARD_EDGE, neck hole
+        a_ = cv2.remap(f, x_, y_, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        a_ = cv2.erode(a_, ke, borderType=cv2.BORDER_CONSTANT, borderValue=0)
+        a_[a_ < HARD_EDGE] = 0
+        if hole is not None:
+            a_ = a_ * (1 - np.clip(cv2.remap(hole, x_, y_, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT,
+                                             borderValue=0), 0, 1))
+        return a_ >= 128
+
+    ref_cov = covered(rx, ry)
+    m0x, m0y = mx, my
+    region = np.zeros((H, W), np.uint8)
+    w = np.zeros((H, W), np.float32)
+    rounds, left = 0, 0
+    for it in range(iters + 1):
+        lost = mask & ref_cov & ~covered(mx, my)
+        left = int(lost.sum())
+        if not left or it == iters:
+            break
+        k = 2 * BLEND_GROW * (it + 1) + 1
+        region = cv2.dilate(region | lost.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+        w = np.maximum(cv2.GaussianBlur(region.astype(np.float32), (0, 0), BLEND_SIGMA), region.astype(np.float32))
+        mx = ((1 - w) * m0x + w * rx).astype(np.float32)
+        my = ((1 - w) * m0y + w * ry).astype(np.float32)
+        rounds += 1
+    report["blend_px"] = int((w > 0.01).sum())
+    report["blend_rounds"] = rounds
+    report["blend_residual_px"] = left
+    return mx, my
 
 
 def _validate_side_floor(pairs, rejected):
@@ -819,11 +1267,571 @@ def shoulder_line(pairs, glm, blm, mask, g_alpha, fractions=SHOULDER_LINE_FRACTI
     return report
 
 
+
+def _smoothstep(x):
+    x = np.clip(x, 0.0, 1.0)
+    return x * x * (3 - 2 * x)
+
+
+def _unit(v):
+    n = float(np.linalg.norm(v))
+    return v / n if n > 1e-9 else v
+
+
+def _march(inside, p, d, limit):
+    """Distance from p along unit d while inside(point) holds (0.5 px steps), at most `limit`."""
+    dist, step = 0.0, 0.5
+    while dist + step <= limit:
+        q = p + d * (dist + step)
+        if not inside(q):
+            break
+        dist += step
+    return dist
+
+
+def _arm_fit_extent(arms, side, c, d):
+    """Round 12b (tube_arm="fit"): arm extents (outer, inner) along the unit cross-section direction d from the tube
+    centre c (u < 0 = outer, u > 0 = inner, like the tube), from the straight arm fit `_arm_at` (centre line x(y) and
+    the horizontal width): the arm is a strip along its centre line; its horizontal width is converted to the width
+    along d. (None, None) when the arm has no fit or d is parallel to the arm."""
+    f0, f1 = _arm_at(arms, side, float(c[1])), _arm_at(arms, side, float(c[1]) + 10.0)
+    if f0 is None or f1 is None:
+        return None, None
+    a0 = np.array([f0[0], float(c[1])])
+    e = _unit(np.array([f1[0] - f0[0], 10.0]))
+    cr = float(e[0] * d[1] - e[1] * d[0])
+    if abs(cr) < 0.2:
+        return None, None
+    m = np.array([[d[0], -e[0]], [d[1], -e[1]]])
+    u_c = float(np.linalg.solve(m, a0 - np.asarray(c, float))[0])  # c + u_c d = the arm centre line
+    half = 0.5 * f0[1] * abs(e[1]) / abs(cr)
+    return max(half - u_c, 0.0), max(half + u_c, 0.0)
+
+
+def sleeve_zone(pairs, blm, H, W, around=15):
+    """Shoulder / armpit / sleeve zone (both sides, = tests_mls.tube_zone): outward of the body armhole line above the
+    lower cuff target + 10 px, plus `around` px around the armhole segment."""
+    Y, X = np.mgrid[0:H, 0:W]
+    P = np.stack([X, Y], -1).astype(np.float32)
+    zone = np.zeros((H, W), bool)
+    for side, sx in (("left", "_l"), ("right", "_r")):
+        if "cuff_out" + sx not in pairs or "cuff_in" + sx not in pairs:
+            continue
+        B0 = np.array(pairs["shoulder" + sx][1], float)
+        B1 = np.array(pairs["armpit" + sx][1], float) if "armpit" + sx in pairs else \
+            np.array([_f(blm["armpit"][f"{side}_x"]), _f(blm["armpit"]["y"])])
+        cm = (np.array(pairs["cuff_out" + sx][1]) + np.array(pairs["cuff_in" + sx][1])) / 2
+        ba = np.array([-(B1 - B0)[1], (B1 - B0)[0]])
+        if (cm - B0) @ ba < 0:
+            ba = -ba
+        ylow = max(pairs["cuff_out" + sx][1][1], pairs["cuff_in" + sx][1][1]) + 10
+        seg = B1 - B0
+        t = np.clip(((P - B0) @ seg) / float(seg @ seg), 0, 1)
+        near = np.linalg.norm(P - (B0 + t[..., None] * seg), axis=-1) <= around
+        zone |= ((((P - B0) @ ba) > 0) & (Y <= ylow)) | near
+    return zone
+
+
+def _fill_sleeve_holes(layer, pairs, blm):
+    """Round 13b (owner 2026-11-15, rule #63 on the FINAL T-shirt contour, torso + tube): px with alpha < 128 that
+    cannot reach the canvas border through alpha < 128 px (enclosed by the garment) are filled (alpha 255, colour
+    from the nearest opaque px), only inside `sleeve_zone` (the neck opening is never touched). Returns
+    (layer, filled px)."""
+    H, W = layer.shape[:2]
+    free = np.ones((H + 2, W + 2), np.uint8)
+    free[1:-1, 1:-1] = layer[:, :, 3] < 128
+    cv2.floodFill(free, None, (0, 0), 2)
+    holes = (free[1:-1, 1:-1] == 1) & sleeve_zone(pairs, blm, H, W)
+    if not holes.any():
+        return layer, 0
+    out = layer.copy()
+    prod._colour_from_nearest_opaque(out, holes)
+    out[:, :, 3][holes] = 255
+    return out, int(holes.sum())
+
+
+def _below_cuff(P, ca, cb, d):
+    """Px beyond the cuff segment ca-cb in the axis direction d, inside the strip of the cuff width x TUBE_ARM_MAX
+    (never the torso beside the arm)."""
+    c = (ca + cb) / 2
+    cw = _unit(cb - ca)
+    hw = float(np.linalg.norm(cb - ca)) / 2
+    return (((P - c) @ d) > 0) & (np.abs((P - c) @ cw) <= hw * TUBE_ARM_MAX)
+
+
+def _underarm_zone(H, W, inner, ca, cb, B0, B1):
+    """Round 13 (owner 2026-11-15): the protected underarm zone, bounded by the body armhole line (B0-B1, extended),
+    the tube's inner edge (`inner`, t = 0 -> 1) and the cuff line (ca-cb, extended): polygon armpit -> inner edge ->
+    inner cuff end -> the cuff line's crossing with the armhole line. Empty when the lines do not cross."""
+    zone = np.zeros((H, W), np.uint8)
+    d1, d2 = B1 - B0, cb - ca
+    den = d1[0] * d2[1] - d1[1] * d2[0]
+    if abs(den) < 1e-6:
+        return zone > 0
+    t = ((ca[0] - B0[0]) * d2[1] - (ca[1] - B0[1]) * d2[0]) / den
+    X = B0 + t * d1
+    poly = np.array([B1] + [np.asarray(p, float) for p in inner] + [cb, X], np.float64)
+    cv2.fillPoly(zone, [np.round(poly * 8).astype(np.int32)], 1, shift=3)
+    return zone > 0
+
+
+def tube_sleeves(img, glm, blm, mask, pairs, s, mx, my, arms=None, sections=TUBE_SECTIONS, blend=TUBE_BLEND_PX,
+                 mode="tube", tube_maps=None, arm="r11", armpit_mode="off"):
+    """Round 11 benchmark (keyword tshirt_layer(sleeve_mode="tube" | "tube_perp"), adapt only, docs/06 "Tube sleeve,
+    round 11"). Per side the sleeve is a strip in (t, u): t along the axis, u across (-1 = outer edge, +1 = inner
+    edge, outer and inner widths measured separately at `sections` cross-sections).
+    Body cuff (fix 1, owner 2026-11-13): the segment through the midpoint of the MLS cuff targets (cuff_out / cuff_in
+    pairs, already on the arm), perpendicular to the axis; body axis = armhole midpoint (shoulder target -> armpit
+    target) -> that point. Garment axis = armhole midpoint -> cuff midpoint.
+    "tube": t = 0 on the armhole segment (garment: shoulder seam -> armpit; body: shoulder target -> armpit target),
+    cross-sections turn from the armhole direction to the axis normal (ruled strip), t = 1 on the cuff.
+    "tube_perp": every cross-section perpendicular to the axis; t = 0 is the perpendicular through the shoulder seam
+    (body: the shoulder target); the underarm triangle between that line and the armhole stays MLS (never cleared).
+    Output widths (fix 2): max(arm extent in the mask outward of the armhole line x CUFF_ARM_EASE, ramp), ramp =
+    smoothstep (t <= TUBE_RAMP_T) from the t = 0 width to garment width x s; the arm floor holds at every
+    cross-section after t = 0 (t = 0 itself is pinned: the armhole segment for "tube", the shoulder target outward
+    for "tube_perp"). The strip is meshed and each triangle mapped affinely back to the garment; the tube map is
+    smoothstep-blended into the MLS map within `blend` px of the t = 0 segment. The domain is clipped to the outward
+    side of the body armhole line. A tube px must come from a garment sleeve px.
+    Layering (owner 2026-11-13, the #40 underarm holes): the tube is a SEPARATE map written into `tube_maps` (tx, ty)
+    and drawn OVER the MLS layer by tshirt_layer (tube wins where both exist); the MLS map is kept, and an MLS px is
+    cleared only when its source is a sleeve px, the tube does not draw it, it is outward of the armhole line and it
+    lies over the background beyond the figure dilated by the arm ease (median arm half-width x (CUFF_ARM_EASE - 1),
+    at least 1 px). arm="fit" (round 12b): the arm extents per cross-section are also taken from the straight arm fit
+    (`_arm_at`: centre line and width of the separated arm rows, the width converted to the cross-section direction),
+    the larger of fit and march wins; half-widths = clamp(ramp, arm x CUFF_ARM_EASE, arm x TUBE_ARM_MAX); MLS sleeve
+    px the tube does not draw beyond its cuff line (outward of the armhole line, inside the strip of the cuff width
+    x TUBE_ARM_MAX) are cleared too (report "cleared_beyond_cuff_px", zone "beyond_cuff_zone" = those px grown by
+    the remove_halo reach). The clamp alone can uncover a few figure px (inner armpit): with side_floor_mode="mask"
+    the last guard in tshirt_layer puts them back. Tried and dropped (2026-11-15): a round 11 tube map fallback.
+    Returns {side: report}."""
+    H, W = mask.shape
+    gH, gW = img.shape[:2]
+    alpha = img[:, :, 3]
+    arms = arms if arms is not None else prod.find_arms(mask, blm)
+    report, tube_any = {}, np.zeros((H, W), bool)
+    mls_x, mls_y = mx.copy(), my.copy()
+    Y, X = np.mgrid[0:H, 0:W]
+    P = np.stack([X, Y], -1).astype(np.float32)
+    for side, sx in (("left", "_l"), ("right", "_r")):
+        rep = {"mode": mode}
+        report[side] = rep
+        try:
+            A0 = np.array([_f(glm["shoulder"][f"{side}_x"]), _f(glm["shoulder"]["y"])])
+            A1 = np.array([_f(glm["armpit"][f"{side}_x"]), _f(glm["armpit"]["y"])])
+            C0 = np.array([_f(glm["sleeve_cuff_outer"][side]["x"]), _f(glm["sleeve_cuff_outer"][side]["y"])])
+            C1 = np.array([_f(glm["sleeve_cuff_inner"][side]["x"]), _f(glm["sleeve_cuff_inner"][side]["y"])])
+        except (KeyError, TypeError):
+            rep["skipped"] = "garment armpit / shoulder / cuff missing"
+            continue
+        if not all(k + sx in pairs for k in ("shoulder", "cuff_out", "cuff_in")):
+            rep["skipped"] = "shoulder or cuff pair dropped"
+            continue
+        B0 = np.array(pairs["shoulder" + sx][1], float)
+        B1 = np.array(pairs["armpit" + sx][1], float) if "armpit" + sx in pairs else \
+            np.array([_f(blm["armpit"][f"{side}_x"]), _f(blm["armpit"]["y"])])
+        Mb0 = (B0 + B1) / 2
+        Mb1 = (np.array(pairs["cuff_out" + sx][1], float) + np.array(pairs["cuff_in" + sx][1], float)) / 2  # fix 1
+        Mg0, Mg1 = (A0 + A1) / 2, (C0 + C1) / 2
+        d_b, d_g = _unit(Mb1 - Mb0), _unit(Mg1 - Mg0)
+        gA, gC, bA = _unit(A1 - A0), _unit(C1 - C0), _unit(B1 - B0)
+        nrm = np.array([-d_b[1], d_b[0]])  # body axis normal, oriented outer -> inner like the armhole
+        if nrm @ bA < 0:
+            nrm = -nrm
+        ng = np.array([-d_g[1], d_g[0]])
+        if ng @ gA < 0:
+            ng = -ng
+        if mode == "tube_perp":  # t = 0 = the perpendicular through the shoulder seam / shoulder target
+            G0 = Mg1 + d_g * ((A0 - Mg1) @ d_g)
+            O0 = Mb1 + d_b * ((B0 - Mb1) @ d_b)
+        else:
+            G0, O0 = Mg0, Mb0
+        ga = np.array([-gA[1], gA[0]])
+        if (Mg1 - A0) @ ga < 0:
+            ga = -ga
+        yy, xx = np.mgrid[0:gH, 0:gW]
+        g_sleeve = (((xx - A0[0]) * ga[0] + (yy - A0[1]) * ga[1]) > -1.0) & (yy <= max(C0[1], C1[1]) + 10) & \
+            (alpha > 0)
+        g_solid = g_sleeve & (alpha > 128)
+        ba = np.array([-bA[1], bA[0]])
+        if (Mb1 - B0) @ ba < 0:
+            ba = -ba
+
+        def g_in(q):
+            x, y = int(round(q[0])), int(round(q[1]))
+            return 0 <= x < gW and 0 <= y < gH and g_solid[y, x]
+
+        def b_in(q):
+            x, y = int(round(q[0])), int(round(q[1]))
+            return 0 <= x < W and 0 <= y < H and mask[y, x] and (q - B0) @ ba > 0
+
+        lim = 3 * max(float(np.linalg.norm(A1 - A0)), float(np.linalg.norm(C1 - C0)))
+        ts = np.linspace(0.0, 1.0, sections + 1)
+        G, O = [], []
+        for k, t in enumerate(ts):
+            gc, bc = G0 + t * (Mg1 - G0), O0 + t * (Mb1 - O0)
+            if mode == "tube_perp":
+                gd, bd = ng, nrm
+            else:
+                gd, bd = _unit((1 - t) * gA + t * gC), _unit((1 - t) * bA + t * nrm)
+            if k == 0 and mode != "tube_perp":  # the armhole segment, pinned
+                g_o, g_i = float(np.linalg.norm(A0 - Mg0)), float(np.linalg.norm(A1 - Mg0))
+                a_o = a_i = None
+                w0 = (float(np.linalg.norm(B0 - Mb0)), float(np.linalg.norm(B1 - Mb0)))
+            else:
+                g_o = _march(g_in, gc, -gd, lim) or 0.5 * float(np.linalg.norm(C1 - C0))
+                g_i = _march(g_in, gc, gd, lim) or 0.5 * float(np.linalg.norm(C1 - C0))
+                a_o, a_i = _march(b_in, bc, -bd, lim * s), _march(b_in, bc, bd, lim * s)
+                if arm != "r11":
+                    fo, fi = _arm_fit_extent(arms, side, bc, _unit(bd))
+                    if fo is not None:
+                        a_o, a_i = max(a_o, fo), max(a_i, fi)
+                if k == 0:  # tube_perp t = 0: outer pinned at the shoulder target, inner from the garment
+                    w0 = (float(abs((B0 - O0) @ nrm)), g_i * s)
+            G.append([gc, gd, g_o, g_i])
+            O.append([bc, bd, None, None, a_o, a_i])
+        for k, t in enumerate(ts):  # fix 2: ramp only the garment part, the arm floor at every section after t = 0
+            r = _smoothstep(t / TUBE_RAMP_T) if TUBE_RAMP_T > 0 else 1.0
+            ramp_o = w0[0] + (G[k][2] * s - w0[0]) * r
+            ramp_i = w0[1] + (G[k][3] * s - w0[1]) * r
+            if k == 0:
+                O[k][2], O[k][3] = w0
+            elif arm != "r11":  # round 12b: clamp(garment x s ramp, arm x ease, arm x TUBE_ARM_MAX)
+                O[k][2] = float(np.clip(ramp_o, O[k][4] * CUFF_ARM_EASE, O[k][4] * TUBE_ARM_MAX)) if O[k][4] else ramp_o
+                O[k][3] = float(np.clip(ramp_i, O[k][5] * CUFF_ARM_EASE, O[k][5] * TUBE_ARM_MAX)) if O[k][5] else ramp_i
+            else:
+                O[k][2] = max(O[k][4] * CUFF_ARM_EASE, ramp_o)
+                O[k][3] = max(O[k][5] * CUFF_ARM_EASE, ramp_i)
+        tt = np.linspace(0.0, 1.0, sections * TUBE_SUB + 1)
+        uu = np.linspace(-1 - TUBE_U_MARGIN, 1 + TUBE_U_MARGIN, 23)
+
+        def at(seq, t):
+            f = t * sections
+            k = min(int(f), sections - 1)
+            r = f - k
+            return [None if x is None or y is None else (1 - r) * np.asarray(x, float) + r * np.asarray(y, float)
+                    for x, y in zip(seq[k], seq[k + 1])]
+
+        def point(sec, u):
+            c, d, w_o, w_i = sec[0], _unit(sec[1]), float(sec[2]), float(sec[3])
+            return c + d * (u * (w_i if u > 0 else w_o))
+
+        inner_base = [point(at(O, t), 1.0) for t in tt]  # the tube's inner edge
+
+        P_out = np.zeros((len(tt), len(uu), 2), np.float32)
+        P_g = np.zeros((len(tt), len(uu), 2), np.float32)
+        for i, t in enumerate(tt):
+            go, oo = at(G, t), at(O, t)
+            for j, u in enumerate(uu):
+                P_out[i, j] = point(oo, u)
+                P_g[i, j] = point(go, u)
+        tmx = np.full((H, W), -1.0, np.float32)
+        tmy = np.full((H, W), -1.0, np.float32)
+        dom = np.zeros((H, W), bool)
+        for i in range(len(tt) - 1):
+            for j in range(len(uu) - 1):
+                quad = ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))
+                for tri in ((quad[0], quad[1], quad[2]), (quad[0], quad[2], quad[3])):
+                    src = np.float32([P_out[a_] for a_ in tri])
+                    dst = np.float32([P_g[a_] for a_ in tri])
+                    x0, y0 = np.floor(src.min(0)).astype(int)
+                    x1, y1 = np.ceil(src.max(0)).astype(int)
+                    x0, y0, x1, y1 = max(x0, 0), max(y0, 0), min(x1, W - 1), min(y1, H - 1)
+                    if x1 < x0 or y1 < y0:
+                        continue
+                    m = np.zeros((y1 - y0 + 1, x1 - x0 + 1), np.uint8)
+                    cv2.fillConvexPoly(m, np.round((src - [x0, y0]) * 16).astype(np.int32), 1, cv2.LINE_8, 4)
+                    if not m.any():
+                        continue
+                    try:
+                        M = cv2.getAffineTransform(src, dst)
+                    except cv2.error:
+                        continue
+                    ys, xs = np.nonzero(m)
+                    Xs, Ys = xs + x0, ys + y0
+                    tmx[Ys, Xs] = M[0, 0] * Xs + M[0, 1] * Ys + M[0, 2]
+                    tmy[Ys, Xs] = M[1, 0] * Xs + M[1, 1] * Ys + M[1, 2]
+                    dom[Ys, Xs] = True
+        gx, gy = np.rint(tmx).astype(int), np.rint(tmy).astype(int)
+        okg = (gx >= 0) & (gx < gW) & (gy >= 0) & (gy < gH)
+        src_sleeve = np.zeros((H, W), bool)
+        src_sleeve[okg] = g_sleeve[gy[okg], gx[okg]]
+        tmx[dom & ~src_sleeve] = -1
+        tmy[dom & ~src_sleeve] = -1
+        sx_, sy_ = np.rint(mls_x).astype(int), np.rint(mls_y).astype(int)
+        okm = (sx_ >= 0) & (sx_ < gW) & (sy_ >= 0) & (sy_ < gH)
+        mls_sleeve = np.zeros((H, W), bool)
+        mls_sleeve[okm] = g_sleeve[sy_[okm], sx_[okm]] & (alpha[sy_[okm], sx_[okm]] > 0)
+        out_side = ((P - B0) @ ba) > 0
+        dom &= out_side  # the tube works only outward of the body armhole line (torso px never touched)
+        # t = 0 segment (output) and the side beyond it (towards the cuff)
+        T0a, T0b = point(O[0], -1.0), point(O[0], 1.0)
+        seg = T0b - T0a
+        tpar = np.clip(((P - T0a) @ seg) / max(float(seg @ seg), 1e-9), 0, 1)
+        dist = np.linalg.norm(P - (T0a + tpar[..., None] * seg), axis=-1)
+        wgt = _smoothstep(dist / max(blend, 1e-6))
+        use = dom & (tmx >= 0)
+        bx = np.where(mls_x >= 0, (1 - wgt) * mls_x + wgt * tmx, tmx)
+        by = np.where(mls_y >= 0, (1 - wgt) * mls_y + wgt * tmy, tmy)
+        tx, ty = tube_maps
+        tx[use], ty[use] = bx[use], by[use]
+        # MLS stays; clear only sleeve px over the background beyond the arm + ease that the tube does not draw
+        halves = [v for o in O[1:] for v in (o[4], o[5]) if v]
+        ease_px = max(1, int(round(float(np.median(halves)) * (CUFF_ARM_EASE - 1)))) if halves else 1
+        near = cv2.dilate(mask.astype(np.uint8), cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
+                                                                           (2 * ease_px + 1, 2 * ease_px + 1))) > 0
+        # (tried 2026-11-13 and reverted: clearing them over the arm beyond TUBE_DISTAL_T opened 117-144 px of holes
+        # inside the sleeve on #28 / #40, the tube is narrower than the arm there; docs/06 round 12)
+        clear = out_side & mls_sleeve & ~use & ~near & ~tube_any
+        if arm in ("finished", "finished_a"):  # round 13: rule (a) never in the underarm zone; rule (b) over the arm
+            ca, cb = point(O[-1], -1.0), point(O[-1], 1.0)
+            prot = _underarm_zone(H, W, inner_base, ca, cb, B0, B1)
+            clear &= ~prot
+            rep["protected_px"] = int(prot.sum())
+            rep["protected_zone"] = prot
+            below = _below_cuff(P, ca, cb, d_b) & out_side
+            if armpit_mode == "r14":  # round 14: the cuff-width strip x 1.25 reached torso px beside the arm; rule
+                bnd, crease = arm_torso_boundary(mask, blm, side)  # (b) works on the arm side of the boundary only
+                ex = np.full((H, 1), np.nan, np.float32)
+                for y_, e_ in bnd.items():
+                    ex[y_, 0] = e_
+                torso_side = ~np.isnan(ex) & ((X >= ex) if side == "left" else (X < ex))
+                if crease is not None:  # below the crease the torso is the mask run through the axis
+                    ax_ = prod._crotch_x(blm)
+                    for y_ in range(int(crease[1]), min(int(crease[1]) + 120, H)):
+                        run_ = _torso_run(mask, y_, ax_)
+                        if run_:
+                            torso_side[y_, run_[0]:run_[1] + 1] = True
+                below &= ~torso_side
+            rep["below_cuff_zone"] = below
+            if arm == "finished":
+                arm_b = below & mask & mls_sleeve & ~use & ~tube_any & ~prot
+                rep["cleared_below_cuff_px"] = int((arm_b & ~clear).sum())
+                rep["cut_b"] = arm_b & ~clear  # round 13b: an interior cut of clean fabric, kept out of remove_halo
+                clear |= arm_b
+                if armpit_mode == "r14":  # torso fabric the seam ease put on the arm below the cuff line: clipped
+                    arm_touch = ~np.isnan(ex) & ~torso_side  # on the arm/torso boundary (a cut, as rule b)
+                    # (sleeve px too: on the touch rows rule (b) is not limited to the cuff strip / the armhole line)
+                    spill = arm_touch & (((P - (ca + cb) / 2) @ d_b) > 0) & mask & (mx >= 0) & ~use & ~tube_any
+                    arm_sep = np.zeros((H, W), bool)  # below the crease: torso fabric never on the separated arm
+                    for y_, l_, r_ in (arms.get(side) or {}).get("rows", []):
+                        arm_sep[y_, l_:r_ + 1] = True
+                    spill |= arm_sep & (((P - (ca + cb) / 2) @ d_b) > 0) & (mx >= 0) & ~mls_sleeve & ~use & ~tube_any
+                    rep["clipped_on_arm_px"] = int((spill & ~clear).sum())
+                    rep["cut_b"] = rep["cut_b"] | (spill & ~clear)
+                    clear |= spill
+        elif arm == "fit":  # round 12b: the MLS sleeve px beyond the tube's cuff line go (the jagged cuffs)
+            ca, cb = point(O[-1], -1.0), point(O[-1], 1.0)
+            cw = _unit(cb - ca)  # across the cuff: only the strip of the cuff's own width (+ TUBE_ARM_MAX - 1 each
+            hw = float(np.linalg.norm(cb - ca)) / 2  # side), never the torso px under the armpit
+            lat = np.abs((P - (ca + cb) / 2) @ cw) <= hw * TUBE_ARM_MAX
+            beyond = (((P - (ca + cb) / 2) @ d_b) > 0) & lat & out_side & mls_sleeve & ~use & ~tube_any
+            rep["cleared_beyond_cuff_px"] = int((beyond & ~clear).sum())
+            rep["cleared_beyond_cuff_figure_px"] = int((beyond & ~clear & mask).sum())
+            k = 2 * (prod.HALO_ERODE + 1) + 1  # + the reach of remove_halo's erosion from that new edge (benchmark)
+            rep["beyond_cuff_zone"] = cv2.dilate((beyond & ~clear).astype(np.uint8),
+                                                 cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))) > 0
+            clear |= beyond
+        mx[clear] = -1
+        my[clear] = -1
+        tube_any |= use
+        rep["ease_px"] = ease_px
+        # fix 3: axis vs the arm centreline = the straight fit through the separated arm rows (_arm_at), lower half
+        devs = []
+        for k, t in enumerate(ts):
+            if t < 0.5:
+                continue
+            fit = _arm_at(arms, side, float(O[k][0][1]))
+            if fit is not None:
+                devs.append(abs(float(O[k][0][0]) - fit[0]))
+        c1 = O[-1]
+        rep.update({
+            "cleared_px": int(clear.sum()), "domain_px": int(dom.sum()),
+            "axis_garment": [G0.round(1).tolist(), Mg1.round(1).tolist()],
+            "axis_body": [O0.round(1).tolist(), Mb1.round(1).tolist()],
+            "armhole_body": [B0.round(1).tolist(), B1.round(1).tolist()],
+            "t0_body": [T0a.round(1).tolist(), T0b.round(1).tolist()],
+            "cuff": [point(c1, -1.0).round(1).tolist(), point(c1, 1.0).round(1).tolist()],
+            "sections": [[point(o, -1.0).round(1).tolist(), point(o, 1.0).round(1).tolist()] for o in O],
+            "widths": [{"t": round(float(t), 3), "garment_out_in": [round(g[2], 1), round(g[3], 1)],
+                        "garment_x_s": [round(g[2] * s, 1), round(g[3] * s, 1)],
+                        "arm_out_in": [None if o[4] is None else round(o[4], 1), None if o[5] is None else round(o[5], 1)],
+                        "out_in": [round(o[2], 1), round(o[3], 1)]} for t, g, o in zip(ts, G, O)],
+            "axis_dev_max": round(max(devs), 1) if devs else None,
+        })
+    return report
+
+
+
+def _gauss1d(v, sigma):
+    if sigma <= 0.5:
+        return v.astype(np.float64)
+    r = int(3 * sigma)
+    k = np.exp(-0.5 * (np.arange(-r, r + 1) / sigma) ** 2)
+    k /= k.sum()
+    pad = np.pad(v.astype(np.float64), r, mode="edge")
+    return np.convolve(pad, k, mode="valid")
+
+
+def hem_bottom(alpha, x0, x1):
+    """Per column x0..x1: the lowest row with alpha >= HARD_EDGE (-1 when the column has none)."""
+    sub = alpha[:, x0:x1 + 1] >= HARD_EDGE
+    has = sub.any(0)
+    last = sub.shape[0] - 1 - np.argmax(sub[::-1], 0)
+    return np.where(has, last, -1)
+
+
+def smooth_hem(layer, pairs, blm, mask, report):
+    """hem_mode="smooth" (round 12, owner 2026-11-13; adapt only): the warped bottom edge between the hem targets is
+    replaced by a smooth curve: Gaussian low-pass with sigma = HEM_SMOOTH_WAVE x hem width / 3 (waves shorter than
+    ~15 % of the width go, the hem's own long shape stays). The edge only moves DOWN, or up only where every row it
+    would uncover is background (e.g. a tongue between the legs): no figure px is ever uncovered. The move is a
+    vertical remap of the layer inside the hem band (HEM_SMOOTH_BAND x torso length above the edge), per column."""
+    H, W = mask.shape
+    hl, hr = pairs["hem_l"][1], pairs["hem_r"][1]
+    x0, x1 = max(int(np.floor(hl[0])), 0), min(int(np.ceil(hr[0])), W - 1)
+    if x1 - x0 < 10:
+        report["skipped"] = "hem too narrow"
+        return layer
+    a = layer[:, :, 3]
+    old = hem_bottom(a, x0, x1).astype(np.float64)
+    ok = (old >= 0) & (np.abs(old - hl[1]) <= HEM_SMOOTH_NEAR)  # torso-hem columns only (not sleeve-level bottoms)
+    if ok.sum() < 10:
+        report["skipped"] = "no hem edge"
+        return layer
+    xs = np.arange(x0, x1 + 1)
+    i0, i1 = np.nonzero(ok)[0][[0, -1]]
+    filled = np.interp(xs, xs[ok], old[ok])
+    sm = filled.copy()
+    sm[i0:i1 + 1] = _gauss1d(filled[i0:i1 + 1], HEM_SMOOTH_WAVE * (xs[i1] - xs[i0]) / 3.0)
+    band = HEM_SMOOTH_BAND * (hr[1] - _f(blm["shoulder"]["y"]))
+    new = old.copy()
+    raised = lowered = 0
+    for i, x in enumerate(xs):
+        if not ok[i]:
+            continue
+        target = int(round(sm[i]))
+        if target > old[i]:
+            new[i] = min(target, old[i] + band)
+            lowered += 1
+        elif target < old[i]:
+            col = mask[target + 1:int(old[i]) + 1, x]
+            fig = np.nonzero(col)[0]
+            new[i] = old[i] if len(fig) == len(col) else (target + 1 + fig.max() if len(fig) else target)
+            new[i] = max(new[i], target)
+            raised += int(new[i] < old[i])
+    out = _hem_column_remap(layer, xs, ok, old, new, band, mask, report)
+    report.update({"columns": int(ok.sum()), "lowered": lowered, "raised": raised,
+                   "max_move_px": round(float(np.max(np.abs(new[ok] - old[ok]))), 1)})
+    return out
+
+
+def _hem_column_remap(layer, xs, ok, old, new, band, mask=None, report=None):
+    """Vertical remap per column x in xs (where ok and new != old): rows old - band .. new take rows
+    old - band .. old (linear), rows below new become transparent. Alpha < HARD_EDGE -> 0 afterwards.
+    mask (round 12b): a figure px covered (alpha >= 128) before and not after keeps its old px (the slanted side
+    edges near the hem corners and the interpolated bottom row); report["restored_px"]."""
+    H, W = layer.shape[:2]
+    mxm = np.tile(np.arange(W, dtype=np.float32), (H, 1))
+    mym = np.tile(np.arange(H, dtype=np.float32)[:, None], (1, W))
+    for i, x in enumerate(xs):
+        if not ok[i] or new[i] == old[i]:
+            continue
+        b0 = old[i] - band
+        ys = np.arange(int(np.floor(b0)), H)
+        ys = ys[ys >= 0]
+        src = np.where(ys <= new[i], b0 + (ys - b0) * (old[i] - b0) / max(new[i] - b0, 1e-6), -1.0)
+        mym[ys, x] = src.astype(np.float32)
+    out = cv2.remap(layer, mxm, mym, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    out[:, :, 3][out[:, :, 3] < HARD_EDGE] = 0
+    if mask is not None:
+        back = mask & (layer[:, :, 3] >= 128) & (out[:, :, 3] < 128)
+        out[back] = layer[back]
+        if report is not None:
+            report["restored_px"] = int(back.sum())
+    return out
+
+
+def _raise_limit(mask, x, target, old):
+    """The highest bottom edge in column x between target and old (target < old) that uncovers no figure px."""
+    col = mask[target + 1:int(old) + 1, x]
+    fig = np.nonzero(col)[0]
+    new = old if len(fig) == len(col) else (target + 1 + fig.max() if len(fig) else target)
+    return max(new, target)
+
+
+def garment_hem_offsets(alpha, glm, near=HEM_SMOOTH_NEAR):
+    """The garment's own hem curve: (gxs, off) for the garment columns between the hem corners whose bottom edge
+    (alpha >= HARD_EDGE) is within `near` px of the hem landmark row; off = bottom - the straight line between the
+    first and last such bottoms (garment px). None when fewer than 10 columns."""
+    g0, g1 = int(np.ceil(_f(glm["hem"]["left_x"]))), int(np.floor(_f(glm["hem"]["right_x"])))
+    gy = _f(glm["hem"]["y"])
+    if g1 - g0 < 10:
+        return None
+    b = hem_bottom(alpha, g0, g1).astype(np.float64)
+    gxs = np.arange(g0, g1 + 1)
+    ok = (b >= 0) & (np.abs(b - gy) <= near)
+    if ok.sum() < 10:
+        return None
+    gxs, b = gxs[ok], b[ok]
+    line = b[0] + (b[-1] - b[0]) * (gxs - gxs[0]) / max(gxs[-1] - gxs[0], 1)
+    return gxs.astype(np.float64), b - line
+
+
+def garment_hem(layer, pairs, glm, g_alpha, s, blm, mask, report):
+    """hem_mode="garment" (round 12b, owner 2026-11-15; adapt only): target bottom edge per output column between the
+    hem targets = the straight line between the hem_l / hem_r targets + s x the garment's own hem offset
+    (`garment_hem_offsets`, garment column mapped linearly from the target span to the garment's curve span). The edge
+    moves down to the target, or up only through background px (clamped where a figure px would be uncovered: never
+    above the reference edge over the figure). Vertical remap inside a band of max(HEM_SMOOTH_BAND x torso length,
+    2 x the largest applied correction) above the old edge. Report: max stretch (band rows new / old), clamped
+    columns, warn when the stretch is above HEM_GARMENT_WARN_STRETCH."""
+    H, W = mask.shape
+    hl, hr = pairs["hem_l"][1], pairs["hem_r"][1]
+    x0, x1 = max(int(np.floor(hl[0])), 0), min(int(np.ceil(hr[0])), W - 1)
+    curve = garment_hem_offsets(g_alpha, glm)
+    if x1 - x0 < 10 or curve is None:
+        report["skipped"] = "hem too narrow or no garment hem edge"
+        return layer
+    gxs, goff = curve
+    a = layer[:, :, 3]
+    old = hem_bottom(a, x0, x1).astype(np.float64)
+    ok = (old >= 0) & (np.abs(old - hl[1]) <= HEM_SMOOTH_NEAR)
+    if ok.sum() < 10:
+        report["skipped"] = "no hem edge"
+        return layer
+    xs = np.arange(x0, x1 + 1)
+    u = (xs - hl[0]) / max(hr[0] - hl[0], 1e-6)
+    tgt = hl[1] + u * (hr[1] - hl[1]) + s * np.interp(gxs[0] + u * (gxs[-1] - gxs[0]), gxs, goff)
+    new = old.copy()
+    clamped = 0
+    for i, x in enumerate(xs):
+        if not ok[i]:
+            continue
+        t = int(round(tgt[i]))
+        if t > old[i]:
+            new[i] = t
+        elif t < old[i]:
+            new[i] = _raise_limit(mask, x, t, old[i])
+            clamped += int(new[i] > t)
+    corr = np.abs(new[ok] - old[ok])
+    band = max(HEM_SMOOTH_BAND * (hr[1] - _f(blm["shoulder"]["y"])), 2.0 * float(corr.max()))
+    stretch = float(np.max((new[ok] - (old[ok] - band)) / band))
+    out = _hem_column_remap(layer, xs, ok, old, new, band, mask, report)
+    report.update({"columns": int(ok.sum()), "lowered": int((new[ok] > old[ok]).sum()),
+                   "raised": int((new[ok] < old[ok]).sum()), "clamped": clamped,
+                   "max_move_px": round(float(corr.max()), 1), "band_px": round(band, 1),
+                   "max_stretch": round(stretch, 3), "stretch_warn": stretch > HEM_GARMENT_WARN_STRETCH,
+                   "garment_offset_px": [round(float(goff.min()), 1), round(float(goff.max()), 1)]})
+    return out
+
+
 def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=600, hem_rule=(0.35, 10.0), *,
                  sleeve_variant="r7", debug_map=False, side_floor=False, neckline_variant="r7", source="body",
                  base=None, neck_clip=False, neck_hole_polygon=None, collar_floor_on=True, shoulder_variant="off",
                  shoulder_fractions=SHOULDER_LINE_FRACTIONS, shoulder_ease=SHOULDER_LINE_EASE,
-                 shoulder_edge_alpha=128):
+                 shoulder_edge_alpha=128, sleeve_mode="mls", side_floor_mode="landmarks", hem_mode="off",
+                 tube_arm="r11", hem_c_pair=False, armpit_mode="off"):
     """(BGRA layer HxW, info {engine, pairs, rejected, s, neck_opening?, sleeve_hems, runtime, map?}).
     Raises MlsUnavailable (missing landmarks, failed core pairs, bad geometry): the caller uses the parts engine.
     sleeve_variant: benchmark only (module docstring); debug_map: info["map"] = (mx, my) for the fold metric."""
@@ -833,6 +1841,23 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
         raise ValueError(f"unknown neckline variant: {neckline_variant!r}")
     if shoulder_variant not in SHOULDER_VARIANTS:
         raise ValueError(f"unknown shoulder variant: {shoulder_variant!r}")
+    if sleeve_mode not in SLEEVE_MODES:
+        raise ValueError(f"unknown sleeve mode: {sleeve_mode!r}")
+    if side_floor_mode not in SIDE_FLOOR_MODES:
+        raise ValueError(f"unknown side floor mode: {side_floor_mode!r}")
+    if hem_mode not in HEM_MODES:
+        raise ValueError(f"unknown hem mode: {hem_mode!r}")
+    if tube_arm not in TUBE_ARMS:
+        raise ValueError(f"unknown tube arm: {tube_arm!r}")
+    if armpit_mode not in ARMPIT_MODES:
+        raise ValueError(f"unknown armpit mode: {armpit_mode!r}")
+    if fit_mode == "keep_shape":  # armpit modes: adapt only (rounds 13c / 14 benchmark), a no-op in keep_shape
+        armpit_mode = "off"
+    if fit_mode == "keep_shape":  # hem smoothing / garment hem / hem_c pair: adapt only (rounds 12, 12b)
+        hem_mode = "off"
+        hem_c_pair = False
+    if fit_mode == "keep_shape":  # tube sleeves: adapt only (round 11 benchmark), a no-op in keep_shape
+        sleeve_mode = "mls"
     if fit_mode == "keep_shape":  # shoulder line: adapt only (round 9 benchmark), a no-op in keep_shape
         shoulder_variant = "off"
     if neckline_variant in ("clear_skin", "hole_skin") and source != "avatar":  # docs/02 rule 12, docs/09 #89
@@ -853,28 +1878,95 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
     lost = [n for n in CORE_PAIRS if n not in pairs]
     if lost:
         raise MlsUnavailable(f"pair validation failed: {', '.join(lost)}")
+    hem_c_rep = _add_hem_c_pair(pairs, glm, img[:, :, 3]) if hem_c_pair else None
     sline = shoulder_line(pairs, glm, body_lm, mask, img[:, :, 3], shoulder_fractions, shoulder_ease,
                           shoulder_edge_alpha) if shoulder_variant == "line" else None
     raised = collar_floor(pairs, body_lm, mask) if collar_floor_on else None
     mx, my = _inverse_maps(pairs, s, H, W)
+    sfm_report = ap_report = ap_base = None
     if side_floor:  # second stage: pairs where the first solve left the garment edge, x floored; solve again
         before = set(pairs)
         _add_side_floor_pairs(pairs, glm, body_lm, mask, img[:, :, 3] > 128, mx, my, rejected)
+        ref_pairs = dict(pairs)
+        if side_floor_mode == "mask":
+            sfm_report = {}
+            _add_side_floor_mask_pairs(pairs, body_lm, mask, img, mx, my, rejected, sfm_report)
+        mx0, my0 = mx, my
         if set(pairs) != before:  # only when the floor added a pair: otherwise the first solve stands as it is
             mx, my = _inverse_maps(pairs, s, H, W)
+        if side_floor_mode == "mask" and set(pairs) != set(ref_pairs):  # round 12b: no new holes vs the landmark floor
+            ref_map = _inverse_maps(ref_pairs, s, H, W) if set(ref_pairs) != before else (mx0, my0)
+            nh = None
+            if neckline_variant.startswith("hole") and neck_hole_polygon is not None and len(neck_hole_polygon) >= 3:
+                nh = np.zeros(img.shape[:2], np.uint8)
+                cv2.fillPoly(nh, [np.round(np.asarray(neck_hole_polygon, float) * 8).astype(np.int32)], 1, shift=3)
+                nh = nh.astype(np.float32)
+            mx, my = _blend_new_holes(H, W, img[:, :, 3], mask, ref_map, mx, my, sfm_report, hole=nh)
+        if armpit_mode == "r14":  # round 14: a second solve with the armpit pairs, used only around the armpits
+            ap_report = {"s": s}
+            ap_pairs = dict(pairs)
+            _add_armpit_pairs(ap_pairs, glm, body_lm, mask, img, mx0, my0, rejected, ap_report,
+                              tube=sleeve_mode != "mls")
+            ap_report.pop("s")
+            win = ap_report.pop("window")
+            if win is not None:
+                ap_base = (mx, my, win)  # for the local guard at the end
+                ax, ay = _inverse_maps(ap_pairs, s, H, W)
+                mx = ((1 - win) * mx + win * ax).astype(np.float32)
+                my = ((1 - win) * my + win * ay).astype(np.float32)
+    tube_maps = (np.full((H, W), -1.0, np.float32), np.full((H, W), -1.0, np.float32)) if sleeve_mode != "mls" else None
+    tube = tube_sleeves(img, glm, body_lm, mask, pairs, s, mx, my, mode=sleeve_mode, tube_maps=tube_maps,
+                        arm=tube_arm, armpit_mode=armpit_mode) \
+        if sleeve_mode != "mls" else None
     f = img.astype(np.float32)
     f[:, :, :3] *= f[:, :, 3:4] / 255.0
     out = cv2.remap(f, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    if tube_maps is not None:  # the tube layer OVER the MLS layer (premultiplied "over")
+        tl = cv2.remap(f, *tube_maps, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        out = tl + out * (1 - tl[:, :, 3:4] / 255.0)
+        drawn = tube_maps[0] >= 0
+        mx = np.where(drawn, tube_maps[0], mx)  # the map the tube px come from (fold metric, info["map"])
+        my = np.where(drawn, tube_maps[1], my)
     a = out[:, :, 3:4] / 255.0
     out[:, :, :3] = np.where(a > 0, out[:, :, :3] / np.maximum(a, 1e-6), 0)
     layer = np.clip(np.rint(out), 0, 255).astype(np.uint8)
-    layer = prod.remove_halo(layer, outer_only=True)  # edge fix, once, outer contour
+    cut = np.zeros((H, W), bool)  # round 13b: the rule (b) cut edge is not a photo fringe, remove_halo skips it
+    for side in ("left", "right"):
+        z = (tube or {}).get(side, {}).get("cut_b")
+        if z is not None:
+            cut |= z & (layer[:, :, 3] == 0)
+    if cut.any():
+        tmp = layer.copy()
+        tmp[:, :, 3][cut] = 255  # the cut px count as fabric during the erosion, then go back to transparent
+        prod._colour_from_nearest_opaque(tmp, cut, ok=layer[:, :, 3] >= 250)
+        layer = prod.remove_halo(tmp, outer_only=True)
+        layer[cut] = 0
+    else:
+        layer = prod.remove_halo(layer, outer_only=True)  # edge fix, once, outer contour
     if fitted:
         alpha = layer[:, :, 3]
         alpha[alpha < HARD_EDGE] = 0
+    if hem_mode == "smooth":
+        hem_rep = {}
+        layer = smooth_hem(layer, pairs, body_lm, mask, hem_rep)
+    elif hem_mode == "garment":
+        hem_rep = {}
+        layer = garment_hem(layer, pairs, glm, img[:, :, 3], s, body_lm, mask, hem_rep)
     info = {"engine": "mls", "fit_mode": fit_mode, "pairs": pairs, "rejected": rejected, "s": s}
+    if hem_mode == "smooth":
+        info["hem_smooth"] = hem_rep
+    elif hem_mode == "garment":
+        info["hem_garment"] = hem_rep
+    if hem_c_rep is not None:
+        info["hem_c"] = hem_c_rep
     if raised is not None:
         info["collar_floor"] = raised
+    if tube is not None:
+        info["tube"] = tube
+    if sfm_report is not None:
+        info["side_floor_mask"] = sfm_report
+    if ap_report is not None:
+        info["armpit"] = ap_report
     if sline is not None:
         info["shoulder_line"] = sline
     if debug_map:
@@ -936,9 +2028,64 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
             info["neck_clip"] = {"dilate_px": NECK_CLIP_DILATE}
     hems = {}
     for side, sx in (("left", "_l"), ("right", "_r")):  # the hands/forearms overlay starts at the cuff line
-        if "cuff_out" + sx in pairs and "cuff_in" + sx in pairs:
-            sh = np.array([_f(body_lm["shoulder"][f"{side}_x"]), _f(body_lm["shoulder"]["y"])])
+        sh = np.array([_f(body_lm["shoulder"][f"{side}_x"]), _f(body_lm["shoulder"]["y"])])
+        if tube is not None and "cuff" in tube.get(side, {}):  # the tube's own cuff segment
+            a_, b_ = tube[side]["cuff"]
+            hems[side] = (np.float32(a_), np.float32(b_), sh)
+        elif "cuff_out" + sx in pairs and "cuff_in" + sx in pairs:
             hems[side] = (np.float32(pairs["cuff_out" + sx][1]), np.float32(pairs["cuff_in" + sx][1]), sh)
     info["sleeve_hems"] = hems
+    if tube is not None and tube_arm == "finished":  # round 13b: rule #63 on the final contour, sleeve zone only
+        layer, tube["filled_px"] = _fill_sleeve_holes(layer, pairs, body_lm)
+    if ap_base is not None:  # round 14: inside the window no figure px the map without the armpit pairs covers is lost
+        bx_, by_, win = ap_base  # (arm skin below the cuff line is never put back)
+        bl = cv2.remap(f, bx_, by_, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        ke = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * prod.HALO_ERODE + 1,) * 2)  # as remove_halo; tried
+        # without the erosion (2026-11-15): 0 new holes, but it pastes the 1-2 px photo fringe (fragments, spikes)
+        solid_b = cv2.erode(bl[:, :, 3], ke, borderType=cv2.BORDER_CONSTANT, borderValue=0) >= HARD_EDGE
+        Yq, Xq = np.mgrid[0:H, 0:W]
+        skin, sleeve_arm = np.zeros((H, W), bool), np.zeros((H, W), bool)
+        for side in ("left", "right"):
+            rows_, crease_ = arm_torso_boundary(mask, body_lm, side)
+            if not rows_ or side not in hems:
+                continue
+            ex_ = np.full((H, 1), np.nan, np.float32)
+            for y_, e_ in rows_.items():
+                ex_[y_, 0] = e_
+            a_, b_, sh_ = (np.asarray(v, float) for v in hems[side])
+            n_ = _unit(np.array([-(b_ - a_)[1], (b_ - a_)[0]]))
+            n_ = -n_ if (sh_ - a_) @ n_ > 0 else n_
+            arm_ = ~np.isnan(ex_) & ((Xq < ex_) if side == "left" else (Xq >= ex_))
+            below_ = ((Xq - a_[0]) * n_[0] + (Yq - a_[1]) * n_[1]) > 0
+            skin |= arm_ & below_
+            sleeve_arm |= arm_ & ~below_
+        # on the arm above the cuff line the sleeve's thin hem px count too (not eroded there)
+        lost = mask & (win > 0.01) & (layer[:, :, 3] < 128) & ((solid_b & ~skin) |
+                                                             ((bl[:, :, 3] >= HARD_EDGE) & sleeve_arm))
+        if lost.any():
+            layer[:, :, :3][lost] = np.clip(np.rint(bl[:, :, :3][lost] / np.maximum(bl[:, :, 3:4][lost], 1e-6) * 255.0),
+                                            0, 255).astype(np.uint8)
+            layer[:, :, 3][lost] = 255
+        ap_report["guard_px"] = int(lost.sum())
+        n_c, lab, st, _ = cv2.connectedComponentsWithStats((layer[:, :, 3] >= 128).astype(np.uint8), connectivity=8)
+        crumbs = np.isin(lab, [i for i in range(1, n_c) if st[i, cv2.CC_STAT_AREA] <= ARMPIT_CRUMB]) & (win > 0.01)
+        layer[crumbs] = 0  # detached garment crumbs inside the window (no ragged fragments)
+        ap_report["crumb_px"] = int(crumbs.sum())
+    if sfm_report is not None:  # round 12b: the last guard, no figure px the landmark floor layer covers is lost
+        ref, _ = tshirt_layer(garment_img, glm, body_lm, mask, fit_mode, H, W, hem_rule, sleeve_variant=sleeve_variant,
+                              side_floor=side_floor, neckline_variant=neckline_variant, source=source, base=base,
+                              neck_clip=neck_clip, neck_hole_polygon=neck_hole_polygon,
+                              collar_floor_on=collar_floor_on, shoulder_variant=shoulder_variant,
+                              shoulder_fractions=shoulder_fractions, shoulder_ease=shoulder_ease,
+                              shoulder_edge_alpha=shoulder_edge_alpha, sleeve_mode=sleeve_mode,
+                              hem_c_pair=hem_c_pair, tube_arm=tube_arm,  # same tube (round 13 fix 4)
+                              armpit_mode=armpit_mode)
+        lost = mask & (ref[:, :, 3] >= 128) & (layer[:, :, 3] < 128)
+        for side in ("left", "right"):  # the arm px cleared beyond the tube cuff on purpose (tube_arm="fit")
+            z = (tube or {}).get(side, {}).get("beyond_cuff_zone")
+            if z is not None:
+                lost &= ~z
+        layer[lost] = ref[lost]
+        sfm_report["patched_px"] = int(lost.sum())
     info["runtime"] = time.perf_counter() - t0
     return layer, info

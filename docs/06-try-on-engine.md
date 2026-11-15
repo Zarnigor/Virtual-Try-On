@@ -5,8 +5,8 @@ This is a proposal; confirm the approach with the owner before building.
 **MVP scope: T-shirt (short sleeve) + pants.** The body photo is taken in a short-sleeved or sleeveless top and
 shorts/tight leggings, so no old sleeves or trouser legs show around the new garment.
 **The garment adapts to the body** per its `fit_mode` (docs/09 #93): `adapt` is what the engine does; `keep_shape`
-is used by the MLS engine (setting `TRYON_WARP=mls`, see "MLS engine" at the end); the default `parts` engine warps
-it like `adapt`. **Decided
+is used by the MLS engine (setting `TRYON_WARP=mls`, the default since docs/09 #105, see "MLS engine" and "Production
+wiring" at the end); the `parts` engine warps it like `adapt`. **Decided
 2026-11-11 (docs/09 #96): `keep_shape` = MLS preset A** (see "keep_shape decision" at the end of this file). There
 is no size-mismatch display and no fit label.
 
@@ -544,7 +544,7 @@ Floating 0 except one 1 px piece. Local scale extremes at the armpit / chest row
 Sheets: `out/sheet_fitted7_k1_before_after.png` (left 6 columns round 6, right 6 round 7, k 1.0),
 `out/sheet_fitted7_k.png` (k 1.0 | 0.7 x male slim, male plus, female plus).
 
-### MLS engine in the try-on service (2026-11-11, docs/09 #98, flag `TRYON_WARP`, default `parts`)
+### MLS engine in the try-on service (2026-11-11, docs/09 #98, flag `TRYON_WARP`; default `mls` since #105)
 `apps/tryon_engine/mls.py` (ported from `tools/warp-benchmark/` at c3f6883; no imports from tools/). Setting
 `TRYON_WARP = parts | mls` from env (default `parts`; any other value stops startup with ImproperlyConfigured),
 passed through docker-compose to the backend and the Celery worker. T-shirt only; pants and the body flow unchanged.
@@ -958,3 +958,547 @@ Observations (not a decision):
   variants stay benchmark keywords.
 - Open (owner): start the body samples at the collar target instead of the neck edge on wide necks; use line_hard4 50/75
   (round 9 showed the 25 % pair kinks the V band); arm-band / fold side effects.
+
+### Tube sleeve, round 11 (2026-11-13, NOT production, no winner picked)
+Why: rigid MLS cannot widen the sleeve to the arm (rounds 8 / 8b): skin windows at the shoulder / sleeve join and wavy
+cuffs remain with sleeve C. Keyword `mls.tshirt_layer(..., sleeve_mode="mls" | "tube")` (default "mls",
+pixel-identical; `render_tryon` never passes it; a no-op in keep_shape, tested on #44 / #45; torso px never change,
+tested on #28). "tube" (`mls.tube_sleeves`, per side, adapt only): the sleeve is a ruled strip, t = 0 on the armhole
+segment (garment: shoulder seam -> armpit; body: shoulder target -> armpit target), t = 1 on the cuff segment
+(garment: cuff_outer -> cuff_inner; body: perpendicular to the arm axis at sleeve length x s), u across (outer /
+inner measured separately). At `TUBE_SECTIONS` = 6 cross-sections: output width = max(garment x s, arm extent in the
+mask outward of the armhole line x CUFF_ARM_EASE 1.1); t = 0 keeps the armhole segment. The strip is meshed (t x u
+36 x 22) and each triangle mapped affinely back to the garment; one `cv2.remap` for the whole garment. Within
+`TUBE_BLEND_PX` = 10 px of the body armhole segment the tube map is smoothstep-blended into the MLS map. The tube
+domain is clipped to the outward side of the body armhole line; there, px whose MLS source is a sleeve px and that the
+tube does not draw are cleared (reported). The first version let the u margin reach inward past the armpit and cleared
+34 torso px under the armpit on #28 / m-slim (caught by the torso test); fixed by the clip.
+
+Reference = the owner's adapt: sleeve C + side_floor (both variants; `render_tryon` does not pass side_floor yet),
+collar_floor on, the garment's neck_hole polygon. Data: the round 8b exporter with `EXPORT_ROOT=.../data/tube11`.
+Runner `run_tube11.py` -> `out/table_tube.md`, `out/results_tube.json`, `out/sheet_tube_<id>.png` (reference | tube,
+3x; yellow = body arm axis, cyan = arm centreline from the mask, grey = cross-sections, red = cuff),
+`out/crop_tube_armhole_worst.png`, `out/crop_tube_worst.png`.
+
+| garment | variant | arm-band skin L / R | cuff wave median / max L, R | balloon L / R | armhole seam L / R | cleared L / R | gap | excess | fold (max) |
+|---|---|---|---|---|---|---|---|---|---|
+| #28 | reference | 428 / 554 | 8.0 / 27.0, 12.9 / 29.7 | 212 / 343 | 119 / 37 | - | 2344 | 2260 | 0.00226 |
+| #28 | tube | 5877 / 7193 | 1.0 / 20.6, 9.1 / 20.2 | 1009 / 415 | 10 / 4 | 9702 / 10407 | 92 | 2718 | 0.0005 |
+| #43 | reference | 2236 / 2615 | 16.2 / 20.9, 9.4 / 11.4 | 117 / 338 | 248 / 32 | - | 3439 | 139 | 0.00274 |
+| #43 | tube | 7556 / 8002 | 4.5 / 19.0, 9.3 / 11.2 | 992 / 611 | 256 / 333 | 9146 / 9311 | 110 | 772 | 0.0006 |
+| #40 | reference | 2575 / 2372 | 5.1 / 5.5, 7.0 / 8.7 | 1277 / 1957 | 30 / 0 | - | 2217 | 3667 | 0.00609 |
+| #40 | tube | 6513 / 6553 | 13.8 / 13.8, 19.6 / 19.6 | 5844 / 5802 | 269 / 281 | 6963 / 7445 | 1201 | 10897 | 0.0015 |
+| all | reference | 5239 / 5541 | | 1606 / 2638 | 397 / 69 | - | 8000 | 6066 | 0.00609 |
+| all | tube | 19946 / 21748 | | 7845 / 6828 | 535 / 618 | 25811 / 27163 | 1403 | 14387 | 0.0015 |
+
+Runtime: reference max 0.136 s, tube max 0.251 s.
+
+Observations on this FIRST version (before the fixes below; not a decision):
+- **The ruled strip degenerates on short sleeves.** The armhole segment is LONGER than the sleeve axis and slanted to
+  it (#28: armhole 112 px, axis 67 px, 39 deg; #43: 188 / 85 / 36 deg; #40: 272 / 111 / 46 deg), and the inner edge
+  (armpit -> cuff_inner) is only 23-30 px against 111-198 px on the outer edge: the strip is a wedge, not a tube. The
+  cross-sections fan out from the underarm (see the grey lines on the sheets); the tube narrows the upper sleeve, so
+  the MLS sleeve px that were cleared (7-10 k px per side) are not replaced: arm-band skin x3.8 / 3.9 (L / R), balloon x4.9 / 2.6.
+- What improved: gap 8000 -> 1403, fold 0.00609 -> 0.0015, the #28 / #43 cuff is straighter (median wave 8.0 -> 1.0,
+  16.2 -> 4.5 on the left); the armhole seam is smaller on #28 only.
+- Worse than the reference on at least one metric in 18 / 18 runs.
+- axis_dev 10.8-12.0 px on every avatar (all flagged > 5 px): not trustworthy as built, the arm extent inward is cut
+  at the armhole line, so the measured "centre" is shifted outward by construction.
+- Not tried (owner's call): t = 0 on a line perpendicular to the arm axis through the shoulder seam (the underarm
+  triangle left to MLS), cross-sections perpendicular to the axis everywhere, a real arm-centreline axis.
+
+**Debug on #28 / m-average (owner 2026-11-13, `debug_tube11.py`).** The first version did not shift the sleeve
+sideways at the cuff (tube cuff midpoint vs the `_arm_at` arm fit: +1.7 / -1.3 px); it was SHORT: body axis 66.4 /
+64.5 px (garment axis 67.4 / 65.4 x s 0.985) against 81.1 / 81.0 px from the armhole midpoint to the reference cuff
+midpoint (cuff y ~374 vs ~388). The torso is scaled 1.065 vertically, s 0.985, and the body armhole midpoint sits lower
+relative to the shoulder than the garment's. The cleared, not re-covered px (952 / 1203) were the band between the two
+cuffs. At t = 0 the body armhole (90 px) is shorter than the garment's x s (110 px), so the width jumped 45 -> 51.7 at
+t = 0.17. The mask's arm merges with the torso down to y ~392-395 on this avatar, so the first axis_dev (a march along
+the slanted cross line) ran into the torso: not valid. Overlay of that version: `out/debug_tube_28_m-average.png`.
+
+**Fixes (owner 2026-11-13) and tube_perp.** (1) The body axis ends on the midpoint of the MLS cuff targets (sleeve C),
+the cuff segment perpendicular to the axis there. (2) Output half-width = max(arm extent x CUFF_ARM_EASE, ramp), ramp =
+smoothstep over t <= `TUBE_RAMP_T` = 0.33 from the t = 0 width to garment x s; the arm floor holds at every section
+after t = 0 (t = 0 is pinned; tested). (3) axis_dev = max |axis x - `_arm_at` x| over the sections with t >= 0.5
+(`_arm_at` = the straight fit through the first separated arm rows, extrapolated upward). New mode `tube_perp`: every
+cross-section perpendicular to the axis, t = 0 = the perpendicular through the shoulder seam / shoulder target, the
+underarm triangle between that line and the armhole stays MLS (never cleared); blend distance measured from the t = 0
+segment in both modes. Torso test and keep_shape no-op cover both modes. 340 backend tests pass, none skipped.
+
+Re-run, reference | tube | tube_perp (side_floor on in all, `out/table_tube.md`, sheets `out/sheet_tube_<id>.png`
+with three columns, `out/crop_tube_armhole_worst.png`, `out/crop_tube_worst.png`, debug overlays
+`out/debug_tube_28_m-average_tube.png` / `_tube_perp.png`):
+
+| garment | variant | arm-band skin L / R | cuff wave median / max L, R | balloon L / R | armhole seam L / R | cleared L / R | gap | excess | fold (max) | axis dev max L / R |
+|---|---|---|---|---|---|---|---|---|---|---|
+| #28 | reference | 428 / 554 | 8.0 / 27.0, 12.9 / 29.7 | 212 / 343 | 119 / 36 | - | 2344 | 2260 | 0.00226 | - |
+| #28 | tube | 605 / 787 | 1.7 / 22.4, 7.9 / 20.8 | 1598 / 552 | 15 / 9 | 1974 / 2741 | 411 | 3130 | 0.00152 | 18.5 / 11.0 |
+| #28 | tube_perp | 2672 / 1266 | 19.9 / 22.4, 20.1 / 25.1 | 2080 / 402 | 2552 / 512 | 3426 / 3749 | 624 | 3375 | 0.00136 | 21.5 / 16.6 |
+| #43 | reference | 2236 / 2615 | 16.2 / 20.9, 9.4 / 11.4 | 117 / 341 | 248 / 32 | - | 3439 | 139 | 0.00274 | - |
+| #43 | tube | 899 / 1509 | 1.0 / 27.0, 4.5 / 14.4 | 1242 / 680 | 38 / 3 | 946 / 992 | 282 | 805 | 0.00178 | 18.1 / 13.5 |
+| #43 | tube_perp | 3625 / 3392 | 16.0 / 26.0, 16.3 / 18.6 | 982 / 424 | 3090 / 1882 | 2908 / 2573 | 250 | 584 | 0.00135 | 21.7 / 18.2 |
+| #40 | reference | 2575 / 2372 | 5.1 / 5.5, 7.0 / 8.7 | 1278 / 1970 | 30 / 0 | - | 2217 | 3667 | 0.00609 | - |
+| #40 | tube | 2883 / 2800 | 6.0 / 7.0, 5.0 / 6.0 | 6698 / 6788 | 8 / 0 | 1228 / 1425 | 579 | 12444 | 0.0023 | 19.7 / 13.8 |
+| #40 | tube_perp | 5688 / 5504 | 5.0 / 5.3, 4.4 / 5.0 | 6526 / 6767 | 3667 / 3048 | 4183 / 3850 | 47 | 12619 | 0.00175 | 22.6 / 18.8 |
+| all | reference | 5239 / 5541 | 8.0 / 27.0, 8.6 / 29.7 | 1607 / 2654 | 397 / 68 | - | 8000 | 6066 | 0.00609 | - |
+| all | tube | 4387 / 5096 | 1.8 / 27.0, 5.0 / 20.8 | 9538 / 8020 | 61 / 12 | 4148 / 5158 | 1272 | 16379 | 0.0023 | 19.7 / 13.8 |
+| all | tube_perp | 11985 / 10162 | 5.3 / 26.0, 15.1 / 25.1 | 9588 / 7593 | 9309 / 5442 | 10517 / 10172 | 921 | 16578 | 0.00175 | 22.6 / 18.8 |
+
+Runtime max: reference 0.150 s, tube 0.302 s, tube_perp 0.301 s. Worse than the reference on at least one metric:
+tube 17 / 18 runs (arm L 12, arm R 11, balloon L 15, balloon R 14, excess 14, fold 9, wave L 8, wave R 3, seam L 2),
+tube_perp 18 / 18 (arm L 18, arm R 17, balloon L 18, balloon R 12, seam L 18, seam R 18, excess 15, fold 7, wave L 6,
+wave R 4). #28 / m-average after the fixes: tube axis length 81.1 / 80.9 px (= the reference cuff), cleared not
+re-covered 132 / 236 px, px over the background 536 / 511 (reference 96 / 423); tube_perp axis 119.8 / 119.7 px, cleared
+not re-covered 474 / 336, over the background 660 / 425. axis_dev is measured against an upward extrapolation of the
+lower arm; at the cuff row itself the tube axis is -1.6 / 0.0 px from the `_arm_at` fit.
+Clean sheets (owner 2026-11-13, `CLEAN=1`: the garment as the user sees it, no axes / sections / numbers) are in
+`out/sheet_tube_<id>.png`; the sheets with the overlays are kept in `out/tube11_overlays/`. Numbers unchanged.
+
+**Layering fix (owner 2026-11-13, #40 underarm).** The grey tank showed under both armpits on #40 (tube): MLS sleeve
+px outward of the armhole line were cleared and the underarm triangle was not re-covered by the tube; the torso test
+does not see it (outside the torso). Now (both modes) the tube is a separate map drawn OVER the MLS layer
+(premultiplied "over", tube wins where both exist, the blend at the armhole kept); an MLS px is cleared only when its
+source is a sleeve px, the tube does not draw it, it is outward of the armhole line and over the background beyond
+the figure dilated by the arm ease (median arm half-width x (CUFF_ARM_EASE - 1), at least 1 px). New metric and test
+"no new holes": figure px uncovered by the garment in the shoulder / armpit / sleeve zone (outward of the reference
+armhole line above the lower cuff target + 10 px, plus 15 px around the armhole segment) that the reference covers;
+test `TubeSleeveTests.test_no_new_holes_in_the_shoulder_armpit_sleeve_zone` (#28, #40 x 6 avatars x both modes, 0 px).
+341 backend tests pass, none skipped. Sheets now carry an underarm crop (both sides, 4x) under each cell; full renders
+`out/render_tube_<id>.png` (real `render_tryon`, benchmark keywords added in-process only). Previous outputs:
+`out/tube11_before_layering/`.
+
+| garment | variant | arm-band skin L / R | cuff wave median / max L, R | balloon L / R | armhole seam L / R | new holes L / R | cleared L / R | gap | excess | fold (max) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| #28 | reference | 428 / 554 | 8.0 / 27.0, 12.9 / 29.7 | 212 / 343 | 119 / 36 | 0 / 0 | - | 2344 | 2260 | 0.00226 |
+| #28 | tube | 196 / 229 | 21.4 / 23.4, 16.0 / 29.6 | 1610 / 659 | 9 / 7 | 0 / 0 | 72 / 396 | 470 | 3181 | 0.00171 |
+| #28 | tube_perp | 197 / 240 | 21.4 / 24.1, 16.0 / 24.8 | 2080 / 606 | 7 / 36 | 0 / 0 | 144 / 1001 | 484 | 3449 | 0.00293 |
+| #43 | reference | 2236 / 2615 | 16.2 / 20.9, 9.4 / 11.4 | 117 / 341 | 248 / 32 | 0 / 0 | - | 3439 | 139 | 0.00274 |
+| #43 | tube | 730 / 1286 | 12.5 / 27.0, 13.2 / 18.1 | 1247 / 785 | 33 / 1 | 0 / 0 | 42 / 255 | 586 | 885 | 0.002 |
+| #43 | tube_perp | 651 / 1035 | 10.8 / 26.0, 13.1 / 19.4 | 1009 / 587 | 45 / 3 | 0 / 0 | 269 / 700 | 577 | 653 | 0.00369 |
+| #40 | reference | 2575 / 2372 | 5.1 / 5.5, 7.0 / 8.7 | 1278 / 1970 | 30 / 0 | 0 / 0 | - | 2217 | 3667 | 0.00609 |
+| #40 | tube | 2347 / 2230 | 5.8 / 6.7, 5.5 / 6.0 | 6707 / 6835 | 3 / 0 | 0 / 0 | 19 / 112 | 1877 | 12485 | 0.0029 |
+| #40 | tube_perp | 2065 / 2011 | 5.2 / 6.8, 8.0 / 8.4 | 6541 / 6845 | 11 / 0 | 0 / 0 | 472 / 527 | 1563 | 12675 | 0.00474 |
+| all | reference | 5239 / 5541 | 8.0 / 27.0, 8.6 / 29.7 | 1607 / 2654 | 397 / 68 | 0 / 0 | - | 8000 | 6066 | 0.00609 |
+| all | tube | 3273 / 3745 | 9.6 / 27.0, 9.0 / 29.6 | 9564 / 8279 | 45 / 8 | 0 / 0 | 133 / 763 | 2933 | 16551 | 0.0029 |
+| all | tube_perp | 2913 / 3286 | 7.9 / 26.0, 9.9 / 24.8 | 9630 / 8038 | 63 / 39 | 0 / 0 | 885 / 2228 | 2624 | 16777 | 0.00474 |
+
+Runtime max: reference 0.173 s, tube 0.266 s, tube_perp 0.464 s. Worse than the reference on at least one metric:
+tube 18 / 18 runs, tube_perp 18 / 18 runs (per-run list in `out/table_tube.md`).
+
+For later (not built): `TUBE_SECTIONS` is a parameter so long sleeves could reuse the tube. The MVP stays the
+short-sleeve T-shirt (docs/02). Long sleeves would also need: only the hands drawn above the garment (today the
+forearms are drawn above it too), a new garment type with its own landmarks and checks, and AI / code validation that
+accepts long-sleeved garments.
+
+### Side coverage, round 12 (2026-11-13, NOT production, no winner picked)
+Problem: with side_floor on, grey strips of the avatar's own tank show beside the torso, mostly on plus avatars
+(round 11 sheets: #28 m-plus, f-plus, #43 f-plus).
+
+**Step 1, where side_floor takes the body edge from (`run`: `mls._torso_edges`, `_add_side_floor_pairs`).** Body edge =
+the mask's torso run through the body axis; when that run is > 1.3x the landmark span (`body_span`: an arm touching the
+torso) or missing, the landmark span is used. Ease = 1.5 % of the torso width. Floor pairs only on 3 rows per side
+(`side_a` = 1/3 and `side_b` = 2/3 of the garment's armpit -> hem rows, `side_hip` = the body hip row), and only where
+the first solve leaves the garment edge inside the floor; plus the adapt main pairs (armpit, chest, waist, hem; on #28
+f-plus `chest_l` / `chest_r` were dropped). #28 f-plus (round 11 reference + tube, `debug_side12.py`,
+`out/debug_side12_28_f-plus.png`): rows 334-406 (and 418 left) use the landmark span (arm touching); there the old
+count could not be measured (the run contains the arm). On the mask rows the garment edge sits 1-4 px inside the mask
+edge from 430 to 514, and 9-15 px inside from 526 to 574 (left; right 5-11 px): between `side_b` (y 505) and
+`side_hip` (y 605) there is no pair. Uncovered torso px on the mask rows: L 2069 / R 664 (rows 505-605: 967 / 588).
+
+**Method.** Keyword `mls.tshirt_layer(..., side_floor_mode="landmarks" | "mask")` (default "landmarks", pixel-identical;
+only with side_floor=True; a no-op in keep_shape, tested on #44 / #45; `render_tryon` never passes it). "mask"
+(`_add_side_floor_mask_pairs`), in addition to the 3 landmark floor pairs: every `SIDE_FLOOR_STEP` = 12 px from armpit +
+2 to the hem target, per side, the torso edge from `torso_side_edges` (the mask's torso run; a side is "clean" when its
+edge is <= `SIDE_TOUCH` = 1.3x the landmark half-span from the axis; arm-touch rows are interpolated linearly between
+the nearest clean rows of that side, the body armpit landmark is the anchor above when no clean row is above, and
+flagged "interp"); garment edge = the outermost px of the first solve's covered run through the axis at alpha >=
+HARD_EDGE; where that edge is inside the torso edge: pair q = that px's garment point, p = torso edge
+`SIDE_FLOOR_EASE_PX` = 2 px outward, weight 1.0; rows within 6 px of a landmark floor pair are skipped; a pair that
+breaks the vertical order of its side (vs the other side pairs) is dropped. Two earlier attempts during the run: replacing
+the landmark floor pairs (no `side_hip`) opened the hem corners (2242 new hole px on #28 f-plus); stopping the rows
+24 px above the hem made it worse (2555).
+
+Reference = sleeve C + side_floor (landmarks) + sleeve_mode "tube" (layering fix) + collar_floor + the neck_hole
+polygon; mask = the same + side_floor_mode "mask". Data: the round 8b exporter with `EXPORT_ROOT=.../data/side12`.
+Runner `run_side12.py` -> `out/table_side12.md` (incl. the #28 f-plus per-row tables, reference vs mask),
+`out/results_side12.json`, `out/sheet_side12_<id>.png` (reference | mask, 3x side crops), `out/crop_side12_worst.png`.
+Side strip = figure px not covered between the torso edge and the axis, rows armpit + 2 -> 20 px above the hem target
+(the hem is a later round); new holes split into side rows and the hem band (20 px above the hem target -> 20 below).
+
+| garment | variant | side strip L / R | of it arm-touch rows L / R | new holes side rows L / R | new holes hem band | newly covered | excess | hem curve px (max) | fold (max) |
+|---|---|---|---|---|---|---|---|---|---|
+| #28 | reference | 6211 / 3109 | 1131 / 1080 | 0 / 0 | 0 | 0 | 3181 | 19.0 | 0.00171 |
+| #28 | mask | 2817 / 1831 | 393 / 350 | 361 / 1115 | 5964 | 6078 | 3502 | 17.5 | 0.00359 |
+| #43 | reference | 7286 / 3308 | 1627 / 1196 | 0 / 0 | 0 | 0 | 885 | 23.5 | 0.00200 |
+| #43 | mask | 4738 / 2261 | 617 / 353 | 1557 / 1763 | 9435 | 6973 | 1149 | 22.6 | 0.00895 |
+| #40 | reference | 3862 / 1570 | 2245 / 1155 | 0 / 0 | 0 | 0 | 12485 | 10.2 | 0.00290 |
+| #40 | mask | 2088 / 278 | 898 / 240 | 378 / 53 | 2481 | 4144 | 13318 | 9.8 | 0.00350 |
+| all | reference | 17359 / 7987 | 5003 / 3431 | 0 / 0 | 0 | 0 | 16551 | 23.5 | 0.00290 |
+| all | mask | 9643 / 4370 | 1908 / 943 | 2296 / 2931 | 17880 | 17195 | 17969 | 22.6 | 0.00895 |
+
+Runtime max: reference 0.403 s, mask 0.464 s. #28 f-plus per row (left, uncovered px, reference -> mask): 382: 12 -> 7,
+394: 12 -> 3, 538: 14 -> 3, 550: 15 -> 2, 562: 14 -> 3; right 382: 19 -> 16, 538: 10 -> 0; at 598 the garment's hem
+reaches the row in mask (L 3 -> 26, R 0 -> 56). Hem bottom on #28 f-plus, measured on the r10 test fixture during the diagnosis (columns 250 / 350 / 400): 611 -> 605 px
+(hem_c column 300: 625 -> 624).
+Sheets with the whole T-shirt (owner 2026-11-13, `FULL=1`: neck -> below the hem, full width, 2x, short labels) are in
+`out/sheet_side12_<id>.png`; the side-crop sheets are kept in `out/side12_side_crops/`. Numbers unchanged.
+
+**Round 12, second pass (owner 2026-11-13: keep "mask" as the base; three issues).**
+(1) Hem tongue: no "mask" floor rows in the hem band (`SIDE_FLOOR_HEM_BAND` = 8 % of shoulder -> hem target); the
+removed rows are reported (`info["side_floor_mask"]["hem_band_removed_rows"]`, e.g. #28 f-slim 577 / 589 / 601, f-plus
+598 / 610). New metric hem_tongue_px = max drop of the bottom edge (alpha >= HARD_EDGE) in the middle 20 % of the torso
+hem below the line between its corners (only columns whose bottom is within 60 px of the hem target row; the first
+attempt measured the sleeve-level bottoms at the corners and gave 149-267 px: not valid).
+(2) Tube in the reference: on (report present, no side skipped); sleeve-source px visible beyond the tube cuff line:
+19 / 29 (#28 f-slim). The MLS sleeve px the tube does not draw stay where they lie over the arm (layering fix), next
+to the tube. Clearing them over the arm beyond half the axis was tried and reverted: 117-144 px of new holes inside
+the sleeve (#28 m-slim / m-average, #40 f-plus), the tube is narrower than the arm there (its arm floor stops at the
+armhole line).
+(3) `hem_mode="smooth"` (keyword, default "off", adapt only, `smooth_hem`): on the torso-hem columns (bottom within
+`HEM_SMOOTH_NEAR` = 60 px of the hem target; the first version also took sleeve-level bottoms, max move 98-107 px),
+the bottom edge is low-passed (Gaussian, sigma = `HEM_SMOOTH_WAVE` 0.15 x width / 3); the edge moves down, or up only
+where every uncovered row is background; vertical remap of the layer inside `HEM_SMOOTH_BAND` (8 % of the torso
+length). Tests: default / keep_shape 0 px, smooth never uncovers a figure px, no mask rows in the hem band. 346 backend
+tests pass, none skipped.
+
+| garment | variant | side strip L / R | arm-touch rows L / R | new holes side L / R | new holes hem band | newly covered | hem tongue px (max) | hem wave px (max) | excess | fold (max) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| #28 | reference | 6211 / 3109 | 1131 / 1080 | 0 / 0 | 0 | 0 | 7.5 | 3.5 | 3181 | 0.00171 |
+| #28 | mask | 3032 / 1841 | 393 / 350 | 570 / 1126 | 6541 | 6065 | 20.8 | 7.4 | 3508 | 0.00394 |
+| #28 | mask + smooth | 2926 / 1744 | 393 / 350 | 464 / 1029 | 6010 | 6065 | 20.3 | 6.9 | 3508 | 0.00393 |
+| #43 | reference | 7286 / 3308 | 1627 / 1196 | 0 / 0 | 0 | 0 | 13.5 | 4.3 | 885 | 0.00200 |
+| #43 | mask | 4920 / 2304 | 617 / 353 | 1762 / 1806 | 9581 | 6995 | 27.6 | 11.2 | 1148 | 0.00960 |
+| #43 | mask + smooth | 4621 / 1997 | 617 / 353 | 1462 / 1499 | 8975 | 6994 | 25.6 | 9.5 | 1147 | 0.00976 |
+| #40 | reference | 3862 / 1570 | 2245 / 1155 | 0 / 0 | 0 | 0 | 16.0 | 6.9 | 12485 | 0.00290 |
+| #40 | mask | 2088 / 278 | 898 / 240 | 378 / 53 | 2481 | 4144 | 13.1 | 4.5 | 13318 | 0.00350 |
+| #40 | mask + smooth | 2088 / 278 | 898 / 240 | 378 / 53 | 2211 | 4180 | 9.8 | 3.6 | 13316 | 0.00349 |
+| all | reference | 17359 / 7987 | 5003 / 3431 | 0 / 0 | 0 | 0 | 16.0 | 6.9 | 16551 | 0.00290 |
+| all | mask | 10040 / 4423 | 1908 / 943 | 2710 / 2985 | 18603 | 17204 | 27.6 | 11.2 | 17974 | 0.00960 |
+| all | mask + smooth | 9635 / 4019 | 1908 / 943 | 2304 / 2581 | 17196 | 17239 | 25.6 | 9.5 | 17971 | 0.00976 |
+
+Runtime max: reference 0.353 s, mask 0.437 s, mask + smooth 0.450 s. Runs with hem tongue > reference + 1 px: mask 6 /
+18, mask + smooth 7 / 18; hem wave > reference + 1 px: 8 / 18 both; smooth max edge move 8 px. Sheets
+(`out/sheet_side12_<id>.png`, `FULL=1`): reference | mask | mask + smooth; the two-column run is in `out/side12_2col/`.
+
+### Hem and tube, round 12b (2026-11-15, NOT production, no winner picked)
+Owner 2026-11-15: report the tongue, fix every new hole of "mask", tube with the underarm fix in the reference, a
+garment-hem mode, an extra hem_c column, the #28 f-plus armpit. Runner `run_hem12b.py` (data: round 8b exporter,
+`data/side12`) -> `out/table_hem12b.md`, `out/results_hem12b.json`, `out/sheet_hem12b_<id>.png` (clean, whole T-shirt:
+reference | + smooth | + garment | + hem_c), `out/sheet_tube12b_40.png` (tube r11 | tube fit). Exit status 1 when a
+run has new holes > 0.
+
+**Round 12 numbers asked for (before 12b).** hem_tongue_px reference / mask / mask + smooth: #28 f-slim 5.5 / 20.8 /
+20.3, #43 f-slim 9.5 / 17.0 / 18.0, #43 f-average 10.5 / 27.6 / 25.6, #43 f-plus 10.0 / 14.5 / 16.0, #43 m-plus
+13.5 / 19.6 / 16.5, #28 f-plus 5.5 / 9.0 / 10.5; the other 12 runs within 1.1 px of the reference. The hem-band
+exclusion was active in every mask run (rows removed: slim 577 / 589 / 601 or 579 / 591, average 605 / 617 or 609 /
+621, plus 606 / 618 / 630, f-plus 598 / 610). New holes of mask (vs the landmark floor, whole canvas, alpha >= 128):
+#28 m-slim 638 ... #43 f-plus 3602 px; in the round 12 table 18603 of 24298 px (77 %) in the hem band (the hem rises
+between corner and centre, components ~100 px wide, 7-41 px high), the rest 1-12 px wide side slivers and 5-18 px
+spots at the armpits.
+
+**Why the #28 f-plus "grey hole" was not flagged.** Its px were NOT covered by the round 12 reference either (the
+reference leaves the whole underarm strip open there); mask covered more around them and left an island, so it looked
+like a hole. "New holes" counts only px the reference covered, so it could not see it. Besides, the counts were
+reported, never asserted (no test compared mask with the landmark floor). Now: no island (the 12b reference shows the
+open strip of the round 12 reference); the side strip under the arm is still open (side coverage, not solved).
+
+**Method.** All keywords default off (pixel-identical), adapt only (keep_shape 0 px on #44 / #45), render_tryon never
+passes them.
+- side_floor_mode "mask", no new holes: (1) `_blend_new_holes`: figure px covered by the landmark floor solve and not
+  by the mask solve (warped alpha, eroded like remove_halo, >= HARD_EDGE, the owner's neck hole applied) get the
+  landmark floor map back locally (region grown 4 px x round, Gaussian ramp sigma 4 px; at most 4 rounds; blend 4666 -
+  54261 px, 1-3 rounds, residual 0 in every run). (2) Last guard: the finished landmark floor layer is built too; a
+  figure px it covers and the mask layer does not takes its px (`patched_px`: #43 m-plus 13, #43 f-average 1, #40
+  m-average 1, others 0). Tried first and dropped: anchor pairs at the holes (4 rounds, 17-597 px left per run, new
+  holes at the shoulders); the guard alone on the round 12 mask (2524 px patched on #28 f-plus, visible patch seams).
+- `tube_arm="fit"`: arm extents per cross-section also from the straight arm fit (`_arm_fit_extent`, `_arm_at`
+  converted to the cross-section direction), max with the march; half-widths clamp(ramp, arm x 1.1, arm x
+  TUBE_ARM_MAX 1.25); the MLS sleeve px beyond the tube cuff line (strip of the cuff width x 1.25) cleared. Tried and
+  dropped: a round 11 tube map fallback (the last guard does it).
+- `hem_mode="garment"` (`garment_hem`): target = line between the hem targets + s x the garment's own hem offset
+  (alpha bottom minus the line between its end bottoms; offsets 0-8.8 / 0-25.0 / 0-17.5 garment px on #28 / #43 / #40),
+  down freely, up only through background; band max(8 % torso, 2 x largest move). `_hem_column_remap` (shared with
+  smooth) puts back a figure px the remap uncovered (garment: 0-124 px per run, slanted corner edges; smooth: 0-1).
+- `hem_c_pair=True`: adapt already has hem_c (garment hem landmark row at the centre -> torso centre on the hem target
+  row); this replaces q with the garment's alpha bottom at the centre column (5.0 / 14.0 / 15.0 px below the landmark
+  row on #28 / #43 / #40) and p with the midpoint of the hem targets.
+
+| garment | variant | hem tongue px (max) | hem wave px (max) | max band stretch | side strip L / R | new holes | beyond cuff px | balloon L / R | arm-band skin L / R | fold (max) | runtime s (max) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| #28 | r12ref | 7.5 | 3.5 | - | 6211 / 3109 | - | - | 1610 / 659 | 196 / 229 | 0.00171 | 0.267 |
+| #28 | reference | 7.5 | 3.5 | - | 3551 / 1410 | 0 | 1596 | 563 / 531 | 601 / 785 | 0.01202 | 0.646 |
+| #28 | + smooth | 6.5 | 3.5 | - | 3551 / 1410 | 0 | - | 563 / 531 | 601 / 785 | 0.01200 | 0.668 |
+| #28 | + garment | 6.2 | 1.2 | 1.5 | 3547 / 1404 | 0 | - | 563 / 531 | 601 / 785 | 0.01152 | 0.716 |
+| #28 | + hem_c | 2.0 | 3.2 | - | 3585 / 1423 | 2678 | - | 562 / 531 | 601 / 785 | 0.01005 | 0.647 |
+| #43 | r12ref | 13.5 | 4.3 | - | 7286 / 3308 | - | - | 1247 / 785 | 730 / 1286 | 0.00200 | 0.283 |
+| #43 | reference | 19.6 | 7.2 | - | 3439 / 605 | 0 | 63 | 310 / 462 | 772 / 1293 | 0.02116 | 0.748 |
+| #43 | + smooth | 15.1 | 4.2 | - | 3362 / 530 | 0 | - | 310 / 462 | 772 / 1293 | 0.02112 | 0.75 |
+| #43 | + garment | 12.2 | 2.3 | 1.5 | 3286 / 456 | 0 | - | 310 / 462 | 772 / 1293 | 0.01982 | 0.753 |
+| #43 | + hem_c | 11.4 | 7.6 | - | 3527 / 727 | 4684 | - | 306 / 459 | 772 / 1293 | 0.01633 | 0.761 |
+| #40 | r12ref | 16.0 | 6.9 | - | 3862 / 1570 | - | - | 6707 / 6835 | 2347 / 2230 | 0.00290 | 0.277 |
+| #40 | reference | 13.1 | 4.5 | - | 1857 / 359 | 0 | 54 | 1057 / 1157 | 2168 / 1957 | 0.00784 | 0.703 |
+| #40 | + smooth | 9.8 | 2.5 | - | 1857 / 359 | 0 | - | 1057 / 1157 | 2168 / 1957 | 0.00784 | 0.696 |
+| #40 | + garment | 8.4 | 1.8 | 1.5 | 1857 / 359 | 0 | - | 1057 / 1157 | 2168 / 1957 | 0.00763 | 0.717 |
+| #40 | + hem_c | 7.0 | 4.5 | - | 1844 / 297 | 4188 | - | 1057 / 1159 | 2145 / 1910 | 0.00766 | 0.686 |
+
+New holes: reference vs r12ref (px cleared beyond the fit tube cuff not counted, listed as beyond cuff px); the hem
+columns vs the reference. FAIL runs: 18 / 72, all + hem_c (365-878 px each: the pair lifts the hem centre over the
+body). hem_tongue_px per run, r12ref / reference / + smooth / + garment / + hem_c: #28 f-slim 5.5 / 6.0 / 6.5 / 4.6 /
+2.0; #43 f-slim 9.5 / 9.5 / 9.5 / 8.2 / 3.0; #43 f-average 10.5 / 10.5 / 10.0 / 10.2 / 3.0; #43 f-plus 10.0 / 10.0 /
+10.0 / 10.2 / 3.5; #43 m-plus 13.5 / 19.6 / 15.1 / 12.2 / 11.4; #28 f-plus 5.5 / 5.5 / 5.5 / 5.2 / 0.5 (all 18 in
+`table_hem12b.md`). + garment: max stretch 1.5 in 12 / 18 runs (the 2 x largest move band gives at most 1.5), > 1.25 in
+14 / 18; clamped columns 0 except #40 m-plus 186.
+
+**#40 tube before / after** (tube_r11 = reference with tube_arm "r11"): cuff out / in px r11 -> fit, arm out / in in
+brackets: m-slim L 38.5 / 38.5 -> 25.0 / 38.5 (20.0 / 34.0), R 39.2 / 41.2 -> 25.5 / 41.2; m-plus L 46.7 / 50.6 ->
+35.6 / 50.6 (28.5 / 46.0); f-average L 41.6 / 44.0 -> 28.1 / 44.0 (22.5 / 40.0); f-plus L 39.9 / 39.9 -> 38.1 / 49.8
+(30.5 / 45.2). Max (out + in) / arm ratio 1.49-1.94 -> 1.16-1.25. Balloon (#40, all avatars) L / R 6791 / 6973 ->
+1057 / 1157; arm-band skin 2141 / 1944 -> 2168 / 1957. Cleared beyond the cuff 133-272 px per side on #40.
+Runtime: the last guard builds a second layer, reference max 0.75 s (r12ref 0.28 s).
+
+### Tube sleeve finished, round 13 (2026-11-15, NOT production, no winner picked)
+Owner 2026-11-15: underarm fix + leftover cuff px; base (all columns) adapt + sleeve C + side_floor_mode "mask" +
+hem_mode "garment" (+ collar_floor, neck_hole polygon). Runner `run_tube13.py` (data `data/side12`) ->
+`out/table_tube13.md`, `out/results_tube13.json`, `out/sheet_tube13_<id>.png` (per avatar: no tube | tube a+b | tube a,
+whole T-shirt 2x, then 3x crops underarm L / cuff L / underarm R / cuff R).
+
+**Method.** Keyword `tube_arm` (default "r11", pixel-identical; keep_shape 0 px on #44 / #45; render_tryon never
+passes it): "finished" = the round 12b fit widths (arm extent from `_arm_at` and the march, half-width clamp(ramp,
+arm x 1.1, arm x 1.25)), tube OVER the MLS layer; leftover MLS sleeve px cleared only by (a) over the background beyond
+the arm + ease, or (b) over the arm (figure px) below the tube's cuff line (cuff-width strip x 1.25); never in the
+protected underarm zone (`_underarm_zone`: armhole line, tube inner edge, cuff line; 108-240 px per side) or inward of
+the armhole line. "finished_a" = rule (a) only (the gate fallback). Fix 4: the "mask" last guard now builds its
+landmark floor layer with the same tube_arm (before: r11 tube, which patched tube-caused losses back).
+Metrics: new holes = figure px covered in "no tube" and not in the tube column, all px (enclosed or open), except the
+arm below the cuff line (reported as arm below cuff); holes enclosed = uncovered figure px inside the layer's filled
+outer contour, sleeve / underarm zone.
+
+| garment | variant | new holes | arm uncovered below cuff | holes enclosed L / R | arm-band skin L / R | cuff wave max L / R | balloon L / R | fold (max) | runtime s (max) |
+|---|---|---|---|---|---|---|---|---|---|
+| #28 | no tube | - | - | 0 / 0 | 347 / 514 | 5.9 / 29.8 | 757 / 580 | 0.01344 | 0.5 |
+| #28 | tube a+b | 805 | 1177 | 52 / 10 | 601 / 785 | 1.7 / 25.3 | 563 / 531 | 0.01152 | 0.8 |
+| #28 | tube a | 0 | 0 | 52 / 10 | 190 / 224 | 2.6 / 29.3 | 563 / 531 | 0.01167 | 0.8 |
+| #43 | no tube | - | - | 0 / 0 | 2147 / 2532 | 17.3 / 11.4 | 405 / 677 | 0.02281 | 0.5 |
+| #43 | tube a+b | 43 | 17 | 27 / 4 | 772 / 1294 | 27.5 / 38.8 | 310 / 462 | 0.01982 | 0.8 |
+| #43 | tube a | 0 | 0 | 27 / 4 | 721 / 1283 | 27.5 / 38.8 | 310 / 462 | 0.01985 | 0.8 |
+| #40 | no tube | - | - | 0 / 0 | 2218 / 1987 | 10.3 / 10.2 | 1932 / 2644 | 0.00964 | 0.5 |
+| #40 | tube a+b | 108 | 17 | 0 / 0 | 2168 / 1956 | 23.5 / 25.4 | 1057 / 1157 | 0.00763 | 0.8 |
+| #40 | tube a | 0 | 0 | 0 / 0 | 2130 / 1931 | 23.5 / 25.4 | 1057 / 1157 | 0.00782 | 0.8 |
+| all | no tube | - | - | 0 / 0 | 4712 / 5033 | 17.3 / 29.8 | 3094 / 3901 | 0.02281 | 0.5 |
+| all | tube a+b | 956 | 1211 | 79 / 14 | 3541 / 4035 | 27.5 / 38.8 | 1930 / 2150 | 0.01982 | 0.8 |
+| all | tube a | 0 | 0 | 79 / 14 | 3041 / 3438 | 27.5 / 38.8 | 1930 / 2150 | 0.01985 | 0.8 |
+
+**GATE (tube a+b): 18 / 18 runs fail**, 3-162 px per run (#28 113-162, #43 3-13, #40 10-36), all at the cuff rows
+(y 354-404). On #28 m-slim and #40 f-plus the lost px lie 0-2.0 px ABOVE the cuff line (plus 1-5 px below it on #28
+left, outside the cuff-width strip): the remove_halo erosion (2 px) of the new cuff edge that rule (b) creates.
+Rule (b) cleared 75-518 px per side. **Fallback (tube a): 0 new holes in 18 / 18 runs**, 0 arm px uncovered below the
+cuff; the jagged MLS cuff px below the cuff line stay (crops). Holes enclosed: 0 without the tube, 79 / 14 px with
+either tube (#28 52 / 10, #43 27 / 4): px open (uncovered) without the tube that the tube closes around (not new
+holes). Cuff wave is measured on each layer's own cuff (MLS pairs vs the tube cuff segment): not comparable between
+"no tube" and the tubes. "mask" last guard patched 26 px (a+b) / 16 px (a) over the 18 runs.
+
+**Round 13b (owner 2026-11-15: keep a + b, fix the cut edge, fill enclosed holes).** tube_arm "finished" now (1)
+keeps the rule (b) cut out of remove_halo (the cut px count as fabric during the erosion, then go back to transparent;
+`rep["cut_b"]`), (2) fills enclosed holes (alpha < 128, not reachable from the canvas border) of the FINAL layer
+(torso + tube) inside `sleeve_zone` (rule #63; the neck opening is outside the zone), `info["tube"]["filled_px"]`.
+Columns no tube | tube a+b fixed (the round 13 three-column run is kept in `out/tube13_a_b_3col/`).
+
+| garment | variant | new holes | arm uncovered below cuff | holes enclosed L / R | arm-band skin L / R | cuff wave max L / R | balloon L / R | fold (max) | runtime s (max) |
+|---|---|---|---|---|---|---|---|---|---|
+| #28 | no tube | - | - | 0 / 0 | 347 / 514 | 5.9 / 29.8 | 757 / 580 | 0.01344 | 0.6 |
+| #28 | tube a+b fixed | 0 | 728 | 0 / 0 | 136 / 203 | 3.9 / 26.6 | 563 / 531 | 0.01276 | 1.0 |
+| #43 | no tube | - | - | 0 / 0 | 2147 / 2532 | 17.3 / 11.4 | 405 / 677 | 0.02281 | 0.5 |
+| #43 | tube a+b fixed | 0 | 6 | 0 / 0 | 660 / 1272 | 27.5 / 38.8 | 310 / 462 | 0.01990 | 0.9 |
+| #40 | no tube | - | - | 0 / 0 | 2218 / 1987 | 10.3 / 10.2 | 1932 / 2644 | 0.00964 | 0.4 |
+| #40 | tube a+b fixed | 0 | 14 | 0 / 0 | 2126 / 1923 | 23.5 / 25.4 | 1057 / 1157 | 0.00795 | 0.8 |
+| all | no tube | - | - | 0 / 0 | 4712 / 5033 | 17.3 / 29.8 | 3094 / 3901 | 0.02281 | 0.6 |
+| all | tube a+b fixed | 0 | 748 | 0 / 0 | 2922 / 3398 | 27.5 / 38.8 | 1930 / 2150 | 0.01990 | 1.0 |
+
+GATE: 0 / 18 runs fail. Filled px per run: #28 m-plus 11, #28 f-plus 52, #43 m-plus 16, #43 f-plus 27, the other 14
+runs 0. Rule (b) cleared 75-518 px per side; "mask" last guard patched 61 px over the 18 runs. Runtime per T-shirt
+layer: no tube 0.24-0.60 s, tube a+b fixed 0.62-1.00 s.
+
+### Armpit, round 13c (2026-11-15, NOT production, no winner picked)
+Owner 2026-11-15: a small open wedge under both armpits between the sleeve's inner end and the torso (#28). Runner
+`run_armpit13c.py` -> `out/table_armpit13c.md`, `out/results_armpit13c.json`, `out/sheet_armpit13c_<id>.png` (per avatar:
+no tube L | R, tube fixed L | R, 3x armpit crops). Base as round 13 (sleeve C + "mask" + hem "garment").
+
+**Check before the fix (owner condition 2).** #28 m-plus and f-plus, both sides: the side_floor "mask" targets follow
+the interpolated torso edge, which runs along the body (the boundary between torso fabric and arm skin in the crops);
+torso fabric is not pulled over the arm. The "crossing" seen earlier came from the straight arm fit (`_arm_at`)
+extended above the row where the arm separates, which cuts across the torso there. No interpolation change.
+Zone first tried as specified (torso edge -> arm inner edge, armpit row -> cuff line): empty in 11 / 18 runs, the
+wedge is not in it. The wedge lies in the protected underarm triangle (armhole line, tube inner edge, cuff line), where
+the tube was clipped to the outward side of the armhole line: uncovered there (round 13b tube) #28 f-plus 89 / 107,
+#43 m-plus 0 / 51, #43 f-plus 46 / 0, #28 m-plus 0 / 12, #28 m-average 7 / 1, other runs 0.
+
+**Method** (tube_arm "finished", keyword armpit_fix default on; keep_shape 0 px on #44 / #45). Zone `armpit_zone` =
+that triangle with the tube's inner edge before widening, continued ARMPIT_BELOW_CUFF = 6 px below the cuff line on
+the torso side of the inner edge line extended. (1) `_widen_inner`: per cross-section after t = 0 the inner half-width
+grows to the torso edge (`torso_side_edges`) + 2 px, weight 1 - smoothstep(t). (2) The tube may draw in the zone.
+(3) `_inpaint_armpit`: figure px of the zone still open: cv2.inpaint (Telea, radius 3), alpha 255, zone px only.
+armpit_open_px = uncovered figure px in the zone (same zone for every column).
+
+| garment | avatar | armpit open no tube L / R | tube 13b L / R | tube fixed L / R | covered by widening | inpainted |
+|---|---|---|---|---|---|---|
+| #28 | m-slim | 2 / 0 | 0 / 0 | 0 / 0 | 0 | 0 |
+| #28 | m-average | 34 / 29 | 58 / 32 | 0 / 0 | 0 | 90 |
+| #28 | m-plus | 5 / 35 | 0 / 13 | 0 / 0 | 12 | 1 |
+| #28 | f-plus | 125 / 132 | 94 / 130 | 0 / 0 | 176 | 48 |
+| #43 | m-slim | 5 / 14 | 0 / 0 | 0 / 0 | 0 | 0 |
+| #43 | m-average | 18 / 0 | 0 / 0 | 0 / 0 | 0 | 0 |
+| #43 | m-plus | 14 / 63 | 0 / 51 | 0 / 0 | 34 | 17 |
+| #43 | f-average | 4 / 0 | 0 / 0 | 0 / 0 | 0 | 0 |
+| #43 | f-plus | 70 / 11 | 47 / 0 | 0 / 0 | 46 | 1 |
+| #40 | f-plus | 8 / 0 | 4 / 0 | 0 / 0 | 0 | 4 |
+| other 8 runs | | 0 / 0 | 0 / 0 | 0 / 0 | 0 | 0 |
+
+Totals: no tube 285 / 284, tube 13b 203 / 226, tube fixed 0 / 0; covered by widening 268, inpainted 161. GATE (open
+<= 5 per side, new holes = 0): 0 / 18 runs fail. Runtime tube fixed 0.60-0.86 s (no tube 0.22-0.47 s).
+**Not in the zone, still visible:** #28 m-slim L 366 and f-slim L 110 uncovered figure px (the avatar's grey tank, base
+BGR ~140) within 30 px of the inner cuff end, 0-28 px below the cuff line, all on the arm side of the inner edge line
+extended (`out/armpit13c_remaining_28_slim.png`). A thin light line along the tube's inner edge over the torso
+fabric (`out/armpit13c_zoom_28_slim.png`).
+
+### Armpit wedge, round 14 (2026-11-15, NOT production, no winner picked)
+Owner 2026-11-15: the wedge under the armpits is still open after round 13c (white / grey notches, ragged black
+fragments); find the root cause from the pixels, a metric that sees it, a geometric fix. Base for every column: adapt +
+sleeve C + side_floor_mode "mask" + hem_mode "garment" + tube "finished" (+ collar_floor, neck_hole polygon); data
+`data/side12`. Tools: `debug_armpit14.py` (step 1, read-only) -> `out/debug_armpit14_<id>_<avatar>.png`,
+`out/table_debug_armpit14.md`, `out/debug_armpit14.json`; `run_armpit14.py` -> `out/table_armpit14.md`,
+`out/results_armpit14.json`, `out/sheet_armpit14_<id>.png` (per avatar: current L | R, 13c L | R, fixed L | R, 3x
+armpit crops, clean), `out/sheet_armpit14_full_<id>.png` (current | 13c | fixed, whole T-shirt, 3x);
+`OVERLAY=1` = wedge px red, px lost vs current yellow (kept in `out/armpit14_overlay/`).
+
+**Root cause (step 1, #28 / #43 / #40 x 6 avatars x 2 sides, `debug_armpit14.py`).**
+- The garment splits into sleeve underside and torso side at its own underarm notch (`garment_notch`: the top of the
+  transparent gap on the alpha; 3-19 garment px below the marked armpit landmark). The body splits into arm and torso
+  at the crease = the first row where the mask separates them. The MLS solve puts the notch 1-74 px ABOVE the crease
+  (#28 1-68, #43 21-74, #40 9-56). On the rows between, the body is one silhouette and the garment is already two
+  edges with transparent px between them.
+- No layer owns those px: the tube ends on its cuff line (2-59 px above the crease in 35 / 36 sides) and is clipped
+  outward of the armhole line; below the cuff only the torso side edge could cover, and it sits 2-19 px inside the
+  arm/torso boundary (the rounded cove of the notch bows inward between the floor pairs; "mask" floor rows where the
+  sleeve is still joined get no pair at all: the run through the axis ends on the sleeve's outer edge; first pair
+  14-86 px below the armpit).
+- Made worse by: (1) the inner cuff target inside the torso (#28 f-plus R 15.5 px, m-plus R / f-average R 5.5 px:
+  the straight arm fit `_arm_at` is extrapolated above the crease); (2) tube rule (b): its strip of the cuff width x
+  1.25 reaches torso px beside the arm and clears MLS sleeve px there (#28: 3-68 px per side that "no tube" covered;
+  the round 13 "new holes" gate exempted exactly that strip); (3) on f-plus the round 12b blend back to the landmark
+  floor map undoes the floor pairs on these rows (#28 f-plus R: 364 px open, 154 without the blend).
+- Side floor suspicion (torso fabric pulled over the arm): not confirmed. The interpolated torso edge
+  (`torso_side_edges`, linear from the armpit landmark to the crease row) passes -1.5 .. +3 px from the top of the
+  background gap on all 36 sides.
+- Round 13c: its zone lies above the cuff line, outward of the armhole line; the wedge lies below the cuff on the
+  torso side. It changed 0 px on 29 / 36 sides; where it drew (#28 f-plus R: +102 px tube, +45 px inpaint) it filled
+  part of the wedge as a blocky patch.
+Uncovered torso px between the inner cuff row and the crease, inward from the boundary (per side, no tube / current):
+#28 0-364 / 2-364 (widest gap 2-19 px), #43 6-212 / 6-206 (2-8 px), #40 3-176 / 3-175 (2-12 px).
+
+**Metrics** (`mls.armpit_wedge`, `mls.armpit_ragged`; independent of the tube's zones; arm/torso boundary =
+`mls.arm_torso_boundary`).
+- wedge px per side = open figure px (alpha < 128) (a) on the torso side of the boundary, <= 25 px from it, rows
+  armpit landmark -> crease + 2, plus (b) on the arm side, <= 12 px from it, rows armpit -> crease, more than 2 px
+  ABOVE the layer's own cuff line (`info["sleeve_hems"]`). Arm skin at / below the cuff line is never counted.
+- ragged: fragment px = garment px of the armpit box not connected to the garment's largest piece; spike px =
+  garment px of the box removed by an opening with a 5 px ellipse (teeth, 1-4 px slivers; the garment's own wavy
+  sleeve hem gives spike px in every column, so it is reported, not gated).
+- new holes = figure px the current column covers and the fixed column does not, whole canvas, except arm skin from
+  2 px above the current cuff line down (reported as "+ arm": current covers that skin with leftover fabric, fixed
+  cuts it on the boundary). arm covered = arm px more than 1 px below the cuff line that fixed covers and current
+  does not. neck = px that differ above the armpit row in the inner 40 % between the shoulders.
+
+**Fix** (keyword `mls.tshirt_layer(armpit_mode="off" | "r13c" | "r14")`, default "off", adapt only, keep_shape 0 px
+on #44 / #45, `render_tryon` never passes it; it replaces the boolean `armpit_fix`, so tube_arm "finished" without
+the keyword is round 13b again; "r13c" = round 13c unchanged, kept only for this comparison, to be deleted after the
+owner's review). "r14" (`_add_armpit_pairs`, needs side_floor), per side:
+- J = the row where the sleeve's cuff line meets the arm/torso boundary (the crease when the cuff is lower).
+- The garment's torso side seam is pinned to the boundary: body rows every `ARMPIT_STEP` = 4 px, from `ARMPIT_LEAD` =
+  4 px above J (and above the inner cuff target by the length of the garment's sleeve underside) down to a row >=
+  `ARMPIT_RUN` = 24 px lower and never above the crease; garment rows linear from the notch row + 2 to the first
+  solve's garment row at the last body row (the fabric's vertical placement is kept there); q = the torso edge of
+  the garment alpha on that row, p = the boundary + `ARMPIT_EASE` = 4 px on the arm side (2 px below the crease).
+  The garment's corner so lands on the boundary at the cuff row and the seam follows the arm down to the crease.
+- Left out of this solve: the "mask" floor pairs on those rows, side pairs out of order with the new ones (#43: the
+  chest pair held the seam inside the boundary), and with a tube the sleeve's inner MLS pairs (cuff_in, smid_in: the
+  tube draws the sleeve; they only fought the pinned seam). Without a tube the inner cuff target is moved onto the arm
+  side of the seam instead (path not benchmarked).
+- The solve is used inside a window only (1 within `ARMPIT_KEEP` = 14 px of the new pairs, Gaussian ramp sigma 6 px,
+  0 elsewhere): the first version let the pairs act globally (3627 new hole px, neck px changed).
+- Tube rules ("finished"): rule (b) works on the arm side of the boundary only; on the arm-touch rows it is no
+  longer limited to the cuff strip / the armhole line; torso fabric the ease puts on the arm below the cuff line is
+  cut on the boundary (same cut mechanism as rule (b): kept out of remove_halo; also on the separated arm rows).
+- Local guard: inside the window a figure px the map without the armpit pairs covers (eroded like remove_halo;
+  not eroded on the arm above the cuff line) and the final layer does not is put back from that map; never arm skin
+  below the cuff line. Detached garment pieces <= 8 px inside the window are removed. No widening, no inpaint.
+Tried and dropped during the round: global pairs (above); q from the first solve's rows only (the junction stayed
+open: the notch row landed below J); inner cuff target moved onto the boundary while its pair stayed (#40: the
+sleeve underside is horizontal, a 5-8 px knot stayed open at J); the guard without erosion (0 new holes, but 8
+fragment px and + 48 spike px).
+
+| garment | avatar | wedge L / R current | 13c | fixed | fragments L / R 13c | fixed | spikes L / R current | 13c | fixed | new holes fixed (+ arm) | arm covered | neck | runtime s current / fixed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| #28 | m-slim | 149 / 33 | 149 / 33 | 0 / 0 | 0 / 0 | 0 / 0 | 12 / 5 | 12 / 5 | 6 / 6 | 0 (+ 0) | 0 | 0 | 0.74 / 0.99 |
+| #28 | m-average | 24 / 1 | 6 / 0 | 0 / 0 | 4 / 24 | 0 / 0 | 4 / 0 | 8 / 24 | 0 / 0 | 0 (+ 0) | 0 | 0 | 0.71 / 0.98 |
+| #28 | m-plus | 124 / 123 | 124 / 110 | 0 / 0 | 0 / 0 | 0 / 0 | 3 / 4 | 3 / 4 | 2 / 2 | 0 (+ 0) | 0 | 0 | 0.74 / 1.02 |
+| #28 | f-slim | 75 / 16 | 75 / 16 | 0 / 0 | 0 / 0 | 0 / 0 | 3 / 1 | 3 / 1 | 3 / 1 | 0 (+ 0) | 0 | 0 | 0.79 / 1.10 |
+| #28 | f-average | 104 / 78 | 104 / 78 | 0 / 0 | 0 / 0 | 0 / 0 | 4 / 4 | 4 / 4 | 2 / 2 | 0 (+ 4) | 0 | 0 | 0.78 / 1.13 |
+| #28 | f-plus | 412 / 553 | 312 / 398 | 0 / 0 | 0 / 0 | 0 / 0 | 2 / 2 | 2 / 16 | 0 / 2 | 0 (+ 10) | 0 | 0 | 0.83 / 1.14 |
+| #43 | m-slim | 122 / 97 | 122 / 97 | 5 / 21 | 0 / 0 | 0 / 0 | 8 / 7 | 8 / 7 | 9 / 12 | 0 (+ 0) | 0 | 0 | 0.74 / 1.03 |
+| #43 | m-average | 53 / 88 | 53 / 88 | 7 / 26 | 0 / 0 | 0 / 0 | 4 / 1 | 4 / 1 | 0 / 5 | 0 (+ 0) | 0 | 0 | 0.83 / 1.14 |
+| #43 | m-plus | 162 / 230 | 162 / 171 | 7 / 31 | 0 / 0 | 0 / 0 | 4 / 2 | 4 / 2 | 6 / 4 | 0 (+ 0) | 0 | 0 | 0.85 / 1.20 |
+| #43 | f-slim | 72 / 93 | 72 / 93 | 7 / 25 | 0 / 0 | 0 / 0 | 7 / 9 | 7 / 9 | 8 / 14 | 0 (+ 3) | 0 | 0 | 0.76 / 1.16 |
+| #43 | f-average | 72 / 103 | 72 / 103 | 5 / 23 | 0 / 0 | 0 / 0 | 9 / 5 | 9 / 5 | 9 / 11 | 0 (+ 13) | 0 | 0 | 0.92 / 1.28 |
+| #43 | f-plus | 322 / 126 | 263 / 126 | 4 / 13 | 0 / 0 | 0 / 0 | 2 / 5 | 2 / 5 | 3 / 8 | 0 (+ 23) | 0 | 0 | 0.86 / 1.28 |
+| #40 | m-slim | 252 / 63 | 252 / 63 | 3 / 3 | 0 / 0 | 0 / 0 | 11 / 5 | 11 / 5 | 14 / 10 | 1 (+ 5) | 0 | 0 | 0.66 / 0.97 |
+| #40 | m-average | 129 / 50 | 129 / 50 | 2 / 0 | 0 / 0 | 0 / 0 | 1 / 6 | 1 / 6 | 6 / 4 | 0 (+ 1) | 0 | 0 | 0.63 / 0.86 |
+| #40 | m-plus | 225 / 116 | 225 / 116 | 10 / 1 | 0 / 0 | 0 / 0 | 4 / 1 | 4 / 1 | 13 / 4 | 0 (+ 0) | 0 | 0 | 0.77 / 1.08 |
+| #40 | f-slim | 204 / 168 | 204 / 168 | 4 / 0 | 0 / 0 | 0 / 0 | 8 / 14 | 8 / 14 | 15 / 11 | 0 (+ 0) | 0 | 0 | 0.79 / 1.09 |
+| #40 | f-average | 190 / 70 | 190 / 70 | 1 / 2 | 0 / 0 | 0 / 0 | 6 / 12 | 6 / 12 | 10 / 18 | 0 (+ 27) | 0 | 0 | 0.63 / 0.93 |
+| #40 | f-plus | 261 / 67 | 257 / 67 | 0 / 0 | 0 / 0 | 0 / 0 | 3 / 4 | 3 / 4 | 8 / 5 | 0 (+ 35) | 0 | 0 | 0.81 / 1.24 |
+
+Totals (L / R): wedge current 2952 / 2075 (torso side 2527 / 1659, arm above cuff 425 / 416), 13c 2771 / 1847, fixed
+55 / 145 (torso side 5 / 0, arm above cuff 50 / 145); fragments current 0 / 0, 13c 4 / 24, fixed 0 / 0; spikes
+current 95 / 87, 13c 99 / 125, fixed 114 / 119 (above current on 21 / 36 sides, by 1-9 px). New holes 13c 0; fixed 1
+(+ 121 arm skin px at / below the cuff line). Arm covered 0, neck 0 in 18 / 18 runs.
+**GATE (fixed: wedge <= 5 per side, fragments 0, new holes 0): 8 / 18 runs fail.**
+- #43, 6 runs (wedge R 13-31, L 7 in three runs) and #40 m-plus (wedge L 10): all arm skin above the nominal cuff
+  line, 2.5-5.8 px above it, under the garment's own curved / wavy sleeve hem at its inner end (torso side 0-2 px
+  in these runs; the same px are open in current: arm part 7-10 / 33-49 on #43). The tube maps the straight chord
+  between the cuff landmarks to the cuff line; the garment's hem rises above that chord near the inner end. Not closed
+  by this round (a cuff-shape question, not the torso wedge).
+- #40 m-slim: 1 new hole px = a detached 1 px sleeve crumb on the arm above the cuff that current keeps; the crumb
+  removal takes it.
+Runtime per T-shirt layer: current 0.63-0.92 s (mean 0.77), fixed 0.86-1.28 s (mean 1.09): + 0.23-0.43 s (one more
+MLS solve in the layer and one in the "mask" last guard's reference layer, the local guard's remap).
+**Limits / not done.** (1) `arm_torso_boundary` relies on the touch test of `torso_side_edges` (edge <= 1.3 x the
+landmark half-span): with the older landmarks of the r10 test fixture, f-slim left reports no arm-touch rows and r14
+skips that side (reported as skipped; with the `data/side12` landmarks all 12 sides have 41-93 rows). (2) r14
+without a tube (sleeve_mode "mls") is built but not benchmarked. (3) Spike px on #43 / #40 are higher than current
+(the sleeve's thin hem px on the arm are kept by the guard instead of 2-4 lost px). (4) A faint line along the tube's
+inner edge is visible on #28 m-slim L in the 3x crop.
+Tests: `ArmpitWedgeTests` (default off, unknown mode, finished = 13b again, keep_shape 0 px for r13c / r14, no-op
+without side_floor, wedge / fragments / new holes / arm / outside-window identical on #28 x 4 and #40 x 2 avatars,
+helpers); `ArmpitFixTests` now passes armpit_mode="r13c". 363 backend tests pass, none skipped.
+
+### Production wiring of the adapt T-shirt config (2026-11-15, docs/09 #105)
+`TRYON_WARP` now defaults to `mls`. For an adapt T-shirt `render_tryon` calls `mls.tshirt_layer` with sleeve C +
+`side_floor=True, side_floor_mode="mask"` + `sleeve_mode="tube", tube_arm="finished"` + `armpit_mode="r14"` +
+`hem_mode="garment"` (`warp._mls_adapt_kwargs`), i.e. the "fixed" column of round 14; keep_shape is called as before.
+Settings `TRYON_MLS_TUBE`, `TRYON_MLS_SIDE_FLOOR`, `TRYON_MLS_ARMPIT`, `TRYON_MLS_HEM` (first value = on, second =
+the behaviour before): 1 | 0, mask | off, r14 | off, garment | mls. The armpit mode is off whenever the tube or the
+side floor is off. Tube skipped on a side (`info["tube"][side]["skipped"]`): the T-shirt is rendered again without
+the tube and the armpit mode, quality warning `tube_fallback`. `debug["tshirt_config"]` / job result `tshirt_config`
+= the values actually used; job result `render_ms`. Round 13c (`armpit_mode="r13c"`) is deleted; the 13c numbers
+above stay as history, `run_armpit14.py` / `debug_armpit14.py` no longer render a 13c column.
+Numbers: production layer vs the benchmark call 0 px on #28 / #43 / #40 x 6 avatars; keep_shape #44 / #45 x 6: 0 px
+(`tools/tryon_check/prod_vs_bench.py`). `render_tryon` for an adapt T-shirt 1114-1487 ms (mean 1333) called
+directly, `render_ms` 922-1095 ms in the worker; keep_shape 97-137 ms; before this change adapt took about 150 ms.
+Through `POST tryon/` (`tools/tryon_check/post_path.py`, sheets `tools/tryon_check/out/post_path/sheet_<id>.png`,
+before | after): 21 renders, 9 refused by the gender rule; px that differ before vs after: adapt 59656-99511 per
+render, keep_shape 0.
+**Known issues (owner 2026-11-15, not blockers):** the round 14 gate fails on 8 of 18 runs (#43 cuff slivers, #40
+m-plus, 1 px #40 m-slim); render time about 1.1 s per adapt T-shirt layer (to optimize later, likely the "mask" last
+guard's comparison layer, which builds a second full layer); a stepped torso edge (2-5 px) beside the gap below the
+armpit on #28; r14 skips a side when `torso_side_edges` finds no arm-touch rows (older landmarks).
+
