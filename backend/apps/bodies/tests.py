@@ -8,7 +8,10 @@ from apps.bodies.models import Body
 from apps.outfits.models import Outfit
 from apps.testing import MediaTestCase, png_bytes, upload
 
-LANDMARKS = {"head_top": {"y": 50}, "shoulder": {"y": 230, "left_x": 200, "right_x": 400}}
+from apps.avatars.tests_staff import full_landmarks
+from apps.bodies.landmark_checks import complete_body_landmarks
+
+LANDMARKS = full_landmarks()
 
 
 @mock.patch("apps.bodies.views.run_body_validation.delay")
@@ -33,12 +36,18 @@ class BodyRulesTests(MediaTestCase):
         self.assertEqual(self._upload(adult="false").status_code, 400)
         self.assertFalse(Body.objects.exists())
 
-    def test_second_upload_fails(self, _):
-        self.assertEqual(self._upload().status_code, 201)
+    def test_upload_while_a_confirmed_body_exists_fails(self, _):
+        self.assertEqual(self._confirmed_body().status_code, 200)
         r = self._upload()
         self.assertEqual(r.status_code, 409)
         self.assertEqual(r.data["code"], "BODY_EXISTS")
         self.assertEqual(Body.objects.filter(user=self.user).count(), 1)
+
+    def test_upload_replaces_an_unconfirmed_body(self, _):
+        first = self._upload()
+        second = self._upload()
+        self.assertEqual((first.status_code, second.status_code), (201, 201))
+        self.assertEqual([b.pk for b in Body.objects.filter(user=self.user)], [second.data["body"]["id"]])
 
     # --- immutability ---
     def test_confirm_requires_landmarks(self, _):
@@ -47,11 +56,17 @@ class BodyRulesTests(MediaTestCase):
         self.assertEqual(r.status_code, 400)
         self.assertIsNone(Body.objects.get(user=self.user).confirmed_at)
 
+    def test_confirm_runs_the_landmark_checks(self, _):
+        self._upload()
+        r = self.client.post("/api/body/confirm/", {"landmarks": {"head_top": {"y": 50}}}, format="json")
+        self.assertEqual((r.status_code, r.data["code"]), (400, "LANDMARKS_INVALID"))
+        self.assertIsNone(Body.objects.get(user=self.user).confirmed_at)
+
     def test_confirmed_body_cannot_be_changed(self, _):
         self.assertEqual(self._confirmed_body().status_code, 200)
         r = self.client.post("/api/body/confirm/", {"landmarks": {"head_top": {"y": 1}}}, format="json")
         self.assertEqual(r.status_code, 409)
-        self.assertEqual(Body.objects.get(user=self.user).landmarks, LANDMARKS)
+        self.assertEqual(Body.objects.get(user=self.user).landmarks, complete_body_landmarks(LANDMARKS))
 
     def test_no_update_endpoints_for_photo_or_landmarks(self, _):
         self._confirmed_body()

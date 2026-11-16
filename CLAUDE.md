@@ -24,7 +24,8 @@ but the frontend must fully work too (React is required). The owner works and re
   shoulder_* marked at the sleeve seam); wired only in the MLS engine (docs/09 #98). **MLS is the default T-shirt
   engine (`TRYON_WARP=mls`, docs/09 #105);** adapt T-shirts = sleeve C + tube + armpit r14 + side floor "mask" +
   garment hem + cuff hem + fringe drop (flags `TRYON_MLS_*`, docs/09 #105, #106); every T-shirt gets the r17
-  finish (`TRYON_FINISH`, docs/09 #107) and so do pants (`TRYON_FINISH_PANTS`, docs/09 #108); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
+  finish (`TRYON_FINISH`, docs/09 #107) and so do pants (`TRYON_FINISH_PANTS`, docs/09 #108); an adapt T-shirt hangs
+  over the pants (`TRYON_PANTS_TUCK`, docs/09 #109); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
   **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
@@ -107,8 +108,8 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-**Latest handoff: `docs/11-session-handoff.md` (2026-11-15, round 17 added 2026-11-16): uncommitted rounds 11-14, open problems, next
-steps, how to run. Read it first.**
+**Latest handoff: `docs/11-session-handoff.md` section 0 (2026-11-16): the project is handed in on 2026-11-17;
+session 2 of 2 = polish + submission. Read it first.**
 Last updated: 2026-11-16. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
@@ -137,6 +138,10 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       re-upload replaces an unconfirmed body, `AI_DEV_BYPASS=1` always skips. Remove `google-generativeai` from requirements.
       Tests: MockTransport + real-HTTP guard, PostgreSQL `TransactionTestCase` race for the last slot; one manual real-API check
       of the generated `responseJsonSchema` (ask the owner before sending it).
+      **2026-11-16 (docs/09 #110):** the upload job runs the shared pipeline (code checks, 600x1200, auto landmarks,
+      original deleted); upload over an unconfirmed body replaces it; confirm runs the landmark checks. **Prompt 02
+      is still not wired:** the submission runs with `AI_DEV_BYPASS=1` + `BODY_AI_CHECK_ENABLED=0` (owner decision).
+      Check: `tools/tryon_check/own_body_path.py` (17 checks ok). 401 backend tests.
 - [ ] 5. One `LandmarkEditor` (port of `tools/landmark-editor-prototype`) for body + garments; sanity checks client + server.
       **Partly done (2026-11-09, branch `landmark-editor-variant-c`):** garment editor rebuilt from design artboard VariantC in
       `frontend/src/components/landmark-editor/` (pure `geometry.ts` + `garmentGroups.ts` + component), used by
@@ -144,7 +149,7 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       **Garment sanity checks done (2026-11-09, docs/09 #53-54):** server `apps/garments/landmark_checks.py` (400
       `LANDMARKS_INVALID`), editor clamps moves to the order rules (4 px gap), Save needs every point placed. 35 vitest tests.
       Body groups + body checks done for the staff editor (docs/09 #72). Still to do: BodyConfirm wiring + checks at confirm. No ESLint config exists yet (`npm run lint` fails).
-      Body confirm page must send the edited landmarks to `POST body/confirm/` (BodyConfirm.tsx has a TODO).
+      **Done 2026-11-16 (docs/09 #110):** BodyConfirm is the editor with the body groups and sends the landmarks.
       **2026-11-11 (docs/09 #92):** extended T-shirt set (armpit, collar, collar_bottom, cuff corners replace
       sleeve_end), `landmarks_complete`, client + server checks; locale file `frontend/src/locale/uz.ts`.
 - [ ] 6. Garment pipeline: prompts 01 + 04, quality check, Save/Cancel preview (screen 8), delete original, visibility (screen 9).
@@ -158,6 +163,8 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       local testing without a key (body uploads fail closed with `AI_UNAVAILABLE` otherwise, prompt 02 is not wired).
       100 backend tests, tsc, 35 vitest pass. Still to do: prompt 04 (needs credits), quality check, Save/Cancel, delete original.
 - [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.
+      **2026-11-16 (docs/09 #110):** `avatars/nearest/` requires sex + 4 measurements; the try-on page has the form.
+      Not done: landmarks adjusted to measurements, screens 3 + 6 as designed.
 - [ ] 8. Try-on: hands/forearms above the garment, `quality_warnings[]`, explicit `POST outfits/` save, screens 10-12 per design.
       **2026-11-10 (docs/09 #79-84, docs/06 "Layer order" + "Known limits"):** compositing restructured into one layer
       order (pants -> shoulder cap -> torso -> rigid sleeves -> head/neck -> hands), row warp by `cv2.remap`, flags
@@ -240,6 +247,10 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       #51 x 6 avatars and 5 T-shirt + pants outfits x 6: 0 new holes. **In production:** setting
       `TRYON_FINISH_PANTS` (1 | 0, default 1, needs `TRYON_FINISH=r17`). Gates 0 px (`run_finish17.py` with
       `PANTS=1`, `run_finish17c.py`). 390 backend tests, 78 vitest, tsc. Not measured: shorts, white / black pants.
+      **2026-11-16 round 18 + production (docs/09 #109, docs/06 "Pants under the T-shirt, round 18"):** an adapt MLS
+      T-shirt hangs over the pants (`warp.drape_over_pants` + `tuck_pants`, setting `TRYON_PANTS_TUCK`, default 1);
+      pants px beside the T-shirt 57043 -> 6359 on 18 adapt renders, figure px uncovered 0; keep_shape untouched.
+      `run_tuck18.py`.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

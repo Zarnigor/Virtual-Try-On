@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { listAvatars, type Avatar } from '../api/avatars'
+import { listAvatars, nearestAvatar, type Avatar } from '../api/avatars'
 import { garmentFitsSex, listGarments, type Garment } from '../api/garments'
 import { getBody, setBodySex, type Body } from '../api/bodies'
 import { getConfig } from '../api/config'
@@ -18,10 +18,20 @@ const TRYON_ERRORS: Record<string, string> = {
   BODY_SEX_REQUIRED: TRYON_GENDER.bodySexRequired,
 }
 
+const AVATAR_FIELDS: Array<['shoulder' | 'chest' | 'waist' | 'hip', string]> = [
+  ['shoulder', 'Yelka aylanasi (sm)'], ['chest', 'Koʻkrak aylanasi (sm)'],
+  ['waist', 'Bel aylanasi (sm)'], ['hip', 'Son aylanasi (sm)'],
+]
+
 export default function TryOn() {
   const [base, setBase] = useState<'body' | 'avatar'>('avatar')
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null)
+  // Model (avatar) path: measurements are required; the nearest avatar is picked from them (docs/02).
+  const [avSex, setAvSex] = useState<Sex | ''>('')
+  const [avM, setAvM] = useState({ shoulder: '', chest: '', waist: '', hip: '' })
+  const [finding, setFinding] = useState(false)
+  const [avError, setAvError] = useState('')
   const [garments, setGarments] = useState<Garment[]>([])
   const [scope, setScope] = useState<'all' | 'mine' | null>(null)
   // docs/09 #97: the list shows only garments for the base's sex (+ unisex) unless "show all" is on
@@ -60,6 +70,26 @@ export default function TryOn() {
       })
       .catch(() => {})
   }, [scope, baseSex, showAll])
+
+  const findAvatar = async () => {
+    const nums = Object.fromEntries(Object.entries(avM).map(([k, v]) => [k, Number(v)])) as Record<keyof typeof avM, number>
+    if (!avSex) return setAvError('Jinsni tanlang.')
+    if (Object.values(nums).some((v) => !(v >= 20 && v <= 300))) {
+      return setAvError('Barcha oʻlchamlarni kiriting (20 dan 300 sm gacha).')
+    }
+    setAvError('')
+    setFinding(true)
+    try {
+      const { data } = await nearestAvatar({ sex: avSex, ...nums })
+      setAvatars((prev) => (prev.some((a) => a.id === data.id) ? prev : [...prev, data]))
+      setSelectedAvatar(data.id)
+    } catch (err: unknown) {
+      const d = (err as { response?: { data?: { detail?: string } } })?.response?.data
+      setAvError(d?.detail || 'Avatar topilmadi. Qayta urinib koʻring.')
+    } finally {
+      setFinding(false)
+    }
+  }
 
   const chooseBodySex = (sex: Sex) => {
     setBodySex(sex).then(({ data }) => setBody(data)).catch(() => setError(TRYON_GENDER.bodySexRequired))
@@ -176,12 +206,37 @@ export default function TryOn() {
 
             {base === 'avatar' && (
               <div>
-                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Avatar tanlang</p>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>
+                  Oʻlchamlaringizni kiriting: sizga eng yaqin model tanlanadi.
+                </p>
+                <Segmented<Sex> title="Jins" value={avSex} options={SEX_LABELS} onChange={setAvSex} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, margin: '10px 0' }}>
+                  {AVATAR_FIELDS.map(([key, label]) => (
+                    <label key={key} style={{ fontSize: 12, color: 'var(--text-soft)' }}>
+                      {label}
+                      <input
+                        className="input"
+                        type="number"
+                        inputMode="decimal"
+                        min={20}
+                        max={300}
+                        value={avM[key]}
+                        onChange={(e) => setAvM((p) => ({ ...p, [key]: e.target.value }))}
+                        style={{ width: '100%', marginTop: 4 }}
+                      />
+                    </label>
+                  ))}
+                </div>
+                {avError && <p className="error-text" style={{ marginBottom: 8 }}>{avError}</p>}
+                <button className="btn btn-secondary btn-sm" onClick={findAvatar} disabled={finding} style={{ marginBottom: 12 }}>
+                  {finding ? 'Qidirilmoqda…' : 'Mos modelni topish'}
+                </button>
+                {selectedAvatar !== null && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 200, overflowY: 'auto' }}>
                   {avatars.length === 0 ? (
                     <p style={{ color: 'var(--muted)', fontSize: 13 }}>Avatarlar topilmadi</p>
                   ) : (
-                    avatars.map((av) => (
+                    avatars.filter((av) => !avSex || av.sex === avSex).map((av) => (
                       <label
                         key={av.id}
                         style={{
@@ -219,6 +274,7 @@ export default function TryOn() {
                     ))
                   )}
                 </div>
+                )}
               </div>
             )}
           </div>

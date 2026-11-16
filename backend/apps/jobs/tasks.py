@@ -113,6 +113,31 @@ def _ai_verdict(raw, schema, known) -> bool:
     return True
 
 
+def _process_body(body):
+    """The shared body pipeline on the uploaded original. A code-check rejection becomes JobRejected(code)."""
+    from apps.bodies.pipeline import BodyPhotoRejected, process_body_photo
+    with body.image.open("rb") as fh:
+        data = fh.read()
+    try:
+        return process_body_photo(data)
+    except BodyPhotoRejected as e:
+        raise JobRejected(e.code, e.detail)
+
+
+def _store_processed_body(body, processed):
+    """The normalized 600x1200 PNG and the auto landmarks replace the original; the original file is deleted."""
+    from django.core.files.base import ContentFile
+    original = body.image.name
+    body.image.save("body.png", ContentFile(processed.png), save=False)
+    body.landmarks = processed.landmarks
+    body.save(update_fields=["image", "landmarks"])
+    if original and original != body.image.name:
+        try:
+            body.image.storage.delete(original)
+        except Exception:
+            logger.warning("could not delete the original of body %d", body.pk)
+
+
 # ---------- helpers ----------
 
 def _start(job_pk):
@@ -154,12 +179,13 @@ def run_body_validation(job_pk: int):
         _fail(job, "BODY_NOT_FOUND")
         return
     try:
-        # TODO step 4: run apps/bodies/pipeline.process_body_photo (code checks, normalization) before the AI call.
+        processed = _process_body(body)  # code checks first (docs/09 #26): EXIF strip, rembg, framing, 600x1200
         if not settings.BODY_AI_CHECK_ENABLED:  # DEBUG only (settings): prompt 02 skipped, marked for the UI
-            _done(job, {"approved": True, "ai_skipped": True})
-            return
-        ai_checked = _ai_verdict(_ask_body_validation(body), BodyValidation, BODY_ISSUES)
-        _done(job, {"approved": True, "ai_skipped": not ai_checked})
+            ai_checked = False
+        else:
+            ai_checked = _ai_verdict(_ask_body_validation(body), BodyValidation, BODY_ISSUES)
+        _store_processed_body(body, processed)
+        _done(job, {"approved": True, "ai_skipped": not ai_checked, "warnings": processed.warnings})
     except JobRejected as e:
         _fail(job, e.code, e.detail, e.codes)
         body.delete()  # unconfirmed and rejected: let the user upload again

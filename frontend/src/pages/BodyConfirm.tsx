@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { getBody, confirmBody, deleteBody, type Body } from '../api/bodies'
 import type { BodyLandmarks } from '../api/types'
 import Spinner from '../components/Spinner'
+import LandmarkEditor from '../components/landmark-editor/LandmarkEditor'
+import { BODY_GROUPS, BODY_RULES } from '../components/landmark-editor/bodyGroups'
 
 export default function BodyConfirm() {
   const navigate = useNavigate()
@@ -18,17 +20,17 @@ export default function BodyConfirm() {
       .finally(() => setLoading(false))
   }, [])
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (landmarks: Record<string, unknown>) => {
     if (!body) return
+    if (!confirm('Tasdiqlangandan soʻng rasm va nuqtalarni oʻzgartirib boʻlmaydi. Tasdiqlaysizmi?')) return
     setConfirming(true)
+    setError('')
     try {
-      // TODO(step 5): landmarks come from the LandmarkEditor; until it exists the backend
-      // rejects an empty set with "Avval chiziqlarni belgilang."
-      await confirmBody({ landmarks: body.landmarks as BodyLandmarks })
+      await confirmBody({ landmarks: landmarks as unknown as BodyLandmarks })
       navigate('/body/measurements')
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(msg || 'Tasdiqlashda xato')
+      const data = (err as { response?: { data?: { code?: string; detail?: string } } })?.response?.data
+      setError(data?.code === 'LANDMARKS_INVALID' && data.detail ? data.detail : 'Tasdiqlashda xato. Qayta urinib koʻring.')
     } finally {
       setConfirming(false)
     }
@@ -60,40 +62,40 @@ export default function BodyConfirm() {
     )
   }
 
-  return (
-    <div className="page" style={{ maxWidth: 560 }}>
-      <h1 className="page-title">Tana rasmini tasdiqlash</h1>
+  if (body.confirmed_at) {
+    return (
+      <div className="page">
+        <p style={{ color: 'var(--muted)' }}>Tana allaqachon tasdiqlangan. <a href="/tryon">Kiyib koʻrish</a></p>
+      </div>
+    )
+  }
 
-      <div className="card" style={{ marginBottom: 24 }}>
-        {body.image_url && (
-          <img
-            src={body.image_url}
-            alt="Tana rasmi"
-            style={{
-              width: '100%',
-              maxHeight: 500,
-              objectFit: 'contain',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--inset)',
-              marginBottom: 16,
-            }}
-          />
-        )}
-        <p style={{ color: 'var(--text-soft)', fontSize: 14 }}>
-          Rasm tasdiqlanganidan soʻng, uni oʻzgartirish mumkin boʻlmaydi. Iltimos diqqat bilan tekshiring.
+  return (
+    <div className="page">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <button className="btn btn-secondary btn-sm" onClick={handleReupload}>Boshqa rasm yuklash</button>
+        <p style={{ color: 'var(--text-soft)', fontSize: 14, margin: 0 }}>
+          Nuqtalar avtomatik qoʻyildi. Tekshiring, kerak boʻlsa suring. Tasdiqlangandan soʻng oʻzgartirib boʻlmaydi.
         </p>
       </div>
-
       {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
-
-      <div style={{ display: 'flex', gap: 12 }}>
-        <button className="btn btn-primary" onClick={handleConfirm} disabled={confirming} style={{ flex: 1 }}>
-          {confirming ? 'Kutilmoqda…' : 'Tasdiqlash'}
-        </button>
-        <button className="btn btn-secondary" onClick={handleReupload}>
-          Qayta yuklash
-        </button>
-      </div>
+      {body.image_url ? (
+        <LandmarkEditor
+          imageUrl={body.image_url}
+          imageAlt="Tana rasmi"
+          bounds={{ w: 600, h: 1200 }}
+          groups={BODY_GROUPS}
+          rules={BODY_RULES}
+          landmarks={body.landmarks}
+          heading="Tana nuqtalari"
+          subheading="Har bir chiziqning chap va oʻng nuqtasini tana chetiga qoʻying."
+          saving={confirming}
+          saveLabel="Tasdiqlash"
+          onSave={handleConfirm}
+        />
+      ) : (
+        <p className="error-text">Tana rasmi yoʻq. Qayta yuklang.</p>
+      )}
     </div>
   )
 }

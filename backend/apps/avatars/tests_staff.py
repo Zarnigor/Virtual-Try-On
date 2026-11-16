@@ -236,3 +236,28 @@ class SeedSubsetTests(MediaTestCase):
             call_command("seed_avatars", src=str(folder), stdout=out)
         self.assertEqual(sorted(Avatar.objects.values_list("sex", "build")), [("female", "slim"), ("male", "plus")])
         self.assertTrue(all(a.landmarks_confirmed_at is None for a in Avatar.objects.all()))
+
+
+class NearestAvatarTests(MediaTestCase):
+    """Model (avatar) path: every measurement is required (docs/02)."""
+
+    def setUp(self):
+        super().setUp()
+        self.login(self.make_user())
+        for build, chest in (("slim", 84), ("plus", 120)):
+            Avatar.objects.create(sex="female", build=build, landmarks=full_landmarks(),
+                                  measurements={"shoulder": 100, "chest": chest, "waist": chest - 14, "hip": chest + 6})
+
+    def test_all_measurements_are_required(self):
+        r = self.client.get("/api/avatars/nearest/", {"sex": "female", "chest": 90})
+        self.assertEqual((r.status_code, r.data["code"]), (400, "MEASUREMENTS_REQUIRED"))
+        self.assertEqual(r.data["fields"], ["shoulder", "waist", "hip"])
+        r = self.client.get("/api/avatars/nearest/", {"shoulder": 100, "chest": 90, "waist": 70, "hip": 95})
+        self.assertEqual((r.status_code, r.data["code"]), (400, "SEX_REQUIRED"))
+
+    def test_nearest_by_measurements(self):
+        q = {"sex": "female", "shoulder": 100, "chest": 118, "waist": 104, "hip": 124}
+        r = self.client.get("/api/avatars/nearest/", q)
+        self.assertEqual((r.status_code, r.data["build"]), (200, "plus"))
+        r = self.client.get("/api/avatars/nearest/", {**q, "chest": 85, "waist": 70, "hip": 91})
+        self.assertEqual(r.data["build"], "slim")

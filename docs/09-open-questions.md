@@ -544,3 +544,37 @@ _(none blocking P0)_
      tests, 78 vitest, tsc. This replaces "pants are not touched" of #107. Recorded: the owner's pants #48, #49,
      #51 are stored as `unisex` (the owner described #48 / #49 as for girls, #51 as for men); shorts and
      white / black pants are not measured; demo results not rebuilt.
+109. **2026-11-16: an adapt MLS T-shirt hangs over the pants** (round 18; owner approved the two-session finish
+     plan, item "pants show beside the T-shirt"; docs/06 "Pants under the T-shirt, round 18"). Setting
+     `TRYON_PANTS_TUCK` (1 | 0, default 1; 0 = the behaviour before #109). `warp.drape_over_pants`: on rows where
+     the pants are wider than the T-shirt, each half of the T-shirt row is stretched about the axis until it covers
+     the pants (+ 2 px, at most 1.35 x, smoothed along y, held down to the hem); `warp.tuck_pants`: pants px still
+     beside the T-shirt above its hem are dropped unless they lie within 3 px of the figure. keep_shape T-shirts and
+     the `parts` engine are not touched. Measured (5 outfits x 6 avatars, `run_tuck18.py`): pants px beside the
+     T-shirt #28 + #51 25573 -> 1273, #43 + #48 19121 -> 2618, #40 + #49 12349 -> 2468; keep_shape #44 + #18 and
+     #45 + #51 unchanged; figure px uncovered 0 / 30. Tests `PantsTuckTests` (4). Not in the job result.
+110. **2026-11-16: own-body path and avatar path work end to end; submission runs without prompt 02** (owner
+     approved the two-session finish plan: "roziman"). Deadline: the project is handed in on 2026-11-17.
+     - **Body upload job** (`run_body_validation`): the shared pipeline `process_body_photo` now runs on the upload
+       (EXIF strip, rembg, code checks, 600x1200, auto landmarks) before any AI step; a code-check rejection
+       (`NO_PERSON`, `HEAD_OR_FEET_CUT`, `FIGURE_CLIPPED`, `CORRUPT_FILE`) fails the job with its Uzbek message and
+       deletes the body; on success the normalized PNG + landmarks replace the original and the original file is
+       deleted. Job result adds `warnings`.
+     - **Confirm** (`POST body/confirm/`): `validate_body_landmarks` (400 `LANDMARKS_INVALID`) and
+       `complete_body_landmarks`, as the staff avatar editor. `BodyConfirm.tsx` is the `LandmarkEditor` with the body
+       groups and sends the edited landmarks.
+     - **Upload over an unconfirmed body replaces it** (#33 was not implemented: it returned 409); a confirmed body
+       still gives 409 `BODY_EXISTS`.
+     - **Avatar path:** `GET avatars/nearest/` requires `sex` + shoulder, chest, waist, hip (400 `SEX_REQUIRED`,
+       `MEASUREMENTS_REQUIRED` with `fields`); the try-on page asks for them and shows the avatar list only after a
+       match. Landmarks are not adjusted to the measurements (not done).
+     - **Prompt 02 (body AI check) is NOT wired** (`_ask_body_validation` returns None). Owner decision for the
+       submission: run with `AI_DEV_BYPASS=1` + `BODY_AI_CHECK_ENABLED=0` (set in the local `.env`), say so in the
+       README. Adults-only therefore rests on the "I am 18+" confirmation only. The daily AI limit for bodies is
+       not exercised.
+     - Hem rule (#91): the owner accepted the current default (`TRYON_HEM_RULE=1`) for the submission.
+     - Check: `tools/tryon_check/own_body_path.py` (real API + worker, temporary user): 17 checks ok. 401 backend
+       tests, 78 vitest, tsc.
+     - Cut for the submission (known limits): engine rounds (side line, armpit fold, #48 hem, keep_shape shoulder,
+       render time), prompts 02 / 04 / 05, public garments + moderation, explicit `POST outfits/` (an outfit is
+       stored by every try-on).

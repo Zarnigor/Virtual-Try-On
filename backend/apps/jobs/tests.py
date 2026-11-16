@@ -47,6 +47,7 @@ class FailClosedParsingTests(SimpleTestCase):
         self.assertFalse(body_verdict({**GOOD_BODY, "clothing": "loose"}).accepted)
 
 
+@override_settings(BODY_AI_CHECK_ENABLED=True)  # the tests do not depend on the local .env
 class BodyJobTests(MediaTestCase):
     def setUp(self):
         super().setUp()
@@ -54,6 +55,41 @@ class BodyJobTests(MediaTestCase):
         self.body = Body(user=self.user, landmarks={})
         self.body.image.save("b.png", ContentFile(png_bytes()), save=True)
         self.job = Job.objects.create(user=self.user, kind="body_validation", target_id=self.body.pk)
+        from apps.bodies.pipeline import ProcessedBody
+        self.processed = ProcessedBody(png_bytes(), {"head_top": {"y": 50}}, 1.0, [])
+        self.patcher = mock.patch.object(tasks, "_process_body", return_value=self.processed)
+        self.process = self.patcher.start()
+        self.addCleanup(self.patcher.stop)
+
+    @override_settings(AI_DEV_BYPASS=True)
+    def test_processed_image_and_landmarks_replace_the_original(self):
+        original = self.body.image.name
+        storage = self.body.image.storage
+        tasks.run_body_validation(self.job.pk)
+        self.body.refresh_from_db()
+        self.assertEqual(self.body.landmarks, {"head_top": {"y": 50}})
+        self.assertNotEqual(self.body.image.name, original)
+        self.assertFalse(storage.exists(original))  # originals are deleted after processing
+        self.assertTrue(storage.exists(self.body.image.name))
+
+    @override_settings(AI_DEV_BYPASS=True)
+    def test_code_check_rejection_comes_before_the_ai_and_deletes_the_body(self):
+        self.process.side_effect = tasks.JobRejected("HEAD_OR_FEET_CUT", "x")
+        with mock.patch.object(tasks, "_ask_body_validation") as ask:
+            tasks.run_body_validation(self.job.pk)
+        ask.assert_not_called()
+        self.job.refresh_from_db()
+        self.assertEqual((self.job.status, self.job.error_code), ("failed", "HEAD_OR_FEET_CUT"))
+        self.assertFalse(Body.objects.exists())
+
+    def test_process_body_maps_a_pipeline_rejection_to_a_job_rejection(self):
+        self.patcher.stop()
+        self.addCleanup(self.patcher.start)  # the setUp cleanup stops it again
+        from apps.bodies.pipeline import BodyPhotoRejected
+        with mock.patch("apps.bodies.pipeline.process_body_photo", side_effect=BodyPhotoRejected("NO_PERSON")):
+            with self.assertRaises(tasks.JobRejected) as cm:
+                tasks._process_body(self.body)
+        self.assertEqual(cm.exception.code, "NO_PERSON")
 
     @override_settings(AI_DEV_BYPASS=False)
     def test_no_ai_fails_closed_and_frees_the_slot(self):

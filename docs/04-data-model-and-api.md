@@ -48,7 +48,7 @@ General rules
 | POST | body/confirm/ | `{landmarks, height_cm?, measurements?}` | `Body` (photo + landmarks locked); 409 `BODY_CONFIRMED` |
 | PATCH | body/measurements/ | `{height_cm?, measurements?}` | `Body`; 403 `MEASUREMENTS_LOCKED` + `unlock_at` |
 | GET | avatars/ | | `Avatar[]` |
-| GET | avatars/nearest/ | `?sex&height&shoulder&chest&waist&hip` | `Avatar` |
+| GET | avatars/nearest/ | `?sex&shoulder&chest&waist&hip` (all required, circumference cm 20..300; `height` optional, unused); 400 `SEX_REQUIRED` / `MEASUREMENTS_REQUIRED` `{fields}` | `Avatar` |
 | GET | staff/avatars/ | (staff only, others 404) | `StaffAvatar[]` (`Avatar` + `height_cm, landmarks_confirmed_at, status: confirmed\|auto`) |
 | GET | staff/avatars/{id}/ | (staff only) | `StaffAvatar`; landmarks not yet confirmed get edge points from the mask (GET never writes) |
 | POST | staff/avatars/ | multipart `sex, build, photo, height_cm, shoulder, chest, waist, hip` (staff only) | 201 `StaffAvatar + warnings[]` (200 when it replaced that sex+build; landmarks reset to auto); 400 `{code, detail}` (`NO_PERSON`, `HEAD_OR_FEET_CUT`, `FIGURE_CLIPPED`, upload codes) |

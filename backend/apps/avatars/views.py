@@ -19,34 +19,35 @@ def list_avatars(request):
 def nearest_avatar(request):
     """
     Find the nearest avatar by sex + measurements (circumference in cm).
-    Required: sex. Optional: shoulder, chest, waist, hip (all circumference cm).
+    Required: sex and shoulder, chest, waist, hip (all circumference cm, 20..300); else 400 MEASUREMENTS_REQUIRED.
     Converts circumference to front-width (÷π) for matching against landmark widths.
     """
     sex = request.query_params.get("sex")
-    if not sex:
-        return Response({"detail": "sex parametri talab qilinadi."}, status=400)
-
-    avatars = Avatar.objects.filter(sex=sex)
-    if not avatars.exists():
-        return Response({"detail": "Avatar topilmadi."}, status=404)
+    if sex not in ("male", "female"):
+        return Response({"code": "SEX_REQUIRED", "detail": "Jinsni tanlang."}, status=400)
 
     def circ_to_front(cm):
         """Circumference in cm → front-view width in cm."""
         return float(cm) / math.pi if cm else None
 
-    measurements = {}
+    # Model (avatar) path: every measurement is required (docs/02; CLAUDE.md "Decisions already made").
+    measurements, missing = {}, []
     for field in ("shoulder", "chest", "waist", "hip"):
-        val = request.query_params.get(field)
-        if val:
-            try:
-                measurements[field] = circ_to_front(float(val))
-            except (ValueError, TypeError):
-                pass
+        try:
+            val = float(request.query_params.get(field, ""))
+        except (ValueError, TypeError):
+            val = None
+        if val is None or not math.isfinite(val) or not 20 <= val <= 300:
+            missing.append(field)
+        else:
+            measurements[field] = circ_to_front(val)
+    if missing:
+        return Response({"code": "MEASUREMENTS_REQUIRED", "fields": missing,
+                         "detail": "Barcha oʻlchamlarni kiriting (20 dan 300 sm gacha)."}, status=400)
 
-    if not measurements:
-        # no measurements given: return first avatar of that sex
-        avatar = avatars.first()
-        return Response(AvatarSerializer(avatar, context={"request": request}).data)
+    avatars = Avatar.objects.filter(sex=sex)
+    if not avatars.exists():
+        return Response({"code": "AVATAR_NOT_FOUND", "detail": "Avatar topilmadi."}, status=404)
 
     best = None
     best_score = float("inf")

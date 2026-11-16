@@ -9,6 +9,7 @@ from .serializers import (
     BodySerializer, BodyUploadSerializer, MeasurementsSerializer, BodyConfirmSerializer,
 )
 from apps.jobs.models import Job
+from apps.bodies.landmark_checks import BodyLandmarksInvalid, complete_body_landmarks, validate_body_landmarks
 from apps.jobs.tasks import run_body_validation
 
 
@@ -54,7 +55,8 @@ def body_root(request):
 
 
 def _upload_body(request):
-    if _own_body(request) is not None:
+    existing = _own_body(request)
+    if existing is not None and existing.is_confirmed:
         return _err("BODY_EXISTS", 409)
 
     s = BodyUploadSerializer(data=request.data)
@@ -66,6 +68,8 @@ def _upload_body(request):
     if photo.content_type not in ("image/jpeg", "image/png"):
         return _err("BAD_FILE_TYPE", 400)
 
+    if existing is not None:  # an upload replaces an unconfirmed body (docs/09 #33)
+        existing.delete()
     body = Body.objects.create(user=request.user, image=photo, landmarks={}, sex=s.validated_data["sex"])
 
     job = Job.objects.create(user=request.user, kind="body_validation", target_id=body.pk)
@@ -109,7 +113,11 @@ def confirm_body(request):
     s.is_valid(raise_exception=True)
     data = s.validated_data
 
-    body.landmarks = data["landmarks"]
+    try:  # docs/03 "Body landmark checks": the same rules as the staff avatar editor
+        validate_body_landmarks(data["landmarks"])
+    except BodyLandmarksInvalid as e:
+        return Response({"code": "LANDMARKS_INVALID", "detail": e.detail}, status=400)
+    body.landmarks = complete_body_landmarks(data["landmarks"])
     if "height_cm" in data:
         body.height_cm = data["height_cm"]
     if "measurements" in data:
