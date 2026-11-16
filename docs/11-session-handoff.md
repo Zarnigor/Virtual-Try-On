@@ -3,13 +3,10 @@
 Read this first in a new session, together with CLAUDE.md "Status and next step". It records what is finished,
 what is NOT finished, and what to do next. Details and numbers: docs/06 (engine rounds), docs/09 (decisions).
 
-## 0. State after session 2 (2026-11-16): ready for the live demo on 2026-11-17
+## 0. Next session: read `NEXT_STEPS.md` (repo root) first
 
-Both sessions of the finish plan are done (docs/09 #109-#111). The project is shown as a live demo on the owner's
-machine: README "Live demo" has the pre-flight check and the walk-through. Local `.env`: `AI_DEV_BYPASS=1`,
-`BODY_AI_CHECK_ENABLED=0`, `DEMO_MODE` unset (0). Not done and known limits: README "Not done / known limits".
-`prompts/04-garment-cleaning.txt` has a stray "is" on line 1 in the working tree (not committed). `smt.txt` stays
-untracked. If the owner reports something from the browser, fix that first; no new engine rounds.
+Written 2026-11-16 at the end of the day, after engine rounds 18-22 (docs/09 #109-#115). It has the state, the
+first steps of the next session and the open work in order. This file below is older history.
 
 Everything below this line is older history.
 

@@ -109,8 +109,8 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-**Latest handoff: `docs/11-session-handoff.md` section 0 (2026-11-16): both finish sessions are done, the project is
-shown as a live demo on 2026-11-17 (README "Live demo", docs/09 #109-#111). Read it first.**
+**Latest handoff: `NEXT_STEPS.md` (repo root, 2026-11-16): state, first steps and the open work in order. Read it
+first. History: `docs/11-session-handoff.md`, docs/06, docs/09 (last #115).**
 Last updated: 2026-11-16. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
