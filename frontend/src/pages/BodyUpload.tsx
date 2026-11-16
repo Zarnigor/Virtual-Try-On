@@ -46,7 +46,7 @@ export default function BodyUpload() {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h2 style={{ fontSize: 16, marginBottom: 12, color: 'var(--warning)' }}>
-          ⚠ Muhim talablar
+          Muhim talablar
         </h2>
         <ul style={{ paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[

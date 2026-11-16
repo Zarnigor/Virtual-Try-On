@@ -379,6 +379,8 @@ class GarmentAIJobTests(MediaTestCase):
     @override_settings(AI_CLEANING_ENABLED=False)
     def test_cleaning_off_uses_rembg_only(self):
         g, job = self.upload("tshirt", image_bytes((200, 30, 30)))
+        with g.original_image.open("rb") as f:
+            src = Image.open(f).convert("RGB")
         with FakeGemini(gemini_reply(TSHIRT)) as fake:
             job = self.run_job(job)
         self.assertEqual(job.status, "done", job.error_code)
@@ -389,9 +391,8 @@ class GarmentAIJobTests(MediaTestCase):
             out.load()
         self.assertEqual((out.format, out.mode), ("PNG", "RGBA"))  # alpha channel added
         self.assertEqual(out.size, (300, 400))  # cropped to the mask bounding box
-        with g.original_image.open("rb") as f:
-            src = Image.open(f).convert("RGB")
         self.assertEqual(out.getpixel((150, 200)), (*src.getpixel((200, 250)), 255))  # original pixels kept
+        self.assertFalse(g.original_image)  # and the original file is gone
 
     @override_settings(AI_CLEANING_ENABLED=True)
     def test_cleaning_on_fails_clearly_without_spending_ai(self):

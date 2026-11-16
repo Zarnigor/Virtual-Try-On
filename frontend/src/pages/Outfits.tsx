@@ -19,7 +19,7 @@ export default function Outfits() {
   useEffect(load, [])
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Bu koʻrinishni oʻchirilsinmi?')) return
+    if (!confirm('Bu obraz oʻchirilsinmi?')) return
     try {
       await deleteOutfit(id)
       setOutfits((prev) => prev.filter((o) => o.id !== id))
@@ -30,7 +30,7 @@ export default function Outfits() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Saqlangan koʻrinishlar</h1>
+      <h1 className="page-title">Obrazlar</h1>
 
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
@@ -41,10 +41,10 @@ export default function Outfits() {
       ) : outfits.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: 60 }}>
           <p style={{ color: 'var(--muted)', marginBottom: 16 }}>
-            Hali hech qanday koʻrinish yaratilmagan
+            Hali obraz yoʻq. Kiyib koʻring, natija shu yerda saqlanadi.
           </p>
           <a href="/tryon" className="btn btn-primary">
-            Sinab koʻrish
+            Kiyib koʻrish
           </a>
         </div>
       ) : (
@@ -102,7 +102,7 @@ export default function Outfits() {
                     className="btn btn-secondary btn-sm"
                     style={{ flex: 1, fontSize: 12 }}
                   >
-                    ⬇ Yuklab olish
+                    Yuklab olish
                   </a>
                 )}
                 <button
@@ -110,7 +110,7 @@ export default function Outfits() {
                   onClick={() => handleDelete(o.id)}
                   aria-label="Oʻchirish"
                 >
-                  ✕
+                  Oʻchirish
                 </button>
               </div>
             </div>

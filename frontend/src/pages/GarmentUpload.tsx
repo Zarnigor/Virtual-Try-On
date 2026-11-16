@@ -87,7 +87,6 @@ export default function GarmentUpload() {
       >
         {job.status === 'failed' ? (
           <>
-            <div style={{ fontSize: 40 }}>❌</div>
             <h2>Kiyim tozalanmadi</h2>
             <p style={{ color: 'var(--danger)' }}>
               {job.error_message || 'Qayta urinib koʻring.'}
@@ -145,7 +144,7 @@ export default function GarmentUpload() {
                   onChange={() => setType(t)}
                   style={{ display: 'none' }}
                 />
-                {t === 'tshirt' ? '👕 Futbolka' : '👖 Shim'}
+                {t === 'tshirt' ? 'Futbolka' : 'Shim'}
               </label>
             ))}
           </div>

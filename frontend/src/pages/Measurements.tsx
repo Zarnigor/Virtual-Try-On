@@ -122,7 +122,7 @@ export default function Measurements() {
           {error && <p className="error-text" style={{ marginBottom: 12 }}>{error}</p>}
           {success && (
             <p style={{ color: 'var(--accent)', fontSize: 13, marginBottom: 12 }}>
-              ✓ Muvaffaqiyatli saqlandi
+              Saqlandi
             </p>
           )}
 

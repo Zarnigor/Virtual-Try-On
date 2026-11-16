@@ -156,7 +156,7 @@ export default function TryOn() {
 
   return (
     <div className="page">
-      <h1 className="page-title">Sinab koʻrish</h1>
+      <h1 className="page-title">Kiyib koʻrish</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 24, alignItems: 'start' }}>
         {/* Left: controls */}
@@ -192,7 +192,7 @@ export default function TryOn() {
                     onChange={() => setBase(b)}
                     style={{ display: 'none' }}
                   />
-                  {b === 'body' ? '🧍 Mening tanam' : '🤖 Avatar'}
+                  {b === 'body' ? 'Mening tanam' : 'Model'}
                 </label>
               ))}
             </div>
@@ -363,7 +363,7 @@ export default function TryOn() {
             disabled={starting || isPolling}
             style={{ width: '100%' }}
           >
-            {starting || isPolling ? 'Qayta ishlanmoqda…' : '✨ Sinab koʻrish'}
+            {starting || isPolling ? 'Qayta ishlanmoqda…' : 'Kiyib koʻrish'}
           </button>
         </div>
 
@@ -371,8 +371,7 @@ export default function TryOn() {
         <div className="card" style={{ minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           {!jobId && !resultUrl && (
             <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>👕</div>
-              <p>Kiyim va asos tanlab, "Sinab koʻrish" tugmasini bosing</p>
+              <p>Kiyim va asos tanlab, "Kiyib koʻrish" tugmasini bosing</p>
             </div>
           )}
 
@@ -387,7 +386,6 @@ export default function TryOn() {
 
           {job?.status === 'failed' && (
             <div style={{ textAlign: 'center', color: 'var(--danger)' }}>
-              <div style={{ fontSize: 40, marginBottom: 8 }}>❌</div>
               <p>{job.error_message || 'Xato yuz berdi'}</p>
             </div>
           )}
@@ -421,7 +419,7 @@ export default function TryOn() {
                   download="tryon-result.png"
                   className="btn btn-secondary btn-sm"
                 >
-                  ⬇ Yuklab olish
+                  Yuklab olish
                 </a>
                 <a href="/outfits" className="btn btn-secondary btn-sm">
                   Koʻrinishlarga oʻtish

@@ -3,22 +3,13 @@
 Read this first in a new session, together with CLAUDE.md "Status and next step". It records what is finished,
 what is NOT finished, and what to do next. Details and numbers: docs/06 (engine rounds), docs/09 (decisions).
 
-## 0. Next session (written 2026-11-16): SESSION 2 OF 2, the project is handed in on 2026-11-17
+## 0. State after session 2 (2026-11-16): ready for the live demo on 2026-11-17
 
-**Done in session 1 (2026-11-16, docs/09 #109, #110):** rounds 17b / 17c committed; round 18 (an adapt T-shirt hangs
-over the pants, `TRYON_PANTS_TUCK`); own-body path end to end (pipeline in the upload job, editor on the confirm
-page, server checks, replace an unconfirmed body); avatar path (measurements required, nearest avatar). Local `.env`:
-`AI_DEV_BYPASS=1`, `BODY_AI_CHECK_ENABLED=0` (prompt 02 is not wired; owner decision). `prompts/04-garment-cleaning.txt`
-has a stray "is" on line 1 in the working tree (not committed; ask the owner or drop it).
-
-**Session 2, in this order (owner approved):**
-1. Pages closer to `design/`: nav names, remove emojis (BodyWaiting, TryOn), texts into `frontend/src/locale/uz.ts`,
-   loading / empty / error states.
-2. Rebuild the demo results with the current engine (`build_demo`; the 18 stored results are from `parts`).
-3. Full check: backend tests, vitest, tsc, `tools/tryon_check/own_body_path.py`, one pass by hand in the browser.
-4. README: clean-machine `docker compose up`, the AI bypass, known limits (list in docs/09 #110).
-5. Merge `tshirt-mls-default` into `main` and hand in. **Ask the owner how it is handed in** (GitHub link, archive
-   or live demo; there is no git remote yet).
+Both sessions of the finish plan are done (docs/09 #109-#111). The project is shown as a live demo on the owner's
+machine: README "Live demo" has the pre-flight check and the walk-through. Local `.env`: `AI_DEV_BYPASS=1`,
+`BODY_AI_CHECK_ENABLED=0`, `DEMO_MODE` unset (0). Not done and known limits: README "Not done / known limits".
+`prompts/04-garment-cleaning.txt` has a stray "is" on line 1 in the working tree (not committed). `smt.txt` stays
+untracked. If the owner reports something from the browser, fix that first; no new engine rounds.
 
 Everything below this line is older history.
 

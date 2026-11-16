@@ -108,8 +108,8 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-**Latest handoff: `docs/11-session-handoff.md` section 0 (2026-11-16): the project is handed in on 2026-11-17;
-session 2 of 2 = polish + submission. Read it first.**
+**Latest handoff: `docs/11-session-handoff.md` section 0 (2026-11-16): both finish sessions are done, the project is
+shown as a live demo on 2026-11-17 (README "Live demo", docs/09 #109-#111). Read it first.**
 Last updated: 2026-11-16. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
@@ -263,5 +263,4 @@ which build day we are on; whether real avatar photos exist; scanline instead of
 Environment: everything runs in Docker (OrbStack). The Mac has git but no host Python/Node: run Python and npm inside the
 containers (`docker compose exec -T backend ...`, `docker compose exec -T frontend ...`). Add `~/.orbstack/bin` to PATH.
 
-Known gaps that are not bugs in the contract: frontend pages do not follow the design yet (nav names, missing screens
-3, 5, 6, 8, 9, 12, emojis, no locale file). Avatars are real photos (`./avatars`, not in git); the drawn placeholders are only created when an avatar is missing.
+Known gaps that are not bugs in the contract: screens 3, 6, 8, 9 are simpler than the design (docs/09 #111). Avatars are real photos (`./avatars`, not in git); the drawn placeholders are only created when an avatar is missing.

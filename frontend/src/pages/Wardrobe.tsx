@@ -15,7 +15,7 @@ export default function Wardrobe() {
     setLoading(true)
     listGarments('mine')
       .then(({ data }) => setGarments(data))
-      .catch(() => setError('Liboslarni yuklab boʻlmadi'))
+      .catch(() => setError('Kiyimlarni yuklab boʻlmadi'))
       .finally(() => setLoading(false))
   }
 
@@ -44,7 +44,7 @@ export default function Wardrobe() {
   return (
     <div className="page">
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24, gap: 16 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, flex: 1 }}>Liboslarim</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 700, flex: 1 }}>Kiyimlar</h1>
         <Link to="/garments/upload" className="btn btn-primary">
           + Kiyim yuklash
         </Link>
@@ -100,7 +100,7 @@ export default function Wardrobe() {
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                   />
                 ) : (
-                  <span style={{ color: 'var(--muted)', fontSize: 32 }}>👕</span>
+                  <span style={{ color: 'var(--muted)', fontSize: 13 }}>Tayyorlanmoqda…</span>
                 )}
               </div>
 
@@ -139,7 +139,7 @@ export default function Wardrobe() {
                   onClick={() => handleDelete(g.id)}
                   aria-label="Oʻchirish"
                 >
-                  ✕
+                  Oʻchirish
                 </button>
               </div>
             </div>

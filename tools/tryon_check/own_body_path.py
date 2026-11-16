@@ -5,7 +5,8 @@
 
 A temporary user: POST body/ (PHOTO, default /avatars/male_average.jpg) -> job -> GET body/ (600x1200, auto
 landmarks) -> POST body/confirm/ -> second upload 409 -> avatars/nearest/ (400 without measurements, 200 with) ->
-POST tryon/ base=body with copies of GARMENTS (default 28, 51) -> outfit image -> GET outfits/. The user and
+POST tryon/ base=body with copies of GARMENTS (default 28, 51) -> outfit image -> GET outfits/ -> garment upload
+(clean job, original deleted, 404 for another user). The user and
 everything it owns is deleted at the end. Prints one line per check; exit status 1 when one fails.
 """
 import os
@@ -56,7 +57,7 @@ def poll(c, job_id, limit=120):
 
 
 User = get_user_model()
-User.objects.filter(email="own-body-check@example.com").delete()
+User.objects.filter(email__startswith="own-body-check").delete()
 user = User.objects.create_user(email="own-body-check@example.com", password="x-check-only-1")
 try:
     c = httpx.Client(base_url=API, timeout=60,
@@ -103,10 +104,20 @@ try:
         check(f"tryon {base} result 600x1200", res is not None and res.shape[:2] == (1200, 600))
         if res is not None:
             cv2.imwrite(f"{OUT}/tryon_{base}.png", res)
-    check("outfits listed", len(c.get("/outfits/").json()) == 2)
     other = User.objects.create_user(email="own-body-check-2@example.com", password="x-check-only-2")
     c2 = httpx.Client(base_url=API, timeout=30,
                       headers={"Authorization": f"Bearer {RefreshToken.for_user(other).access_token}"})
+    check("outfits listed", len(c.get("/outfits/").json()) == 2)
+    src = Garment.objects.get(pk=GARMENTS[0])  # garment upload: clean job, original deleted, landmarks saved
+    r = c.post("/garments/", files={"photo": ("g.png", src.image.read(), "image/png")}, data={"type": src.type})
+    check("garment upload 201", r.status_code == 201, r.text[:200])
+    if r.status_code == 201:
+        gid = r.json()["garment"]["id"] if "garment" in r.json() else r.json()["id"]
+        job = poll(c, r.json()["job_id"])
+        check("garment job done", job["status"] == "done", f"{job.get('error_code')} {job.get('result')}")
+        up = Garment.objects.get(pk=gid)
+        check("garment cleaned image stored, original deleted", bool(up.image) and not up.original_image)
+        check("another user gets 404 for the garment", c2.get(f"/garments/{gid}/").status_code == 404)
     check("another user sees no body (404)", c2.get("/body/").status_code == 404)
     other.delete()
     check("body delete 204", c.delete("/body/").status_code in (200, 204))

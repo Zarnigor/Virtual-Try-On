@@ -201,7 +201,7 @@ class GarmentJobTests(MediaTestCase):
         self.assertEqual(out.getpixel((5, 5)), (200, 120, 40, 64))     # not (50, 30, 10, 64)
         self.assertEqual(out.getpixel((5, 60)), (200, 120, 40, 255))
 
-    def test_exif_orientation_is_applied_and_the_original_is_untouched(self):
+    def test_exif_orientation_is_applied_and_the_original_is_deleted(self):
         from io import BytesIO
         from PIL import Image
         img = Image.new("RGB", (80, 40), (10, 200, 10))
@@ -222,8 +222,8 @@ class GarmentJobTests(MediaTestCase):
         self.garment.refresh_from_db()
         self.assertEqual(seen["size"], (40, 80))  # upright, as the user sees it
         self.assertEqual((self.garment.image.width, self.garment.image.height), (40, 80))
-        with self.garment.original_image.open("rb") as f:
-            self.assertEqual(f.read(), raw)
+        self.assertFalse(self.garment.original_image)  # originals are deleted after processing (docs/09 #111)
+        self.assertFalse(self.garment.image.storage.exists("garments/originals/o.jpg"))
 
     def test_cleaned_png_comes_from_the_original_and_becomes_image_url(self):
         from apps.garments.serializers import GarmentSerializer

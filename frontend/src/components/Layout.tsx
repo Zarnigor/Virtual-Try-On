@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/auth'
 import DemoBadge from './DemoBadge'
+import { NAV } from '../locale/uz'
 import { useMe } from './useMe'
 
 export default function Layout() {
@@ -62,18 +63,17 @@ export default function Layout() {
           </span>
           <DemoBadge />
           <nav style={{ display: 'flex', gap: 4, flex: 1 }}>
-            <NavLink to="/" end style={navStyle}>Bosh sahifa</NavLink>
-            <NavLink to="/wardrobe" style={navStyle}>Liboslar</NavLink>
-            <NavLink to="/tryon" style={navStyle}>Sinab koʻrish</NavLink>
-            <NavLink to="/outfits" style={navStyle}>Koʻrinishlar</NavLink>
-            {user?.is_staff && <NavLink to="/staff/avatars" style={navStyle}>Avatarlar</NavLink>}
+            <NavLink to="/" end style={navStyle}>{NAV.home}</NavLink>
+            <NavLink to="/body" style={navStyle}>{NAV.body}</NavLink>
+            <NavLink to="/wardrobe" style={navStyle}>{NAV.garments}</NavLink>
+            <NavLink to="/tryon" style={navStyle}>{NAV.tryOn}</NavLink>
+            <NavLink to="/outfits" style={navStyle}>{NAV.outfits}</NavLink>
+            {user?.is_staff && <NavLink to="/staff/avatars" style={navStyle}>{NAV.avatars}</NavLink>}
           </nav>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {user && (
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>{user.email}</span>
-            )}
+            <NavLink to="/profile" style={navStyle}>{NAV.profile}</NavLink>
             <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
-              Chiqish
+              {NAV.logout}
             </button>
           </div>
         </div>

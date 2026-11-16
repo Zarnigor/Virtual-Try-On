@@ -278,5 +278,13 @@ def _rembg_clean(garment):
     buf = BytesIO()
     img.save(buf, format="PNG")
 
-    # upload_to already adds "garments/". original_image stays until Save/Cancel (step 6).
-    garment.image.save(f"cleaned_{Path(garment.original_image.name).stem}.png", ContentFile(buf.getvalue()), save=True)
+    # upload_to already adds "garments/". The original is deleted once the cleaned image is stored (docs/02
+    # "originals are deleted after processing"; there is no Save / Cancel preview, docs/09 #111).
+    original = garment.original_image.name
+    garment.image.save(f"cleaned_{Path(original).stem}.png", ContentFile(buf.getvalue()), save=False)
+    garment.original_image = None
+    garment.save()
+    try:
+        garment.image.storage.delete(original)
+    except Exception:
+        logger.warning("could not delete the original of garment %d", garment.pk)

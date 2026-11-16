@@ -578,3 +578,14 @@ _(none blocking P0)_
      - Cut for the submission (known limits): engine rounds (side line, armpit fold, #48 hem, keep_shape shoulder,
        render time), prompts 02 / 04 / 05, public garments + moderation, explicit `POST outfits/` (an outfit is
        stored by every try-on).
+111. **2026-11-16, session 2: the project is shown as a live demo on the owner's machine** (owner: "jonli demo").
+     - A garment's original photo is deleted as soon as the cleaned image is stored (`run_garment_cleaning`;
+       there is no Save / Cancel preview, so nothing needs it afterwards). `original_preview_url` is then null.
+     - Frontend: nav = Bosh sahifa, Tana, Kiyimlar, Kiyib koʻrish, Obrazlar, Profil (design); new pages `/body`
+       (`BodyHome`) and `/profile` (`Profile`, screen 12: privacy, delete body, delete account); home page per
+       screen 2 (body card, newest garments, newest outfits, all from the API); emojis removed; new texts in
+       `locale/uz.ts` (`NAV`, `BODY_TEXT`, `PROFILE_TEXT`, `HOME`).
+     - Demo results rebuilt with the current engine (18; the demo T-shirt has the old landmark set and falls back
+       to `parts`). `DEMO_MODE` stays 0 for the live demo.
+     - README: "Live demo" walk-through and the known-limits list. `own_body_path.py`: 21 checks ok (also a garment
+       upload). 401 backend tests, 78 vitest, tsc. The new pages were not opened in a browser by Claude.

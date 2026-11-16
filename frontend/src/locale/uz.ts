@@ -137,3 +137,60 @@ export const BODY_UPLOAD = {
   sexRequired: 'Jinsingizni tanlang.',
 } as const
 
+
+export const NAV = {
+  home: 'Bosh sahifa', body: 'Tana', garments: 'Kiyimlar', tryOn: 'Kiyib koʻrish', outfits: 'Obrazlar',
+  avatars: 'Avatarlar', profile: 'Profil', logout: 'Chiqish',
+}
+
+export const BODY_TEXT = {
+  title: 'Mening tanam',
+  imageAlt: 'Tana rasmi',
+  confirmed: 'Tasdiqlangan',
+  privateOnly: 'Faqat sizga koʻrinadi',
+  lockedNote: 'Rasm va belgilar oʻzgarmaydi. Oʻlchamlarni yilda bir marta yangilash mumkin.',
+  tryOn: 'Kiyib koʻrish',
+  measurements: 'Oʻlchamlar',
+  profile: 'Profil va maxfiylik',
+  none: 'Hali tana yuklanmagan. Kiyib koʻrish uchun rasmingizni yuklang yoki modelni tanlang.',
+  upload: 'Rasm yuklash',
+  confirm: 'Tasdiqlash',
+  unconfirmed: 'Tasdiqlanmagan',
+}
+
+export const PROFILE_TEXT = {
+  title: 'Profil va maxfiylik',
+  account: 'Hisob',
+  logout: 'Chiqish',
+  privacy: 'Maxfiylik',
+  privacyPoints: [
+    'Tana rasmingiz, belgilar va oʻlchamlar faqat sizga koʻrinadi.',
+    'Yuklangan asl rasmlar qayta ishlangandan soʻng oʻchiriladi.',
+    'Kiyimlaringiz sukut boʻyicha shaxsiy.',
+  ],
+  danger: 'Maʼlumotlarni oʻchirish',
+  deleteBodyHelp: 'Tanani oʻchirsangiz, u bilan yaratilgan obrazlar ham oʻchadi. Keyin yangi rasm yuklashingiz mumkin.',
+  noBody: 'Tana yuklanmagan.',
+  deleteBody: 'Tanani oʻchirish',
+  deleteAccount: 'Hisobni oʻchirish',
+  deleteBodyConfirm: 'Tana va u bilan yaratilgan barcha obrazlar oʻchiriladi. Davom etilsinmi?',
+  deleteAccountConfirm: 'Hisobingiz, tanangiz, kiyimlaringiz va obrazlaringiz butunlay oʻchiriladi. Davom etilsinmi?',
+  bodyDeleted: 'Tana oʻchirildi.',
+  failed: 'Amal bajarilmadi. Qayta urinib koʻring.',
+}
+
+export const HOME = {
+  hello: 'Salom!',
+  lead: 'Kiyim tanlang va oʻzingizda koʻring.',
+  uploadGarment: 'Kiyim yuklash',
+  tryOn: 'Kiyib koʻrish',
+  garments: 'Kiyimlar',
+  outfits: 'Oxirgi obrazlar',
+  all: 'Hammasi',
+  noGarments: 'Hali kiyim yoʻq. Birinchi kiyimingizni yuklang.',
+  noOutfits: 'Hali obraz yoʻq. Kiyib koʻring, natija shu yerda saqlanadi.',
+  failed: 'Maʼlumotni yuklab boʻlmadi. Sahifani yangilang.',
+  garmentAlt: 'Kiyim',
+  outfitAlt: 'Obraz',
+  preparing: 'Tayyorlanmoqda…',
+}

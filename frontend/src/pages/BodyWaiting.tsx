@@ -39,7 +39,6 @@ export default function BodyWaiting() {
     >
       {job?.status === 'failed' ? (
         <>
-          <div style={{ fontSize: 40 }}>❌</div>
           <h2 style={{ fontSize: 22 }}>Tekshiruvdan oʻtmadi</h2>
           <p style={{ color: 'var(--danger)', maxWidth: 400 }}>
             {job.error_message || 'Rasm talablarga javob bermadi. Iltimos qayta urinib koʻring.'}
@@ -54,7 +53,7 @@ export default function BodyWaiting() {
           <h2 style={{ fontSize: 22 }}>Rasm tekshirilmoqda</h2>
           <p style={{ color: 'var(--muted)', maxWidth: 360 }}>
             {job?.status === 'running'
-              ? 'Sun\'iy intellekt rasmingizni tahlil qilmoqda…'
+              ? 'Rasm tekshirilmoqda va tayyorlanmoqda…'
               : 'Navbatda kutilmoqda…'}
           </p>
           {error && <p className="error-text">{error}</p>}

@@ -1,7 +1,7 @@
 # TryOn Studio
 
 2D virtual try-on (MVP): a T-shirt or pants photo is cut out, marked with landmarks and **deformed onto a body**
-(one of 6 model avatars, later the user's own photo) by landmarks, not pasted on. Django + React, all in Docker.
+(one of 6 model avatars or the user's own photo) by landmarks, not pasted on. Django + React, all in Docker.
 Instructions for Claude Code and all decisions: `CLAUDE.md` and `docs/` (source of truth: `docs/02`, `docs/09`).
 
 ## Run
@@ -53,27 +53,46 @@ Rebuild after reseeding avatars. Currently built: 1 T-shirt + 1 pants x 6 avatar
 9. `tools/tryon_check/run.py` renders every avatar x garment and measures sleeve reach, covered hands, hem, distortion.
 10. AI prompts and the Uzbek error table live in `prompts/`; decisions in `docs/09`; diagrams in `docs/diagrams/`.
 
-## Not done / known limits (honest list, 2026-11-10)
-- **Own-body flow does not work end to end.** The body pipeline (code checks, normalization, landmarks) is not built;
-  the body AI check (prompt 02) is not wired, so uploads fail closed with "try again later" unless `AI_DEV_BYPASS=1`;
-  the body landmark editor is not built, so `BodyConfirm` cannot confirm. Plan: docs/09 #22-36 and the Part B plan.
-- **Avatar measurements are nominal** (fixed per sex/build in `seed_avatars`, not measured from the photos); "nearest
-  avatar" uses them. Avatar landmarks are auto-detected from the mask and look right on all 6, but there is no staff
-  editor to correct them yet.
-- **Realistic render (prompt 05) is absent.** AI garment cleaning (prompt 04) is off: hangers are not removed.
-- Garment upload has no Save/Cancel preview and keeps the original photo after cleaning (breaks the "originals
-  deleted" rule until step 6 is finished). Every try-on creates an outfit (no explicit save yet).
-- Engine limits: arms that touch the body cannot be separated, so hands there may stay under the garment (warning);
-  a T-shirt is as long as its own landmarks say (cut below crotch + 35 % of crotch->knee); puff sleeves stand out
-  past the arm edge; distortion > 1.4x is reported as a warning, not fixed. The demo pants' landmarks were derived
-  from the cutout automatically, not hand-marked.
-- The frontend does not follow `design/` yet (screens 3, 5, 6, 8, 9, 12 missing). Only 2 demo garments (target ~10).
+## Live demo (2026-11-17)
+Before the demo: `docker compose up -d`, wait until `http://localhost:5173` opens, then run the end-to-end check
+(a temporary user, deleted at the end; prints `ALL OK`):
+```
+docker compose exec -T backend python manage.py shell < tools/tryon_check/own_body_path.py
+```
+The local `.env` runs with `AI_DEV_BYPASS=1` and `BODY_AI_CHECK_ENABLED=0`: no Gemini call is made, nothing depends on
+the network. Leave `DEMO_MODE=0` (the stored demo results use two old garments).
+Walk-through, logged in as the owner of the marked garments:
+1. **Bosh sahifa**: the body card, the newest garments and outfits.
+2. **Kiyimlar** -> a garment -> the landmark editor (T-shirts: step 2 is the neckline). **Kiyim yuklash**: upload a
+   photo, the background is removed, the original file is deleted.
+3. **Kiyib koʻrish** -> **Model**: enter sex + four measurements -> the nearest model is chosen -> pick a T-shirt
+   and pants -> the result in about 1.5 s; it is stored under **Obrazlar**.
+4. **Tana** (own body, a second account without a body): upload an A-pose photo -> code checks, 600x1200, auto
+   landmarks -> correct them in the editor -> **Tasdiqlash** (locked) -> **Kiyib koʻrish** -> **Mening tanam**.
+5. **Profil**: privacy rules, delete the body (its outfits go with it) or the account.
+A garment whose gender does not match the body is refused (`GENDER_MISMATCH`): #28 is male, #40 / #43 / #47 female.
+
+## Not done / known limits (honest list, 2026-11-16; details docs/09 #110)
+- **Body AI check (prompt 02) is not wired.** With `BODY_AI_CHECK_ENABLED=1` and no bypass an own-body upload fails
+  closed with "try again later". The demo runs with the bypass: adults-only rests on the "I am 18+" confirmation and
+  the clothing rule (tight, short-sleeved) is not checked; the code checks (person found, whole figure, framing) run.
+- **AI garment cleaning (prompt 04) and the realistic render (prompt 05) are absent**: garments are cut out by rembg
+  only (hangers stay), no Save / Cancel preview. Public garments, moderation (prompt 03) and reports are not built.
+- **Avatar measurements are nominal** per sex / build; the nearest model is matched on them; its landmarks are not
+  adjusted to the entered measurements.
+- Every try-on stores an outfit (no explicit save step). Measurements entered after confirmation start the yearly lock.
+- **Engine:** keep_shape T-shirts narrower than the hips show the pants beside them; an armpit fold on #43, a pinched
+  cuff on #40, the uneven hem of jeans #48; an adapt T-shirt renders in about 1.2-1.5 s; arms that touch the body
+  cannot be separated (hands may stay under the garment, warning); shorts and white / black pants are not measured.
+  Own body: the auto landmarks are a starting point, unedited shoulders can leave a gap at the sleeve seam.
+- The frontend follows `design/` for the navigation, home, body, profile and editor pages; screens 3, 6, 8, 9 are
+  simpler than the artboards. No ESLint config.
 
 ## Commands
 ```
-docker compose exec -T backend python manage.py test apps     # 186 tests
+docker compose exec -T backend python manage.py test apps     # 401 tests
 docker compose exec -T frontend npx tsc --noEmit              # type check
-docker compose exec -T frontend npm test                      # vitest: 44 tests (landmark editor, body cm)
+docker compose exec -T frontend npm test                      # vitest: 78 tests (landmark editor, body cm)
 docker compose exec -T backend python manage.py migrate
 docker compose exec -T backend python manage.py seed_avatars [--from /avatars | --force]
 docker compose exec backend python manage.py create_staff_user --email you@example.com   # asks the password
