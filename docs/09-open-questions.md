@@ -599,3 +599,14 @@ _(none blocking P0)_
      shoulder pair keeps its aligned y (the seam hangs lower instead of being pinned to the shoulder row).
      Numbers and what got worse: docs/06 "keep_shape scale, round 19". adapt is not touched; the regression
      fixtures are pinned to "shoulder". 402 backend tests.
+113. **2026-11-16: tube sleeves end on the arm/torso boundary** (round 20; owner: "the task now is the sleeves,
+     they are in a very bad state"). Setting `TRYON_MLS_TUBE_CLIP` (arm | armhole, default arm; armhole = before
+     #113); `tshirt_config.tube_clip` = "arm" when used. Cause found: the tube's domain was clipped by the body
+     armhole line (shoulder target -> armpit target) EXTENDED below the armpit; on short cap sleeves whose cuff
+     row lies where the arm still touches the torso, the tube's inner half was drawn over the chest as a
+     sharp-edged triangle (#43, #47, #40, #28, #45 as adapt). Now, below the armpit row, a tube px on the torso
+     side of `arm_torso_boundary` (+ 2 px; the crease column below the crease) is not drawn where the MLS layer
+     underneath has solid fabric. Measured (5 garments x 6 avatars, `run_clip20.py`): 18588 tube px clipped, new
+     holes 0 / 30, px changed outside the sleeve band 0. 402 backend tests.
+     **Not fixed in the sleeves:** the pinched cuff of #40, a dark dot at the armpit crease, skin at the top of
+     the shoulder on #47, ragged cuff px on #45, and keep_shape sleeves (no tube: they stand out sideways).

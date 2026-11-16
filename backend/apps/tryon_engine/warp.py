@@ -1684,7 +1684,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  mls_sleeve: str = "C", mls_tube: bool = False, mls_side_floor: str = "off",
                  mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
                  finish: str = "r60", finish_pants: bool = False, pants_tuck: bool = False,
-                 mls_keep_scale: str = "shoulder"):
+                 mls_keep_scale: str = "shoulder", mls_tube_clip: str = "armhole"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1737,6 +1737,9 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     "off"; debug["tshirt_final"] = the T-shirt layer as composited, debug["arm_weight"] = the arm overlay weight.
     finish_pants (setting TRYON_FINISH_PANTS, docs/09 #108, docs/06 "Finish pass on pants, round 17b"; the default
     here is the off value): finish "r17" also on the pants layer. debug["final_layers"] = {garment type: the layer as composited}.
+    mls_tube_clip (setting TRYON_MLS_TUBE_CLIP, docs/09 #113; the default here is the off value): "arm" = a tube
+    sleeve is not drawn on the torso side of the arm/torso boundary below the armpit row where the MLS layer has
+    solid fabric; `tshirt_config.tube_clip` is then "arm".
     mls_keep_scale (setting TRYON_MLS_KEEP_SCALE, docs/09 #112; the default here is the off value): "fit" = a
     keep_shape MLS T-shirt is scaled by mls.keep_shape_scale; `tshirt_config.keep_scale` is then "fit".
     pants_tuck (setting TRYON_PANTS_TUCK, docs/09 #109; the default here is the off value): MLS T-shirt + pants: the
@@ -1785,6 +1788,9 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                        armpit=mls_armpit if mls_tube and mls_side_floor == "mask" else "off",
                        cuff=mls_cuff if mls_tube else "chord", fringe=mls_fringe if mls_tube else "keep")
             adapt_kw = _mls_adapt_kwargs(cfg)
+            if cfg["tube"] and mls_tube_clip != "armhole":  # docs/09 #113
+                adapt_kw["tube_clip"] = mls_tube_clip
+                cfg["tube_clip"] = mls_tube_clip
         try:
             mls_layer, mls_info = mls_engine.tshirt_layer(
                 *by_type["tshirt"], body_lm, mask, fit, H, W,

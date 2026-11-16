@@ -183,7 +183,7 @@ class TaskTests(MediaTestCase):
                     "armpit": "off", "hem": "mls", "cuff": "chord", "fringe": "keep"}
             if mode == "adapt":  # the settings defaults (docs/09 #105, #106)
                 want.update(sleeve="C", tube=True, side_floor="mask", armpit="r14", hem="garment", cuff="hem",
-                            fringe="drop")
+                            fringe="drop", tube_clip="arm")  # tube_clip: docs/09 #113
             else:  # docs/09 #112
                 want["keep_scale"] = "fit"
             self.assertEqual(cfg[gid], want)

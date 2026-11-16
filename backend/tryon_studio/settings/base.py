@@ -207,7 +207,8 @@ TRYON_MLS_CHOICES = {"TRYON_MLS_TUBE": ("1", "0"), "TRYON_MLS_SIDE_FLOOR": ("mas
                      "TRYON_MLS_ARMPIT": ("r14", "off"), "TRYON_MLS_HEM": ("garment", "mls"),
                      "TRYON_MLS_CUFF": ("hem", "chord"), "TRYON_MLS_FRINGE": ("drop", "keep"),
                      "TRYON_FINISH": ("r17", "off"), "TRYON_FINISH_PANTS": ("1", "0"),
-                     "TRYON_PANTS_TUCK": ("1", "0"), "TRYON_MLS_KEEP_SCALE": ("fit", "shoulder")}
+                     "TRYON_PANTS_TUCK": ("1", "0"), "TRYON_MLS_KEEP_SCALE": ("fit", "shoulder"),
+                     "TRYON_MLS_TUBE_CLIP": ("arm", "armhole")}
 
 
 def parse_mls_choice(name, value):
@@ -240,6 +241,10 @@ TRYON_PANTS_TUCK = parse_mls_choice("TRYON_PANTS_TUCK", os.environ.get("TRYON_PA
 #   TRYON_MLS_KEEP_SCALE  fit (default) = the largest of the shoulder, length and width scales (mls.keep_shape_scale)
 #                         | shoulder = the garment's shoulder seams on the body's shoulder points (before #112)
 TRYON_MLS_KEEP_SCALE = parse_mls_choice("TRYON_MLS_KEEP_SCALE", os.environ.get("TRYON_MLS_KEEP_SCALE"))
+# docs/09 #113 (round 20): where a tube sleeve ends on the torso side below the armpit row.
+#   TRYON_MLS_TUBE_CLIP  arm (default) = the arm/torso boundary (no sleeve flap over the chest)
+#                        | armhole = the extended armhole line (before #113)
+TRYON_MLS_TUBE_CLIP = parse_mls_choice("TRYON_MLS_TUBE_CLIP", os.environ.get("TRYON_MLS_TUBE_CLIP"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

@@ -453,6 +453,7 @@ class FinishWiringTests(SimpleTestCase):
         self.assertEqual(parse_mls_choice("TRYON_FINISH_PANTS", None), "1")
         self.assertEqual(parse_mls_choice("TRYON_PANTS_TUCK", None), "1")
         self.assertEqual(parse_mls_choice("TRYON_MLS_KEEP_SCALE", None), "fit")
+        self.assertEqual(parse_mls_choice("TRYON_MLS_TUBE_CLIP", None), "arm")
         with self.assertRaises(ImproperlyConfigured):
             parse_mls_choice("TRYON_FINISH_PANTS", "yes")
         self.assertEqual(parse_mls_choice("TRYON_FINISH", None), "r17")

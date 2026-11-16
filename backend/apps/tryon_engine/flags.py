@@ -12,7 +12,8 @@ contact shadow; the three realism flags are then not read) | "off" = the three r
 TRYON_FINISH_PANTS (docs/09 #108, default 1): with TRYON_FINISH=r17 the pants layer gets the finish too | 0 = T-shirts
 only, the behaviour before #108. Without TRYON_FINISH=r17 it does nothing.
 TRYON_PANTS_TUCK (docs/09 #109, default 1): an adapt MLS T-shirt worn with pants hangs over them | 0 = before #109.
-TRYON_MLS_KEEP_SCALE (docs/09 #112, default fit): keep_shape MLS T-shirts are scaled to fit the body | shoulder = before."""
+TRYON_MLS_KEEP_SCALE (docs/09 #112, default fit): keep_shape MLS T-shirts are scaled to fit the body | shoulder = before.
+TRYON_MLS_TUBE_CLIP (docs/09 #113, default arm): tube sleeves end on the arm/torso boundary | armhole = before."""
 from django.conf import settings
 
 
@@ -23,7 +24,7 @@ def render_flags(source: str = "body") -> dict:
         raise ValueError(f"unknown body source: {source!r}")
     r17 = settings.TRYON_FINISH == "r17"
     return {"source": source, "finish": "r17" if r17 else "r60",
-            "finish_pants": r17 and settings.TRYON_FINISH_PANTS, "pants_tuck": settings.TRYON_PANTS_TUCK, "mls_keep_scale": settings.TRYON_MLS_KEEP_SCALE,
+            "finish_pants": r17 and settings.TRYON_FINISH_PANTS, "pants_tuck": settings.TRYON_PANTS_TUCK, "mls_keep_scale": settings.TRYON_MLS_KEEP_SCALE, "mls_tube_clip": settings.TRYON_MLS_TUBE_CLIP,
             "shading": r17 or settings.TRYON_SHADING, "contact_shadows": r17 or settings.TRYON_CONTACT_SHADOW,
             "edge_feather": r17 or settings.TRYON_EDGE_FEATHER, "shoulder_cap": settings.TRYON_SHOULDER_CAP,
             "hem_snap": settings.TRYON_HEM_SNAP, "halo_removal": settings.TRYON_HALO_REMOVAL,

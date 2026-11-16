@@ -146,6 +146,8 @@ HEM_SMOOTH_BAND = 0.08  # x torso length: the vertical remap of hem_mode="smooth
 HEM_SMOOTH_NEAR = 60  # px: only columns whose bottom edge is this close to the hem target row are smoothed
 SIDE_TOUCH = 1.3  # a side's mask edge farther from the axis than this x the landmark half-span = an arm touching
 TUBE_SECTIONS = 6  # cross-sections along the sleeve (a parameter: long sleeves would reuse the tube with more)
+TUBE_CLIPS = ("armhole", "arm")
+TUBE_CLIP_EASE = 2  # px the tube may reach past the arm/torso boundary (clip="arm")
 TUBE_BLEND_PX = 10  # px from the body armhole segment over which the tube map is blended into the torso MLS map
 TUBE_U_MARGIN = 0.15  # the strip extends this x the half-width beyond each edge (antialiased edges, no clipping)
 TUBE_SUB = 6  # mesh steps per section interval (t) for the piecewise-affine inverse map
@@ -1426,7 +1428,7 @@ def _underarm_zone(H, W, inner, ca, cb, B0, B1):
 
 
 def tube_sleeves(img, glm, blm, mask, pairs, s, mx, my, arms=None, sections=TUBE_SECTIONS, blend=TUBE_BLEND_PX,
-                 mode="tube", tube_maps=None, arm="r11", armpit_mode="off", cuff="chord"):
+                 mode="tube", tube_maps=None, arm="r11", armpit_mode="off", cuff="chord", clip="armhole"):
     """Round 11 benchmark (keyword tshirt_layer(sleeve_mode="tube" | "tube_perp"), adapt only, docs/06 "Tube sleeve,
     round 11"). Per side the sleeve is a strip in (t, u): t along the axis, u across (-1 = outer edge, +1 = inner
     edge, outer and inner widths measured separately at `sections` cross-sections).
@@ -1679,6 +1681,23 @@ def tube_sleeves(img, glm, blm, mask, pairs, s, mx, my, arms=None, sections=TUBE
         mls_sleeve[okm] = g_sleeve[sy_[okm], sx_[okm]] & (alpha[sy_[okm], sx_[okm]] > 0)
         out_side = ((P - B0) @ ba) > 0
         dom &= out_side  # the tube works only outward of the body armhole line (torso px never touched)
+        if clip == "arm":  # round 20 (docs/09 #113): below the armpit row the extended armhole line runs into the
+            # chest; there the tube ends on the arm/torso boundary (touch rows) and on the crease column below it
+            b_rows, crease = arm_torso_boundary(mask, blm, side)
+            if crease is not None:
+                lim = np.full(H, np.nan, np.float32)
+                for y_, x_ in b_rows.items():
+                    lim[int(y_)] = x_
+                lim[int(crease[1]):] = crease[0]
+                edge = lim[:, None] + (TUBE_CLIP_EASE if side == "left" else -TUBE_CLIP_EASE)
+                with np.errstate(invalid="ignore"):
+                    torso_px = (X > edge) if side == "left" else (X < edge)
+                under = np.zeros((H, W), bool)  # only where the MLS layer below has solid fabric: nothing uncovered
+                under[okm] = alpha[sy_[okm], sx_[okm]] >= 250
+                under = cv2.erode(under.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+                torso_px &= under
+                rep["clip_arm_px"] = int((dom & torso_px & (tmx >= 0)).sum())
+                dom &= ~torso_px
         # t = 0 segment (output) and the side beyond it (towards the cuff)
         T0a, T0b = point(O[0], -1.0), point(O[0], 1.0)
         seg = T0b - T0a
@@ -1954,13 +1973,15 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
                  shoulder_fractions=SHOULDER_LINE_FRACTIONS, shoulder_ease=SHOULDER_LINE_EASE,
                  shoulder_edge_alpha=128, sleeve_mode="mls", side_floor_mode="landmarks", hem_mode="off",
                  tube_arm="r11", hem_c_pair=False, armpit_mode="off", cuff_mode="chord", tube_fringe="keep",
-                 keep_scale="shoulder"):
+                 keep_scale="shoulder", tube_clip="armhole"):
     """(BGRA layer HxW, info {engine, pairs, rejected, s, neck_opening?, sleeve_hems, runtime, map?}).
     keep_scale (keep_shape only, docs/09 #112): "shoulder" = the scale before #112 | "fit" = keep_shape_scale.
     Raises MlsUnavailable (missing landmarks, failed core pairs, bad geometry): the caller uses the parts engine.
     sleeve_variant: benchmark only (module docstring); debug_map: info["map"] = (mx, my) for the fold metric."""
     if sleeve_variant not in SLEEVE_VARIANTS:  # a programming error, never a silent fallback to parts
         raise ValueError(f"unknown sleeve variant: {sleeve_variant!r}")
+    if tube_clip not in TUBE_CLIPS:
+        raise ValueError(f"unknown tube clip: {tube_clip!r}")
     if keep_scale not in KEEP_SCALES:
         raise ValueError(f"unknown keep_shape scale: {keep_scale!r}")
     if neckline_variant not in NECKLINE_VARIANTS:
@@ -2047,7 +2068,7 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
                 my = ((1 - win) * my + win * ay).astype(np.float32)
     tube_maps = (np.full((H, W), -1.0, np.float32), np.full((H, W), -1.0, np.float32)) if sleeve_mode != "mls" else None
     tube = tube_sleeves(img, glm, body_lm, mask, pairs, s, mx, my, mode=sleeve_mode, tube_maps=tube_maps,
-                        arm=tube_arm, armpit_mode=armpit_mode, cuff=cuff_mode) \
+                        arm=tube_arm, armpit_mode=armpit_mode, cuff=cuff_mode, clip=tube_clip) \
         if sleeve_mode != "mls" else None
     f = img.astype(np.float32)
     f[:, :, :3] *= f[:, :, 3:4] / 255.0

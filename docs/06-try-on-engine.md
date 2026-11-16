@@ -1796,3 +1796,22 @@ further out (last three rows), most on f-plus; the shoulder seam is not laid on 
 follow the arm direction (not done: directions 2 and 3 of the keep_shape report). With pants: the pants beside the
 T-shirt are gone on #44 x 6 and mostly on #45 (sheets). Sheets: `out/sheet_keep19_<tshirt>_<pants>.png` (per
 avatar: shoulder | fit). Tests: `PantsTuckTests.test_keep_shape_scale_fit`, `TaskTests.test_mls_complete_tshirt`.
+
+### Tube clip, round 20 (2026-11-16; in production, docs/09 #113)
+Keyword `mls.tshirt_layer(tube_clip="armhole" | "arm")` (own default "armhole"), `render_tryon(mls_tube_clip=)`,
+setting `TRYON_MLS_TUBE_CLIP` (default arm). In `tube_sleeves`, after the armhole-line clip: rows from the body
+armpit row down, limit x = `arm_torso_boundary` on the touch rows and the crease x below; a tube px beyond the
+limit + `TUBE_CLIP_EASE` (2 px) towards the torso is dropped when the MLS layer under it has alpha >= 250 (eroded
+5 x 5), so nothing is uncovered. Report `tube[side]["clip_arm_px"]`.
+
+| garment (as adapt) | runs | tube px clipped | new holes | px changed outside the sleeve band |
+|---|---|---|---|---|
+| #28 | 6 | 3825 | 0 | 0 |
+| #40 | 6 | 2320 | 0 | 0 |
+| #43 | 6 | 2711 | 0 | 0 |
+| #45 | 6 | 4412 | 0 | 0 |
+| #47 | 6 | 5320 | 0 | 0 |
+
+Runner `tools/warp-benchmark/run_clip20.py`, sheets `out/sheet_clip20_<id>.png` (per avatar: armhole | arm),
+`out/table_clip20.md`. The first version without the "solid fabric under it" condition uncovered 4 figure px on
+one #47 render. Not done: see docs/09 #113.
