@@ -31,9 +31,14 @@ section itself is not committed yet.
    `tools/warp-benchmark/run_finish17.py`, tests `FinishR17Tests`. Defaults unchanged (realism flags 0, finish r60).
    **Owner chose r17; in production for T-shirts only (docs/09 #107, uncommitted):** setting `TRYON_FINISH`
    (r17 | off), job result `finish`, tests `FinishWiringTests`; 389 backend tests, 78 vitest, tsc. Pants: their own
-   round after the owner uploads 2-4 pants (only #18 exists). Open: the reference layers of #43 / #40 changed by
-   4-44 hard edge px between the 10:36 and 11:25 runs on 2026-11-16 (DB data, cause not confirmed; ask the owner
-   whether they re-marked landmarks). Ideas after it, in the proposed order: side ease + smooth side line, hem rule (#91),
+   round after the owner uploads 2-4 pants (only #18 exists). The reference layers of #43 / #40 changed by
+   4-44 hard edge px between the 10:36 and 11:25 runs on 2026-11-16: the owner re-marked their landmarks in
+   between (confirmed), not an engine change.
+   **Round 17b, pants (benchmark only, uncommitted; docs/06 "Finish pass on pants, round 17b"):** the owner
+   uploaded pants #48, #49, #51; `render_tryon(finish_pants=True)` + `run_finish17.py` with `PANTS=1`: r17 0 new
+   holes on 24 renders; round 17c (`run_finish17c.py`, 5 outfits x 6 avatars): 0 new holes. **In production
+   (docs/09 #108, uncommitted):** setting `TRYON_FINISH_PANTS` (1 | 0). 390 backend tests, 78 vitest, tsc. Not
+   measured: shorts, white / black pants. The pants #48, #49, #51 are stored as `unisex`. Ideas after it, in the proposed order: side ease + smooth side line, hem rule (#91),
    armpit / cuff leftovers, keep_shape shoulder triangle, 2x resampling for moire.
 3. Stepped torso edge (2-5 px) beside the gap below the armpit on #28 (seen in the `POST tryon/` check sheet).
 4. Robustness of r14: it skips a side when `torso_side_edges` finds no arm-touch rows (older landmarks); r14 without

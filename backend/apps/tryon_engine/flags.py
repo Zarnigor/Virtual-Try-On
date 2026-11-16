@@ -8,7 +8,9 @@ only, docs/09 #102). TRYON_MLS_SLEEVE: MLS sleeve variant, default "C" (docs/09 
 (garment | mls); each off value = the behaviour before #105. Tube sleeves (docs/09 #106): TRYON_MLS_CUFF (hem | chord),
 TRYON_MLS_FRINGE (drop | keep); each second value = the behaviour before #106.
 TRYON_FINISH (docs/09 #107): "r17" (default) = the round 17 finish on the T-shirt layer (smooth edge + form shading +
-contact shadow; the three realism flags are then not read) | "off" = the three realism flags as before."""
+contact shadow; the three realism flags are then not read) | "off" = the three realism flags as before.
+TRYON_FINISH_PANTS (docs/09 #108, default 1): with TRYON_FINISH=r17 the pants layer gets the finish too | 0 = T-shirts
+only, the behaviour before #108. Without TRYON_FINISH=r17 it does nothing."""
 from django.conf import settings
 
 
@@ -19,6 +21,7 @@ def render_flags(source: str = "body") -> dict:
         raise ValueError(f"unknown body source: {source!r}")
     r17 = settings.TRYON_FINISH == "r17"
     return {"source": source, "finish": "r17" if r17 else "r60",
+            "finish_pants": r17 and settings.TRYON_FINISH_PANTS,
             "shading": r17 or settings.TRYON_SHADING, "contact_shadows": r17 or settings.TRYON_CONTACT_SHADOW,
             "edge_feather": r17 or settings.TRYON_EDGE_FEATHER, "shoulder_cap": settings.TRYON_SHOULDER_CAP,
             "hem_snap": settings.TRYON_HEM_SNAP, "halo_removal": settings.TRYON_HALO_REMOVAL,

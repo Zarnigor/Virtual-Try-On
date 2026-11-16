@@ -534,3 +534,13 @@ _(none blocking P0)_
      own round after the owner uploads 2-4 pants (tight / loose, dark / light, optionally shorts). The old realism
      effects (#60, r60) stay available with `TRYON_FINISH=off`; they fail the no-new-holes gate (516-1319 px per
      render). Demo results not rebuilt.
+108. **2026-11-16: the round 17 finish is in production for pants too** (owner: "yes, wire r17 for pants too",
+     plan approved; docs/06 "Finish pass on pants, round 17b", "Finish pass on outfits, round 17c", "Production
+     wiring of the finish on pants"). Setting `TRYON_FINISH_PANTS` (1 | 0, default 1; needs `TRYON_FINISH=r17`;
+     0 = T-shirts only, the behaviour of #107). Job result `finish` = r17 when any garment got it. Benchmarks:
+     pants #18, #48, #49, #51 x 6 avatars and 5 T-shirt + pants outfits x 6 avatars: new holes 0, gates 0 fails.
+     Production gates: production image = the benchmark call 0 px (30 outfits, 24 pants alone, 30 T-shirts alone);
+     `TRYON_FINISH_PANTS=0` = the #107 output 0 px; `TRYON_FINISH=off` = the output before #107 0 px. 390 backend
+     tests, 78 vitest, tsc. This replaces "pants are not touched" of #107. Recorded: the owner's pants #48, #49,
+     #51 are stored as `unisex` (the owner described #48 / #49 as for girls, #51 as for men); shorts and
+     white / black pants are not measured; demo results not rebuilt.

@@ -24,7 +24,7 @@ but the frontend must fully work too (React is required). The owner works and re
   shoulder_* marked at the sleeve seam); wired only in the MLS engine (docs/09 #98). **MLS is the default T-shirt
   engine (`TRYON_WARP=mls`, docs/09 #105);** adapt T-shirts = sleeve C + tube + armpit r14 + side floor "mask" +
   garment hem + cuff hem + fringe drop (flags `TRYON_MLS_*`, docs/09 #105, #106); every T-shirt gets the r17
-  finish (`TRYON_FINISH`, docs/09 #107; pants do not); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
+  finish (`TRYON_FINISH`, docs/09 #107) and so do pants (`TRYON_FINISH_PANTS`, docs/09 #108); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
   **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
@@ -235,6 +235,11 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `TRYON_FINISH` (r17 | off, default r17), job result `finish`; pants untouched (their own round after the owner
       uploads 2-4 pants). Gates: production = benchmark r17 0 px, off = before 0 px, new holes 0 / 30
       (`run_finish17.py`, `VARIANTS=off,r17,prod,setting_off`). 389 backend tests, 78 vitest, tsc.
+      **2026-11-16 rounds 17b / 17c + production (docs/09 #108, docs/06 "Finish pass on pants, round 17b",
+      "Finish pass on outfits, round 17c", uncommitted):** `render_tryon(finish_pants=True)`; pants #18, #48, #49,
+      #51 x 6 avatars and 5 T-shirt + pants outfits x 6: 0 new holes. **In production:** setting
+      `TRYON_FINISH_PANTS` (1 | 0, default 1, needs `TRYON_FINISH=r17`). Gates 0 px (`run_finish17.py` with
+      `PANTS=1`, `run_finish17c.py`). 390 backend tests, 78 vitest, tsc. Not measured: shorts, white / black pants.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

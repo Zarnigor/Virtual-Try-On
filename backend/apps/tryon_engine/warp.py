@@ -1473,7 +1473,7 @@ def smooth_edges(layer: np.ndarray) -> np.ndarray:
     return out
 
 
-FINISH_ARM_NEAR = 12  # px around the T-shirt layer where the arm overlay border is soft (finish "r17")
+FINISH_ARM_NEAR = 12  # px around a finished layer where the arm overlay border is soft (finish "r17")
 FORM_SHADE = 0.10  # darkening at the garment's left / right outline (form shading, round 17)
 FORM_SHADE_LENGTH = 14.0  # px: the darkening falls to 1 / e this far inside the outline
 
@@ -1578,7 +1578,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True,
                  mls_sleeve: str = "C", mls_tube: bool = False, mls_side_floor: str = "off",
                  mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
-                 finish: str = "r60"):
+                 finish: str = "r60", finish_pants: bool = False):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1623,11 +1623,14 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
 
     finish (setting TRYON_FINISH, docs/09 #107, docs/06 "Finish pass, round 17"; the default here is the off value):
     "r60" = the realism effects as before, on every garment layer; "r17" = the effects that are on apply to the
-    T-shirt layer only (pants are composited plain, exactly as with every effect off) and work differently:
+    T-shirt layer (and to the pants layer with finish_pants; without it pants are composited plain, exactly as with
+    every effect off) and work differently:
     edge_feather = smooth_edges (nothing eroded) and a soft border of the arm overlay within FINISH_ARM_NEAR px of
-    the T-shirt; shading = form_shading_map (from the garment's outline, the avatar's luminance is not read);
-    contact_shadows also falls on the arm below the cuff. debug["finish"] = "r17" when a T-shirt got it, else
+    a finished layer; shading = form_shading_map (from the garment's outline, the avatar's luminance is not read);
+    contact_shadows also falls on the arm below the cuff. debug["finish"] = "r17" when a layer got it, else
     "off"; debug["tshirt_final"] = the T-shirt layer as composited, debug["arm_weight"] = the arm overlay weight.
+    finish_pants (setting TRYON_FINISH_PANTS, docs/09 #108, docs/06 "Finish pass on pants, round 17b"; the default
+    here is the off value): finish "r17" also on the pants layer. debug["final_layers"] = {garment type: the layer as composited}.
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -1722,12 +1725,16 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     r17 = finish == "r17"
     arm_dark = np.zeros((H, W), np.float32)
     info["finish"] = "off"
+    info["final_layers"] = {}
+    finished = np.zeros((H, W), bool)  # px of the layers that got finish "r17"
     for gtype, warped in layers:
-        if r17 and gtype != "tshirt":  # docs/09 #107: T-shirts only, pants as with every effect off
+        if r17 and gtype != "tshirt" and not finish_pants:  # docs/09 #107: pants as with every effect off
+            info["final_layers"][gtype] = warped
             canvas = _alpha_composite(canvas, warped)
             continue
         if r17 and (edge_feather or shading or contact_shadows):
             info["finish"] = "r17"
+            finished |= warped[:, :, 3] > 0
         if edge_feather:
             warped = smooth_edges(warped) if r17 else soften_edges(warped)
         if shading and r17:
@@ -1740,6 +1747,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
             arm_dark = np.maximum(arm_dark, dark)
         if gtype == "tshirt":
             info["tshirt_final"] = warped
+        info["final_layers"][gtype] = warped
         canvas = _alpha_composite(canvas, warped)
     if neck_gap_fill and source == "avatar" and "tshirt_layer" in info and info["engine"] == "parts":
         canvas, info["neck_gap"] = neck_gap_fill_fn(canvas, base, mask, body_lm, head,
@@ -1751,13 +1759,13 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                      0, 255).astype(np.uint8)
     keep = arm_overlay_mask(mask, arms, info.get("sleeve_hems"))
     info["arm_weight"] = keep.astype(np.float32)
-    if r17 and (edge_feather or contact_shadows) and "tshirt_final" in info:
+    if r17 and (edge_feather or contact_shadows) and finished.any():
         arm_px = base.astype(np.float32)
         if contact_shadows:  # the cuff's shadow on the arm (the plain overlay would paste the unshaded arm back)
             arm_px[:, :, :3] *= (1 - arm_dark)[:, :, None]
-        if edge_feather:  # soft only beside the T-shirt: the hands over the pants stay a plain paste
+        if edge_feather:  # soft only beside a finished layer: the hands over plain pants stay a plain paste
             k = 2 * FINISH_ARM_NEAR + 1
-            near = cv2.dilate((info["tshirt_final"][:, :, 3] > 0).astype(np.uint8), np.ones((k, k), np.uint8)) > 0
+            near = cv2.dilate(finished.astype(np.uint8), np.ones((k, k), np.uint8)) > 0
             info["arm_weight"] = np.where(near, soft_coverage(keep) * mask, keep).astype(np.float32)
         wgt = info["arm_weight"][:, :, None]
         canvas = np.clip(np.rint(canvas.astype(np.float32) * (1 - wgt) + arm_px * wgt), 0, 255).astype(np.uint8)

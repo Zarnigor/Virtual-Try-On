@@ -33,7 +33,7 @@ def _do_warp(outfit):
     """Renders and saves the result. Returns {engine: "parts" | "mls", quality_warnings: [...], neck_hole: {garment
     id: bool}, tshirt_config: {garment id: {...}}, finish, render_ms} for the job result (neck_hole: the owner
     polygon was used, debug, docs/09 #102; tshirt_config: what the T-shirt render actually used, docs/09 #105;
-    finish: "r17" when the T-shirt got the round 17 finish, else "off", docs/09 #107; render_ms: the render_tryon
+    finish: "r17" when a garment got the round 17 finish, else "off", docs/09 #107, #108; render_ms: the render_tryon
     call, without file I/O)."""
     import time
     import cv2

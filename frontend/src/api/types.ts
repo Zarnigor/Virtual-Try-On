@@ -327,7 +327,7 @@ export interface TryOnJobResult {
   neck_hole: Record<string, boolean>
   /** Debug (docs/09 #105): per T-shirt garment id, the config used. Absent in demo results. */
   tshirt_config?: Record<string, TshirtConfig>
-  /** Debug (docs/09 #107): "r17" = the T-shirt got the finish (smooth edge, form shading, contact shadow). Absent in demo results. */
+  /** Debug (docs/09 #107, #108): "r17" = a garment got the finish (smooth edge, form shading, contact shadow). Absent in demo results. */
   finish?: 'r17' | 'off'
   /** Debug (docs/09 #105): time of the render call in ms. Absent in demo results. */
   render_ms?: number

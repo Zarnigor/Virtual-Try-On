@@ -430,17 +430,19 @@ class FinishR17Tests(SimpleTestCase):
 
 
 class FinishWiringTests(SimpleTestCase):
-    """docs/09 #107: TRYON_FINISH = r17 (default) | off; the T-shirt layer only."""
+    """docs/09 #107, #108: TRYON_FINISH = r17 (default) | off; TRYON_FINISH_PANTS = 1 (default) | 0."""
 
     def test_flags_default_r17_and_off_is_the_three_flags(self):
         from django.test import override_settings
         f = render_flags("avatar")
-        self.assertEqual((f["finish"], f["edge_feather"], f["shading"], f["contact_shadows"]),
-                         ("r17", True, True, True))
+        self.assertEqual((f["finish"], f["edge_feather"], f["shading"], f["contact_shadows"], f["finish_pants"]),
+                         ("r17", True, True, True, True))
+        with override_settings(TRYON_FINISH_PANTS=False):
+            self.assertFalse(render_flags("avatar")["finish_pants"])
         with override_settings(TRYON_FINISH="off"):
             f = render_flags("avatar")
-            self.assertEqual((f["finish"], f["edge_feather"], f["shading"], f["contact_shadows"]),
-                             ("r60", False, False, False))
+            self.assertEqual((f["finish"], f["edge_feather"], f["shading"], f["contact_shadows"], f["finish_pants"]),
+                             ("r60", False, False, False, False))
             with override_settings(TRYON_SHADING=True):
                 self.assertTrue(render_flags("avatar")["shading"])
 
@@ -448,13 +450,16 @@ class FinishWiringTests(SimpleTestCase):
         from django.conf import settings
         from django.core.exceptions import ImproperlyConfigured
         from tryon_studio.settings.base import parse_mls_choice
+        self.assertEqual(parse_mls_choice("TRYON_FINISH_PANTS", None), "1")
+        with self.assertRaises(ImproperlyConfigured):
+            parse_mls_choice("TRYON_FINISH_PANTS", "yes")
         self.assertEqual(parse_mls_choice("TRYON_FINISH", None), "r17")
         self.assertEqual(parse_mls_choice("TRYON_FINISH", "OFF"), "off")
         with self.assertRaises(ImproperlyConfigured):
             parse_mls_choice("TRYON_FINISH", "r60")
         self.assertIn(settings.TRYON_FINISH, ("r17", "off"))
 
-    def test_pants_alone_are_untouched_and_report_off(self):
+    def test_pants_alone_are_untouched_and_report_off_without_finish_pants(self):
         base, lm = avatar()
         p, plm = pants()
         plain, _, d0 = warp.render_tryon(base, lm, [("pants", p, plm)])
@@ -462,6 +467,19 @@ class FinishWiringTests(SimpleTestCase):
                                        contact_shadows=True, finish="r17")
         self.assertTrue((plain == r17).all())
         self.assertEqual((d0["finish"], d1["finish"]), ("off", "off"))
+
+    def test_finish_pants_keyword_finishes_the_pants_and_uncovers_nothing(self):
+        base, lm = avatar()
+        p, plm = pants()
+        kw = dict(edge_feather=True, shading=True, contact_shadows=True, finish="r17")
+        plain, _, d0 = warp.render_tryon(base, lm, [("pants", p, plm)])
+        fin, _, d1 = warp.render_tryon(base, lm, [("pants", p, plm)], finish_pants=True, **kw)
+        self.assertEqual(d1["finish"], "r17")
+        self.assertTrue((plain != fin).any())
+        c0, c1 = d0["final_layers"]["pants"][:, :, 3] >= 128, d1["final_layers"]["pants"][:, :, 3] >= 128
+        self.assertTrue((c0 == c1).all())
+        same, _, _ = warp.render_tryon(base, lm, [("pants", p, plm)], finish_pants=True)  # no effect is on
+        self.assertTrue((plain == same).all())
 
     def test_with_a_tshirt_the_pants_px_away_from_it_are_untouched(self):
         base, lm = avatar()

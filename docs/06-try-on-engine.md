@@ -1665,8 +1665,8 @@ shading). Metric definitions in the runner's docstring. Totals over 30 renders:
 
 (Table of the last run, 2026-11-16 11:25. The first run at 10:36, which the owner's sheets came from, had off
 24911 / 1249 and smooth 8437 / 1104: #43 and #40 differ by 4-44 px per render between the two runs, #28, #44, #45
-are identical; three fresh processes now give identical layers, so the DB data of #43 / #40 changed in between
-(cause not confirmed).)
+are identical; three fresh processes give identical layers. Cause: the owner re-marked the landmarks of #43 and
+#40 between the two runs (confirmed by the owner).)
 Hard edge px per garment, off -> smooth: #28 7532 -> 1558, #43 7770 -> 1527, #40 8044 -> 1732, #44 688 -> 1766,
 #45 967 -> 1841 (the keep_shape layers already have a bilinear alpha edge; `smooth_edges` rebuilds the edge from
 alpha >= 128). Hard cuff px per garment, off -> smooth: #28 28 -> 17, #43 13 -> 13, #40 39 -> 39, #44 900 -> 793,
@@ -1698,3 +1698,57 @@ benchmark r17 call 0 px; flags under `TRYON_FINISH=off` vs the off call 0 px; ne
 `finish`); the fixture tests of `tests_neck_hole.py` pin the finish off (the fixtures predate #107). 389 backend
 tests, 78 vitest, tsc. **Not done:** pants (one pair in the DB, #18; a later round once more pants are uploaded);
 the demo results are not rebuilt.
+
+### Finish pass on pants, round 17b (2026-11-16; in production since docs/09 #108)
+The round 17 finish on the pants layer. Keyword `render_tryon(finish_pants=True)` (own default False): with finish
+"r17" the pants layer gets the same three effects as the T-shirt; the arm overlay border is soft within 12 px of
+any finished layer. As a benchmark round production was unchanged (the wiring is two sections below).
+Runner: `run_finish17.py` with `PANTS=1 GARMENTS=18,48,49,51` (pants alone, DB garments, 6 avatars = 24 renders per
+variant; files `*_finish17b_*`). Garments: #18 demo pants, #48 jeans, #49, #51 red joggers (the owner's uploads of
+2026-11-16; all three are stored as `unisex`). Same variants and metrics as round 17. Totals over 24 renders:
+
+| variant | hard edge px | new holes | lost px | gained px | mean dL fabric | mean dL skin near | changed outside | runtime s mean |
+|---|---|---|---|---|---|---|---|---|
+| off | 4926 | 0 | 0 | 0 | 0.00 | 0.00 | 0 | 0.128 |
+| all (r60) | 0 | 8408 | 60264 | 0 | 0.26 | -2.49 | 0 | 0.186 |
+| smooth | 7021 | 0 | 0 | 0 | -0.22 | -0.08 | 0 | 0.145 |
+| smooth_shadow | 7021 | 0 | 0 | 0 | -0.22 | -3.20 | 0 | 0.155 |
+| r17 | 7021 | 0 | 0 | 0 | -3.31 | -3.35 | 0 | 0.171 |
+
+Hard edge px per garment, off -> smooth: #18 887 -> 1711, #48 1130 -> 2104, #49 899 -> 1471, #51 2010 -> 1735
+(the pants layer already has a bilinear alpha edge, as the keep_shape T-shirts do; the px counted after `smooth_edges`
+are the ones the no-uncover clamp holds at 128 / 255). Hard cuff px 0 in every variant (pants alone).
+**GATE (new holes 0, changed outside 0): "all" (r60) fails 24 / 24 (2003-2303 new holes per garment over 6 renders);
+smooth, smooth_shadow, r17 fail 0 / 24.** Extra time per render: smooth + 0.017 s, smooth_shadow + 0.027 s,
+r17 + 0.043 s.
+**Not measured:** shorts; white or black pants (a T-shirt and pants worn together: round 17c below).
+Sheets: `out/sheet_finish17b_<id>.png`, `out/zoom_finish17b_<id>.png` (3x crops waist / hip / crotch / hem),
+`out/table_finish17b.md`. Test: `FinishWiringTests.test_finish_pants_keyword_finishes_the_pants_and_uncovers_nothing`.
+
+### Finish pass on outfits, round 17c (2026-11-16)
+A T-shirt and pants worn together. Runner `tools/warp-benchmark/run_finish17c.py` (DB garments, through
+`render_tryon` with the settings flags): outfits #28 + #51, #43 + #48, #40 + #49, #44 + #18, #45 + #51 x 6 avatars =
+30 renders per variant. Variants: off | tshirt (finish on the T-shirt layer only, production of #107) | both
+(`finish_pants=True`). Against "off", totals over 30 renders:
+
+| variant | new holes T-shirt | new holes pants | changed outside | pants px changed farther than 24 px from the T-shirt | runtime s mean (off 0.884) |
+|---|---|---|---|---|---|
+| tshirt | 0 | 0 | 0 | 0 | 0.938 |
+| both | 0 | 0 | 0 | 2923902 | 0.977 |
+
+**GATE (new holes 0, changed outside 0, "tshirt" leaves the pants untouched away from the T-shirt): 0 / 60 runs
+fail.** Sheets: `out/sheet_finish17c_<tshirt>_<pants>.png`, `out/zoom_finish17c_<tshirt>_<pants>.png` (3x crops at
+the T-shirt hem corners over the waistband, hip, crotch), `out/table_finish17c.md`.
+
+### Production wiring of the finish on pants (2026-11-16, docs/09 #108)
+Owner: "yes, wire r17 for pants too". Setting `TRYON_FINISH_PANTS` (1 | 0, default 1; an invalid value stops
+startup): with `TRYON_FINISH=r17`, `flags.render_flags` passes `finish_pants=True`; 0 = T-shirts only (the
+behaviour of #107); without `TRYON_FINISH=r17` it does nothing. The job result `finish` is "r17" when any garment
+got the finish (a pants-only outfit now reports "r17").
+Gates, final image, 0 px each: outfits (30): production flags = "both", flags under `TRYON_FINISH_PANTS=0` =
+"tshirt"; pants alone (#18, #48, #49, #51 x 6 = 24): production flags = the r17 call, flags under
+`TRYON_FINISH_PANTS=0` = "off", flags under `TRYON_FINISH=off` = "off"; T-shirts alone (30): production flags =
+the r17 call of #107, `TRYON_FINISH=off` = "off". New holes 0 in every run. Real `POST tryon/` through the worker
+(`tools/tryon_check/post_path.py`, `GARMENTS=48,49,51,28`): 18 pants jobs + 3 T-shirt jobs done, all `finish: r17`.
+Tests: `FinishWiringTests` (5). 390 backend tests, 78 vitest, tsc. **Not done:** shorts and white / black pants
+are not measured; the demo results are not rebuilt.
