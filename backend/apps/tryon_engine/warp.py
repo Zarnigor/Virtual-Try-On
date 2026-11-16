@@ -1126,10 +1126,13 @@ def pants_scale(g: dict, a: dict, H: int) -> tuple[float, bool]:
 
 def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
                arms: dict | None = None, info: dict | None = None,
-               mask: np.ndarray | None = None) -> tuple[np.ndarray, list]:
-    """Pants keep their own silhouette: one uniform scale for both axes (waist..hem vs the body's waist..ankle,
+               mask: np.ndarray | None = None, engine: str = "rows") -> tuple[np.ndarray, list]:
+    """engine "fit" = warp_pants_fit (round 21, docs/09 #114); "rows" (the default here) = as before:
+    Pants keep their own silhouette: one uniform scale for both axes (waist..hem vs the body's waist..ankle,
     or the rise for shorter pants). Only the waistband is fitted to the body; below the hip each row is
     pants_width(garment, body). Each leg is centred on the body's leg centreline (crotch -> knee -> ankle)."""
+    if engine == "fit":
+        return warp_pants_fit(body_lm, garment_lm, garment_img, H, W, arms=arms, info=info, mask=mask)
     warnings: list[str] = []
     g, a = garment_lm, body_lm
     img = _bgra(garment_img)
@@ -1243,6 +1246,226 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
     if info is not None:
         info["pants_waist_y"] = a_wy
         info["pants_top_dip"] = top_dip
+    return result, warnings
+
+
+PANTS_FIT_MAX = 1.7  # "fit": the one horizontal factor is at most this (beyond it single rows widen, warning)
+PANTS_FIT_JOIN = 0.3  # "fit": share of crotch..knee over which a leg leaves the waist block's edges
+PANTS_FIT_TOP = 0.4  # "fit": share of crotch..knee whose rows count for the hip factor (below: the leg factor)
+PANTS_FIT_SIGMA = 7.0  # "fit": rows (x ROW_STEP px) of the blur behind a leg's factor profile
+PANTS_FIT_SEAM = 2.0  # "fit": px the two legs overlap where they meet on the crotch axis
+PANTS_FIT_COVER = 3.0  # px the pants reach past the body leg in the mask
+
+
+def _leg_span(alpha: np.ndarray, sy: float, fallback: tuple, side: str, axis: float) -> tuple[float, float]:
+    """One leg's whole span in garment row sy: every run on its side of the axis that overlaps the landmark span,
+    from the first to the last (a slit at the hem splits the leg into two runs: both belong to it)."""
+    y = min(max(int(round(sy)), 0), alpha.shape[0] - 1)
+    runs = []
+    for l, r in _runs(alpha[y]):
+        if l <= axis <= r:
+            l, r = (l, int(axis)) if side == "left" else (int(axis), r)
+        elif (r < axis) != (side == "left"):
+            continue
+        if r >= fallback[0] and l <= fallback[1]:
+            runs.append((l, r))
+    if not runs or max(q[1] for q in runs) - min(q[0] for q in runs) < 0.3 * (fallback[1] - fallback[0]):
+        return fallback
+    return float(min(q[0] for q in runs)), float(max(q[1] for q in runs)) + 1.0
+
+
+def _torso_cover(mask, y: float, axis: float, bl: float, br: float) -> tuple[float, float]:
+    """(left, right) x the pants block must reach in row y: the figure's run through the axis + PANTS_FIT_COVER,
+    at most 10 % of the landmark width beyond the landmark span (an arm that touches the hip is not the hip)."""
+    if mask is None:
+        return bl, br
+    yi = min(max(int(round(y)), 0), mask.shape[0] - 1)
+    run = next((q for q in _runs(mask[yi]) if q[0] <= axis <= q[1]), None)
+    if run is None:
+        return bl, br
+    lim = 0.1 * (br - bl)
+    return max(run[0] - PANTS_FIT_COVER, bl - lim), min(run[1] + 1 + PANTS_FIT_COVER, br + lim)
+
+
+def _pants_leg_profile(need: list, fx: float, sigma: float = PANTS_FIT_SIGMA) -> list:
+    """A leg's horizontal factor per row: starts at the hip factor fx, then the smooth upper envelope of what the
+    body needs (>= 1, <= PANTS_FIT_MAX): wide where the body is wider than the garment, the garment's own width
+    (factor 1) where it is loose; smooth along the leg so the outline has no kinks."""
+    n = np.clip(np.asarray(need, np.float64), 1.0, PANTS_FIT_MAX)
+    if not len(n):
+        return []
+    n[0] = max(n[0], fx)
+    f = n.copy()
+    for _ in range(3):  # blur, then lift back over the need: converges to a smooth curve above it
+        f = cv2.GaussianBlur(f.reshape(-1, 1), (1, 0), sigma, borderType=cv2.BORDER_REPLICATE)[:, 0]
+        f = np.maximum(f, n)
+    f = cv2.GaussianBlur(f.reshape(-1, 1), (1, 0), sigma / 3, borderType=cv2.BORDER_REPLICATE)[:, 0]
+    return [float(v) for v in np.clip(np.maximum(f, n), 1.0, PANTS_FIT_MAX)]
+
+
+def _pants_fit_factor(ratios: list) -> float:
+    """The one horizontal factor of a pair of pants: the largest body / garment width ratio over the hip and leg
+    rows (so the garment covers the body everywhere with its own outline), at least 1, at most PANTS_FIT_MAX."""
+    return float(min(max([1.0] + list(ratios)), PANTS_FIT_MAX))
+
+
+def warp_pants_fit(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
+                   arms: dict | None = None, info: dict | None = None,
+                   mask: np.ndarray | None = None) -> tuple[np.ndarray, list]:
+    """Pants, round 21 (docs/09 #114, docs/06 "Pants fit, round 21"). The garment keeps its own outline:
+    - vertical: the uniform scale s of pants_scale; the crotch never above the body's crotch;
+    - horizontal: garment row width x s x a smooth factor, never a per-row "garment or body, whichever is
+      wider": fx for the hip block (the largest body / garment ratio over the hip rows and the top PANTS_FIT_TOP
+      of the thighs); down each leg `_pants_leg_profile` (starts at fx, the smooth upper envelope of the body's
+      need, 1 where the garment is loose), so a flare stays a flare and a straight leg stays straight; only the
+      waistband is fitted to the body's waist (smoothstep to the garment width by the hip row);
+    - each leg hangs straight down from its half of the hip block and is moved sideways only as far as the body
+      leg in the mask pushes it (a tight leg follows the body leg, a wide leg stays vertical); where the two legs
+      would overlap they meet on the crotch axis;
+    - the body leg in the mask + PANTS_FIT_COVER px is always covered (a row that needs more than fx widens)."""
+    warnings: list[str] = []
+    g, a = garment_lm, body_lm
+    img = _bgra(garment_img)
+    g_alpha = img[:, :, 3] > 128
+    legs = ("left", "right")
+    g_wy, a_wy = _f(g["waist"]["y"]), _f(a["waist"]["y"])
+    g_cr, a_cr, g_hy = _f(g["crotch"]["y"]), _f(a["crotch"]["y"]), _f(g["hip"]["y"])
+    g_cx, a_cx = _f(g["crotch"]["center_x"]), _crotch_x(a)
+    s, full = pants_scale(g, a, H)
+    cr_dst = max(a_wy + (g_cr - g_wy) * s, a_cr)
+    v_block = (g_cr - g_wy) / max(cr_dst - a_wy, 1e-6)  # src px per dst px, waist..crotch
+    hip_dst = a_wy + (g_hy - g_wy) / v_block
+    g_rows = [(g_wy, _f(g["waist"]["left_x"]), _f(g["waist"]["right_x"])),
+              (g_hy, _f(g["hip"]["left_x"]), _f(g["hip"]["right_x"])),
+              (g_cr, _f(g["hip"]["left_x"]), _f(g["hip"]["right_x"]))]
+
+    # ---- per leg: garment spans, body runs, the body leg's straight centre line
+    leg = {}
+    for side in legs:
+        key = f"{side}_leg"
+        gk, gh, ak, aa = g["knee"][key], g["hem"][key], a["knee"][key], a["ankle"][key]
+        g_outer, a_outer = _f(g["hip"][f"{side}_x"]), _f(a["hip"][f"{side}_x"])
+        leg_src = [(g_cr, g_outer, g_cx) if side == "left" else (g_cr, g_cx, g_outer),
+                   (_f(g["knee"]["y"]), _f(gk["left_x"]), _f(gk["right_x"])),
+                   (_f(gh["y"]), _f(gh["left_x"]), _f(gh["right_x"]))]
+        body_rows = [(a_cr, a_outer, a_cx) if side == "left" else (a_cr, a_cx, a_outer),
+                     (_f(a["knee"]["y"]), _f(ak["left_x"]), _f(ak["right_x"])),
+                     (_f(aa["y"]), _f(aa["left_x"]), _f(aa["right_x"]))]
+        hem_dst = _f(aa["y"]) if full else cr_dst + (_f(gh["y"]) - g_cr) * s
+        v_leg = (_f(gh["y"]) - g_cr) / max(hem_dst - cr_dst, 1e-6)
+        rows = []
+        for y in _ys(cr_dst, hem_dst, ROW_STEP):
+            sy = g_cr + (y - cr_dst) * v_leg
+            sl, sr = _leg_span(g_alpha, sy, _interp_span(leg_src, sy), side, g_cx)
+            bl, br = _interp_span(body_rows, y)
+            run = _leg_run(mask, int(y), side, a_cx, (bl + br) / 2) if mask is not None and y <= _f(aa["y"]) else None
+            if run is None and y <= _f(aa["y"]):
+                run = (bl, br)
+            rows.append((y, sy, sl, sr, run))
+        pts = [(y, (run[0] + run[1]) / 2) for y, _, _, _, run in rows if run is not None and y >= a_cr + 12]
+        if len(pts) >= 2:
+            k1, k0 = np.polyfit([p_[0] for p_ in pts], [p_[1] for p_ in pts], 1)
+        else:
+            k1, k0 = 0.0, (body_rows[0][1] + body_rows[0][2]) / 2
+        leg[side] = {"rows": rows, "line": (float(k1), float(k0)), "hem_dst": hem_dst, "v": v_leg,
+                     "knee_dst": cr_dst + (_f(g["knee"]["y"]) - g_cr) / v_leg}
+
+    # ---- the horizontal factors: fx for the hip block; per leg a smooth profile from fx down the leg
+    top, need_all = [], []
+    for y in _ys(hip_dst, cr_dst, ROW_STEP):
+        sy = g_wy + (y - a_wy) * v_block
+        sl, sr = _garment_span(g_alpha, sy, _interp_span(g_rows, sy))
+        bl, br = body_span(a, y)
+        top.append((br - bl) * (1 + PANTS_EASE) / max((sr - sl) * s, 1e-6))
+    for side in legs:
+        split = cr_dst + PANTS_FIT_TOP * (leg[side]["knee_dst"] - cr_dst)
+        need = []
+        for y, _, sl, sr, run in leg[side]["rows"]:
+            r_ = ((run[1] - run[0]) + 2 * PANTS_FIT_COVER) / max((sr - sl) * s, 1e-6) \
+                if run is not None and y >= a_cr + 12 else 1.0
+            need.append(r_)
+            if y < split:
+                top.append(r_)
+        leg[side]["need"] = need
+        need_all += need
+    fx = _pants_fit_factor(top)
+    for side in legs:
+        leg[side]["factor"] = _pants_leg_profile(leg[side]["need"], fx)
+    need = max(top + need_all) if top or need_all else 1.0
+    fx_low = float(min(min(leg[side]["factor"]) for side in legs))
+    if need > PANTS_FIT_MAX:
+        warnings.append(f"the body needs {need:.2f}x the garment's width (limit {PANTS_FIT_MAX})")
+
+    # ---- waist -> crotch block
+    src_rows, dst_rows, cover = [], [], []
+    for y in _ys(a_wy, cr_dst, ROW_STEP):
+        sy = g_wy + (y - a_wy) * v_block
+        sl, sr = _garment_span(g_alpha, sy, _interp_span(g_rows, sy))
+        bl, br = body_span(a, y)
+        floor = (br - bl) * (1 + PANTS_EASE)
+        k = _smooth((y - a_wy) / max(hip_dst - a_wy, 1e-6))
+        w = (1 - k) * floor + k * max((sr - sl) * s * fx, floor)
+        t = (y - a_wy) / max(cr_dst - a_wy, 1e-6)
+        c = (1 - t * t) * (bl + br) / 2 + t * t * a_cx  # the block ends centred on the crotch axis
+        src_rows.append((sy, sl, sr))
+        dst_rows.append((y, c - w / 2, c + w / 2))
+        cover.append(_torso_cover(mask, y, a_cx, bl, br))
+    src_rows, dst_rows = _smooth_rows(src_rows), _smooth_rows(dst_rows)
+    band_l, band_r = dst_rows[0][1], dst_rows[0][2]  # the waistband's dip is measured on the fitted width
+    dst_rows = [(y, min(l, cl), max(r, cr_)) for (y, l, r), (cl, cr_) in zip(dst_rows, cover)]
+    result = _warp_rows(img, src_rows, dst_rows, H, W, pad=1.0)
+    result = curve_waistband(result, a_wy, a_wy + (g_hy - g_wy) * s, band_l, band_r)  # the dip as in "rows"
+    top_dip = WAISTBAND_CURVE * (band_r - band_l)
+    block_l, block_r = dst_rows[-1][1], dst_rows[-1][2]
+
+    # ---- legs
+    for side in legs:
+        L = leg[side]
+        k1, k0 = L["line"]
+        top = (block_l, a_cx + PANTS_FIT_SEAM) if side == "left" else (a_cx - PANTS_FIT_SEAM, block_r)
+        join = max(PANTS_FIT_JOIN * (L["knee_dst"] - cr_dst), 1.0)
+        x_hang = (top[0] + top[1]) / 2
+        src_rows, dst_rows = [], []
+        for (y, sy, sl, sr, run), fy in zip(L["rows"], L["factor"]):
+            w = (sr - sl) * s * fy
+            # the leg hangs straight down from the hip (centre x_hang) and is moved only as far as the body leg
+            # pushes it: a tight leg follows the body leg, a wide one stays vertical while the leg fits inside
+            lo, hi = (run[1] + 1 + PANTS_FIT_COVER - w / 2, run[0] - PANTS_FIT_COVER + w / 2) if run is not None \
+                else (x_hang, x_hang)
+            c = min(max(x_hang, lo), hi) if lo <= hi else k1 * y + k0
+            l, r = c - w / 2, c + w / 2
+            if side == "left" and r > a_cx:  # the legs meet on the crotch axis instead of overlapping
+                l, r = a_cx - w, a_cx + PANTS_FIT_SEAM  # (+ a seam overlap: no body px shows between them)
+            elif side == "right" and l < a_cx:
+                l, r = a_cx - PANTS_FIT_SEAM, a_cx + w
+            if run is not None:  # the body leg is always covered
+                l, r = min(l, run[0] - PANTS_FIT_COVER), max(r, run[1] + 1 + PANTS_FIT_COVER)
+                if side == "left":
+                    r = min(r, max(a_cx + PANTS_FIT_SEAM, run[1] + 1 + PANTS_FIT_COVER))
+                else:
+                    l = max(l, min(a_cx - PANTS_FIT_SEAM, run[0] - PANTS_FIT_COVER))
+            f = 1 - _smooth((y - cr_dst) / join)
+            l, r = f * top[0] + (1 - f) * l, f * top[1] + (1 - f) * r
+            src_rows.append((sy, sl, sr))
+            dst_rows.append((y, l, r))
+        if info is not None:
+            info.setdefault("pants_leg_rows", {})[side] = dst_rows
+        src_rows[1:], dst_rows[1:] = _smooth_rows(src_rows[1:]), _smooth_rows(dst_rows[1:])
+        for i, (y, sy, sl, sr, run) in enumerate(L["rows"]):  # the smoothing never uncovers the body leg
+            if run is not None and i:
+                _, l, r = dst_rows[i]
+                dst_rows[i] = (y, min(l, run[0] - PANTS_FIT_COVER), max(r, run[1] + 1 + PANTS_FIT_COVER))
+        _tail_rows(g_alpha, src_rows, dst_rows, 1 / L["v"])
+        leg_img = img.copy()
+        other = slice(int(np.ceil(g_cx)), None) if side == "left" else slice(0, int(g_cx))
+        leg_img[int(g_cr):, other, 3] = 0
+        result = _alpha_composite(result, _warp_rows(leg_img, src_rows, dst_rows, H, W))
+
+    result[:max(int(np.ceil(a_wy)), 0)] = 0
+    if info is not None:
+        info["pants_waist_y"] = a_wy
+        info["pants_top_dip"] = top_dip
+        info["pants_fit"] = {"engine": "fit", "fx": fx, "fx_low": fx_low, "need": float(need), "s": float(s), "full": bool(full)}
     return result, warnings
 
 
@@ -1684,7 +1907,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  mls_sleeve: str = "C", mls_tube: bool = False, mls_side_floor: str = "off",
                  mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
                  finish: str = "r60", finish_pants: bool = False, pants_tuck: bool = False,
-                 mls_keep_scale: str = "shoulder", mls_tube_clip: str = "armhole"):
+                 mls_keep_scale: str = "shoulder", mls_tube_clip: str = "armhole", pants_engine: str = "rows"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1737,6 +1960,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     "off"; debug["tshirt_final"] = the T-shirt layer as composited, debug["arm_weight"] = the arm overlay weight.
     finish_pants (setting TRYON_FINISH_PANTS, docs/09 #108, docs/06 "Finish pass on pants, round 17b"; the default
     here is the off value): finish "r17" also on the pants layer. debug["final_layers"] = {garment type: the layer as composited}.
+    pants_engine (setting TRYON_PANTS_ENGINE, docs/09 #114; the default here is the off value): "fit" =
+    warp_pants_fit (one horizontal factor, legs on the body leg's line) | "rows" = warp_pants as before.
     mls_tube_clip (setting TRYON_MLS_TUBE_CLIP, docs/09 #113; the default here is the off value): "arm" = a tube
     sleeve is not drawn on the torso side of the arm/torso boundary below the armpit row where the MLS layer has
     solid fabric; `tshirt_config.tube_clip` is then "arm".
@@ -1767,7 +1992,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     layers = []
     if "pants" in by_type:
         warped, warns = garment_layer("pants", *by_type["pants"], body_lm, H, W, arms, info, mask,
-                                      halo_removal=halo_removal)
+                                      halo_removal=halo_removal, **({"engine": "fit"} if pants_engine == "fit" else {}))
         warnings += [f"pants: {w}" for w in warns]
         layers.append(("pants", warped))
     opening = None

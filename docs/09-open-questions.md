@@ -610,3 +610,19 @@ _(none blocking P0)_
      holes 0 / 30, px changed outside the sleeve band 0. 402 backend tests.
      **Not fixed in the sleeves:** the pinched cuff of #40, a dark dot at the armpit crease, skin at the top of
      the shoulder on #47, ragged cuff px on #45, and keep_shape sleeves (no tube: they stand out sideways).
+114. **2026-11-16: the pants engine is rebuilt** (round 21; owner: "redo the pants fitting from scratch: after
+     the waist it gets far too wide, at the knees the pants lose their shape and stick to the body; fix every
+     pants problem"). Setting `TRYON_PANTS_ENGINE` (fit | rows, default fit; rows = `warp_pants` before #114).
+     Causes found in "rows": (1) every row was `max(garment, body)` on its own, so the outline followed the body
+     wherever the body was wider and the garment elsewhere (kinks, a flare lost); (2) the loose-leg "hang" centre
+     plus "the body leg is always covered" widened a leg to 1.3-2.4 x on a legs-apart stance; (3) the leg left
+     the hip block only by the knee; (4) a hem slit split the leg into two runs and only one was drawn.
+     `warp.warp_pants_fit`: the garment's own outline x a smooth width factor (`fx` for the hip block, per leg
+     `_pants_leg_profile` = the smooth upper envelope of what the body needs, 1 where the garment is loose); each
+     leg hangs straight from its half of the hip block and moves only as far as the body leg pushes it; the legs
+     meet on the crotch axis (2 px overlap); the crotch is never above the body's; both runs of a slit hem belong
+     to the leg (`_leg_span`); the body leg + 3 px and the torso run are always covered.
+     Numbers: docs/06 "Pants fit, round 21". Pants worn with a T-shirt: `run_tuck18.py` gate 0 / 30.
+     **Not fixed:** a grey fringe at the crotch notch of #49 (in the garment cutout), a small bump on the inner
+     edge at the knee of wide legs where the body knee pushes (#18), the hip bump on plus bodies with slim jeans
+     (#48 needs 1.73 x, limit 1.7, warning), shorts are not measured, the hem stays horizontal on a tilted leg.

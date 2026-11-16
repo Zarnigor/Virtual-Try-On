@@ -25,7 +25,8 @@ but the frontend must fully work too (React is required). The owner works and re
   engine (`TRYON_WARP=mls`, docs/09 #105);** adapt T-shirts = sleeve C + tube + armpit r14 + side floor "mask" +
   garment hem + cuff hem + fringe drop (flags `TRYON_MLS_*`, docs/09 #105, #106); every T-shirt gets the r17
   finish (`TRYON_FINISH`, docs/09 #107) and so do pants (`TRYON_FINISH_PANTS`, docs/09 #108); an adapt T-shirt hangs
-  over the pants (`TRYON_PANTS_TUCK`, docs/09 #109); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
+  over the pants (`TRYON_PANTS_TUCK`, docs/09 #109); `parts` = the MLS fallback, and warps keep_shape like adapt; pants use `warp_pants_fit`
+  (`TRYON_PANTS_ENGINE`, docs/09 #114).
   **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
@@ -258,6 +259,10 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       **2026-11-16 round 20 + production (docs/09 #113, docs/06 "Tube clip, round 20"):** tube sleeves end on the
       arm/torso boundary (setting `TRYON_MLS_TUBE_CLIP`, default arm): the sleeve triangle over the chest is gone,
       new holes 0 / 30 (`run_clip20.py`). Sleeve leftovers listed in #113. 402 backend tests.
+      **2026-11-16 round 21 + production (docs/09 #114, docs/06 "Pants fit, round 21"):** new pants engine
+      `warp.warp_pants_fit` (setting `TRYON_PANTS_ENGINE`, default fit; `rows` = the old `warp_pants`): the garment's
+      own outline x a smooth width factor, legs hang from the hip, hem slits kept. Render warnings 33 -> 1 on 24
+      renders, new holes 0 except the hem slit of #48 (`run_pants21.py`). 404 backend tests.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

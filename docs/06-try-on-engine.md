@@ -1815,3 +1815,28 @@ limit + `TUBE_CLIP_EASE` (2 px) towards the torso is dropped when the MLS layer 
 Runner `tools/warp-benchmark/run_clip20.py`, sheets `out/sheet_clip20_<id>.png` (per avatar: armhole | arm),
 `out/table_clip20.md`. The first version without the "solid fabric under it" condition uncovered 4 figure px on
 one #47 render. Not done: see docs/09 #113.
+
+### Pants fit, round 21 (2026-11-16; in production, docs/09 #114)
+`warp.warp_pants_fit` (keyword `warp_pants(engine="fit")`, `render_tryon(pants_engine="fit")`, setting
+`TRYON_PANTS_ENGINE`, default fit). Pants #18, #48, #49, #51 alone x 6 avatars, production flags
+(`tools/warp-benchmark/run_pants21.py`):
+
+| garment | engine | body px uncovered | new holes vs rows | outer edge kinks (sum) | thigh width / body, mean | warnings |
+|---|---|---|---|---|---|---|
+| #18 | rows | 6806 | - | 116 | 1.26 | 11 |
+| #18 | fit | 6286 | 0 | 110 | 1.18 | 0 |
+| #48 | rows | 6896 | - | 138 | 1.19 | 14 |
+| #48 | fit | 6444 | 287 | 110 | 1.07 | 1 |
+| #49 | rows | 6854 | - | 88 | 1.27 | 4 |
+| #49 | fit | 6410 | 0 | 86 | 1.18 | 0 |
+| #51 | rows | 6438 | - | 100 | 1.31 | 4 |
+| #51 | fit | 6365 | 0 | 97 | 1.30 | 0 |
+
+"body px uncovered" counts the same px in both engines (about 1050 per render: hands and fingers outside the arm
+overlay mask), the difference between the engines is what matters. The 287 new-hole px of #48 all lie in the last
+7-8 rows above the ankle on every avatar: the jeans' own hem slit ("rows" drew half the leg stretched over the
+slit, "fit" draws the slit, the ankle shows through it). Warnings = distortion / width warnings of the render
+(33 -> 1). Hip factor fx: #18 1.15-1.67, #48 1.18-1.70, #49 1.05-1.51, #51 1.00-1.32; the leg factor returns to
+1.00 on every render. Sheets: `out/sheet_pants21_<id>.png` (the garment, then per avatar rows | fit),
+`out/table_pants21.md`. Tests: `PantsTuckTests.test_pants_fit_engine_covers_the_legs_and_keeps_a_wide_leg_wide`,
+`test_pants_leg_profile_is_smooth_and_above_the_need`. With a T-shirt (`run_tuck18.py`): figure px uncovered 0 / 30.

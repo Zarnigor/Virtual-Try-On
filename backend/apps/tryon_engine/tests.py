@@ -454,6 +454,7 @@ class FinishWiringTests(SimpleTestCase):
         self.assertEqual(parse_mls_choice("TRYON_PANTS_TUCK", None), "1")
         self.assertEqual(parse_mls_choice("TRYON_MLS_KEEP_SCALE", None), "fit")
         self.assertEqual(parse_mls_choice("TRYON_MLS_TUBE_CLIP", None), "arm")
+        self.assertEqual(parse_mls_choice("TRYON_PANTS_ENGINE", None), "fit")
         with self.assertRaises(ImproperlyConfigured):
             parse_mls_choice("TRYON_FINISH_PANTS", "yes")
         self.assertEqual(parse_mls_choice("TRYON_FINISH", None), "r17")
@@ -557,6 +558,31 @@ class PantsTuckTests(SimpleTestCase):
         # the collar stays where the shoulder scale puts it: the shoulder line drops by the scale difference
         self.assertAlmostEqual(mls.keep_shape_drop(g, b, 420 / 820), 120 * (420 / 820 - s_sh))
         self.assertEqual(mls.keep_shape_drop(g, b, s_sh), 0.0)
+
+    def test_pants_fit_engine_covers_the_legs_and_keeps_a_wide_leg_wide(self):
+        base, lm = avatar()
+        p, plm = pants()
+        mask = warp.figure_mask(base)
+        self.assertEqual(render_flags("avatar")["pants_engine"], "fit")
+        _, _, d0 = warp.render_tryon(base, lm, [("pants", p, plm)])
+        _, w1, d1 = warp.render_tryon(base, lm, [("pants", p, plm)], pants_engine="fit")
+        self.assertEqual(d1["pants_fit"]["engine"], "fit")
+        self.assertGreaterEqual(d1["pants_fit"]["fx"], 1.0)
+        c0, c1 = d0["final_layers"]["pants"][:, :, 3] >= 128, d1["final_layers"]["pants"][:, :, 3] >= 128
+        y0, y1 = int(lm["waist"]["y"]) + 8, int(lm["ankle"]["left_leg"]["y"]) - 8
+        legs = mask[y0:y1] & ~d1["arm_mask"][y0:y1]
+        self.assertEqual(int((legs & c0[y0:y1] & ~c1[y0:y1]).sum()), 0)  # nothing the old engine covered is bare
+        self.assertEqual(int((legs & ~c1[y0:y1]).sum()), 0)
+
+    def test_pants_leg_profile_is_smooth_and_above_the_need(self):
+        need = [1.0] * 5 + [1.3] * 4 + [1.0] * 60
+        f = warp._pants_leg_profile(need, 1.2)
+        self.assertEqual(len(f), len(need))
+        self.assertTrue(all(a >= b - 1e-9 for a, b in zip(f, need)))
+        self.assertGreaterEqual(f[0], 1.2 - 1e-9)
+        self.assertLess(max(abs(a - b) for a, b in zip(f, f[1:])), 0.15)  # no jump from row to row
+        self.assertLess(f[-1], 1.05)  # back to the garment's own width where it is loose
+        self.assertEqual(warp._pants_fit_factor([0.8, 1.2, 9.0]), warp.PANTS_FIT_MAX)
 
     def test_tuck_never_uncovers_the_figure(self):
         shirt, pants, mask = self.layers()
