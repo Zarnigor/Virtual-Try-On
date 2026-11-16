@@ -251,6 +251,10 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       T-shirt hangs over the pants (`warp.drape_over_pants` + `tuck_pants`, setting `TRYON_PANTS_TUCK`, default 1);
       pants px beside the T-shirt 57043 -> 6359 on 18 adapt renders, figure px uncovered 0; keep_shape untouched.
       `run_tuck18.py`.
+      **2026-11-16 round 19 + production (docs/09 #112, docs/06 "keep_shape scale, round 19"):** keep_shape T-shirts
+      scaled by `mls.keep_shape_scale` (setting `TRYON_MLS_KEEP_SCALE`, default fit): body covered, hem below the hip;
+      worse: the garment floats higher over the shoulders and the sleeves stand out more (next: seam on the arm,
+      sleeves along the arm). 402 backend tests.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

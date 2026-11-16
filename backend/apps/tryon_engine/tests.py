@@ -452,6 +452,7 @@ class FinishWiringTests(SimpleTestCase):
         from tryon_studio.settings.base import parse_mls_choice
         self.assertEqual(parse_mls_choice("TRYON_FINISH_PANTS", None), "1")
         self.assertEqual(parse_mls_choice("TRYON_PANTS_TUCK", None), "1")
+        self.assertEqual(parse_mls_choice("TRYON_MLS_KEEP_SCALE", None), "fit")
         with self.assertRaises(ImproperlyConfigured):
             parse_mls_choice("TRYON_FINISH_PANTS", "yes")
         self.assertEqual(parse_mls_choice("TRYON_FINISH", None), "r17")
@@ -536,6 +537,25 @@ class PantsTuckTests(SimpleTestCase):
         out, k = warp.drape_over_pants(shirt, pants[:, :, 3], 150)
         self.assertEqual(k, 1.0)
         self.assertIs(out, shirt)
+
+    def test_keep_shape_scale_fit(self):
+        from apps.tryon_engine import mls
+        self.assertEqual(render_flags("avatar")["mls_keep_scale"], "fit")
+        span = lambda y, l, r: {"y": y, "left_x": l, "right_x": r}  # noqa: E731
+        g = {"collar": span(20, 340, 580), "shoulder": span(140, 150, 790), "chest": span(480, 210, 740),
+             "waist": span(720, 180, 750), "hem": span(960, 170, 760)}
+        b = {"shoulder": span(260, 170, 430), "chest": span(380, 200, 400), "waist": span(480, 210, 390),
+             "hip": span(640, 190, 410)}
+        s_sh = 260 / 640
+        # the length decides: garment shoulder..hem (820) lands on the body's shoulder..hem row (420)
+        self.assertAlmostEqual(mls.keep_shape_scale(g, b, 680), 420 / 820)
+        self.assertAlmostEqual(mls.keep_shape_scale(g, b, 500), s_sh)  # a short hem row: never below the shoulder scale
+        wide = {**b, "hip": span(640, 140, 460)}  # hips wider than the scaled hem: the width decides
+        self.assertAlmostEqual(mls.keep_shape_scale(g, wide, 500), mls.KEEP_SCALE_EASE * 320 / 590)
+        self.assertAlmostEqual(mls.keep_shape_scale(g, b, 2000), mls.KEEP_SCALE_MAX * s_sh)  # capped
+        # the collar stays where the shoulder scale puts it: the shoulder line drops by the scale difference
+        self.assertAlmostEqual(mls.keep_shape_drop(g, b, 420 / 820), 120 * (420 / 820 - s_sh))
+        self.assertEqual(mls.keep_shape_drop(g, b, s_sh), 0.0)
 
     def test_tuck_never_uncovers_the_figure(self):
         shirt, pants, mask = self.layers()

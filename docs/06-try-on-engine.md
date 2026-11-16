@@ -1776,3 +1776,23 @@ pants only, before the finish pass:
 Runner `tools/warp-benchmark/run_tuck18.py`, sheets `out/sheet_tuck18_<tshirt>_<pants>.png` (per avatar: off |
 tuck), `out/table_tuck18.md`. **Not done:** keep_shape (the pants still show beside #45 on wide hips); the px left
 are pants on the figure beside a T-shirt narrower than the hips; the stretch is not in the job result.
+
+### keep_shape scale, round 19 (2026-11-16; in production, docs/09 #112)
+keep_shape #44, #45 x 6 avatars, T-shirt alone, production flags; "shoulder" = before, "fit" = `keep_shape_scale`.
+
+| metric (ranges over 12 renders) | shoulder | fit |
+|---|---|---|
+| scale / shoulder scale | 1.00 | 1.00-1.33 (#45 m-plus 1.00, #45 f-plus 1.33) |
+| torso px not covered (shoulder..hip rows) | 0-10033 (8 renders > 0) | 0 (11 renders), 192 (#45 f-plus) |
+| hem row - hip row, px | -42..+31 (8 renders above the hip) | +6..+80 (none above) |
+| crotch row - hem row, px | 37..96 | 15..48; -34 on #45 f-plus (hem below the crotch) |
+| skin outside the garment, shoulder..armpit rows, px | 0-1160 (f-plus 621, 1160) | 0-1 |
+| garment top above the shoulder / arm, mean px per side | -4.5..29.0 | 1.4..34.0 |
+| the same, max px | 4..41 | 5..66 (f-plus 63-66) |
+| garment px over the background, shoulder..armpit rows | 1063-3872 | 1586-8644 (f-plus 8207, 8644) |
+
+**Got worse with "fit":** the larger garment floats higher above the shoulders / arms and its sleeves stand
+further out (last three rows), most on f-plus; the shoulder seam is not laid on the arm and the sleeves do not
+follow the arm direction (not done: directions 2 and 3 of the keep_shape report). With pants: the pants beside the
+T-shirt are gone on #44 x 6 and mostly on #45 (sheets). Sheets: `out/sheet_keep19_<tshirt>_<pants>.png` (per
+avatar: shoulder | fit). Tests: `PantsTuckTests.test_keep_shape_scale_fit`, `TaskTests.test_mls_complete_tshirt`.

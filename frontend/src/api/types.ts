@@ -302,6 +302,8 @@ export interface TryOnResponse {
 export interface TshirtConfig {
   fit_mode: 'adapt' | 'keep_shape'
   engine: 'parts' | 'mls'
+  /** keep_shape on MLS only (docs/09 #112): present ("fit") when the fit scale was used. */
+  keep_scale?: 'fit'
   /** MLS sleeve variant; null for keep_shape. */
   sleeve?: 'r7' | 'A' | 'B' | 'C' | null
   /** Tube sleeves; false after a tube_fallback. */

@@ -271,8 +271,34 @@ def _order_flips(pairs, a, b):
 
 # ---------- control points ----------
 
+KEEP_SCALES = ("shoulder", "fit")
+KEEP_SCALE_EASE = 1.04  # "fit": the garment's chest / waist / hem rows are at least this much wider than the body's
+KEEP_SCALE_MAX = 1.45  # "fit": at most this many times the shoulder scale (a cropped T-shirt is not blown up)
+
+
+def keep_shape_scale(glm, blm, hem_y):
+    """keep_shape scale "fit" (docs/09 #112): the largest of (a) the shoulder scale (seam on the acromion),
+    (b) the length scale (garment shoulder..hem = body shoulder..hem row: T-shirt lengths differ little between
+    regular and oversized cuts, widths differ a lot) and (c) the width scales (garment chest / waist / hem row at
+    least KEEP_SCALE_EASE x the body's chest / waist / hip row), capped at KEEP_SCALE_MAX x the shoulder scale."""
+    w = lambda lm, r: _f(lm[r]["right_x"]) - _f(lm[r]["left_x"])  # noqa: E731
+    s_sh = w(blm, "shoulder") / w(glm, "shoulder")
+    cands = [s_sh, (hem_y - _f(blm["shoulder"]["y"])) / max(_f(glm["hem"]["y"]) - _f(glm["shoulder"]["y"]), 1e-6)]
+    for g_row, b_row in (("chest", "chest"), ("waist", "waist"), ("hem", "hip")):
+        cands.append(KEEP_SCALE_EASE * w(blm, b_row) / max(w(glm, g_row), 1e-6))
+    return min(max(cands), KEEP_SCALE_MAX * s_sh)
+
+
+def keep_shape_drop(glm, blm, s):
+    """Rows the aligned shoulder line sits below the body's with scale "fit": the collar stays where the shoulder
+    scale puts it, so a larger scale lets the shoulder seam hang lower (a dropped shoulder), not the collar ride up."""
+    s_sh = (_f(blm["shoulder"]["right_x"]) - _f(blm["shoulder"]["left_x"])) / \
+        (_f(glm["shoulder"]["right_x"]) - _f(glm["shoulder"]["left_x"]))
+    return max(_f(glm["shoulder"]["y"]) - _f(glm["collar"]["y"]), 0.0) * max(s - s_sh, 0.0)
+
+
 def control_points(glm, blm, mask, k_map, fitted, hem_rule=(0.35, 10.0), *, sleeve_variant="r7",
-                   side_floor=False):
+                   side_floor=False, keep_scale="shoulder"):
     """(pairs {name: (q garment, p target, weight)}, rejected [names], s). sleeve_variant: module docstring."""
     if sleeve_variant not in SLEEVE_VARIANTS:
         raise ValueError(f"unknown sleeve variant: {sleeve_variant!r}")
@@ -282,8 +308,13 @@ def control_points(glm, blm, mask, k_map, fitted, hem_rule=(0.35, 10.0), *, slee
     if g_sr <= g_sl or a_sr <= a_sl:
         raise MlsUnavailable("shoulder span not positive")
     s = (a_sr - a_sl) / (g_sr - g_sl)
+    drop = 0.0
+    if keep_scale == "fit" and not fitted:
+        s = keep_shape_scale(glm, blm, body_hem_y(blm, *hem_rule))
+        drop = keep_shape_drop(glm, blm, s)
+        k_map = {**k_map, "shoulder": {"x": k_of(k_map, "shoulder")[0], "y": 0.0}}  # the seam hangs, not pinned up
     g_cx, a_cx = (g_sl + g_sr) / 2, (a_sl + a_sr) / 2
-    aligned = lambda q: np.array([a_cx + (q[0] - g_cx) * s, a_sy + (q[1] - g_sy) * s])  # noqa: E731
+    aligned = lambda q: np.array([a_cx + (q[0] - g_cx) * s, a_sy + drop + (q[1] - g_sy) * s])  # noqa: E731
 
     def fit(q, b, group):
         kx, ky = k_of(k_map, group)
@@ -1922,12 +1953,16 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
                  base=None, neck_clip=False, neck_hole_polygon=None, collar_floor_on=True, shoulder_variant="off",
                  shoulder_fractions=SHOULDER_LINE_FRACTIONS, shoulder_ease=SHOULDER_LINE_EASE,
                  shoulder_edge_alpha=128, sleeve_mode="mls", side_floor_mode="landmarks", hem_mode="off",
-                 tube_arm="r11", hem_c_pair=False, armpit_mode="off", cuff_mode="chord", tube_fringe="keep"):
+                 tube_arm="r11", hem_c_pair=False, armpit_mode="off", cuff_mode="chord", tube_fringe="keep",
+                 keep_scale="shoulder"):
     """(BGRA layer HxW, info {engine, pairs, rejected, s, neck_opening?, sleeve_hems, runtime, map?}).
+    keep_scale (keep_shape only, docs/09 #112): "shoulder" = the scale before #112 | "fit" = keep_shape_scale.
     Raises MlsUnavailable (missing landmarks, failed core pairs, bad geometry): the caller uses the parts engine.
     sleeve_variant: benchmark only (module docstring); debug_map: info["map"] = (mx, my) for the fold metric."""
     if sleeve_variant not in SLEEVE_VARIANTS:  # a programming error, never a silent fallback to parts
         raise ValueError(f"unknown sleeve variant: {sleeve_variant!r}")
+    if keep_scale not in KEEP_SCALES:
+        raise ValueError(f"unknown keep_shape scale: {keep_scale!r}")
     if neckline_variant not in NECKLINE_VARIANTS:
         raise ValueError(f"unknown neckline variant: {neckline_variant!r}")
     if shoulder_variant not in SHOULDER_VARIANTS:
@@ -1967,7 +2002,8 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
     fitted = fit_mode != "keep_shape"
     try:
         pairs, rejected, s = control_points(glm, body_lm, mask, k_map_for(fit_mode), fitted, hem_rule,
-                                            sleeve_variant=sleeve_variant, side_floor=side_floor)
+                                            sleeve_variant=sleeve_variant, side_floor=side_floor,
+                                            keep_scale=keep_scale)
     except (KeyError, TypeError, ValueError, ZeroDivisionError) as e:
         raise MlsUnavailable(f"control points: {e!r}") from e
     lost = [n for n in CORE_PAIRS if n not in pairs]
@@ -2095,6 +2131,8 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
         g_cx = (_f(glm["shoulder"]["left_x"]) + _f(glm["shoulder"]["right_x"])) / 2
         a_cx = (_f(body_lm["shoulder"]["left_x"]) + _f(body_lm["shoulder"]["right_x"])) / 2
         g_sy, a_sy = _f(glm["shoulder"]["y"]), _f(body_lm["shoulder"]["y"])
+        if keep_scale == "fit" and not fitted:
+            a_sy += keep_shape_drop(glm, body_lm, s)
         info["neck_opening"] = {"cx": a_cx + (geo["cx"] - g_cx) * s, "hw": geo["hw"] * s,
                                 "y0": a_sy + (geo["y0"] - g_sy) * s, "depth": geo["depth"] * s}
         layer = prod.clear_back_collar(layer, info["neck_opening"], body_lm)

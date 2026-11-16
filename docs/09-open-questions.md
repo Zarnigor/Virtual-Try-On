@@ -589,3 +589,13 @@ _(none blocking P0)_
        to `parts`). `DEMO_MODE` stays 0 for the live demo.
      - README: "Live demo" walk-through and the known-limits list. `own_body_path.py`: 21 checks ok (also a garment
        upload). 401 backend tests, 78 vitest, tsc. The new pages were not opened in a browser by Claude.
+112. **2026-11-16: keep_shape T-shirts are scaled to fit the body** (round 19; owner: "start with direction 1, fix
+     the scale", after the keep_shape report). Setting `TRYON_MLS_KEEP_SCALE` (fit | shoulder, default fit;
+     shoulder = before #112); `tshirt_config.keep_scale` = "fit" when used. Before: scale = body / garment shoulder
+     width, so a dropped-shoulder T-shirt was shrunk until its seams sat on the shoulder points. Now
+     `mls.keep_shape_scale` = the largest of the shoulder scale, the length scale (garment shoulder..hem = body
+     shoulder..hem row) and the width scales (garment chest / waist / hem >= 1.04 x body chest / waist / hip), at
+     most 1.45 x the shoulder scale; the collar stays where the shoulder scale puts it (`keep_shape_drop`) and the
+     shoulder pair keeps its aligned y (the seam hangs lower instead of being pinned to the shoulder row).
+     Numbers and what got worse: docs/06 "keep_shape scale, round 19". adapt is not touched; the regression
+     fixtures are pinned to "shoulder". 402 backend tests.

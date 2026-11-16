@@ -184,6 +184,8 @@ class TaskTests(MediaTestCase):
             if mode == "adapt":  # the settings defaults (docs/09 #105, #106)
                 want.update(sleeve="C", tube=True, side_floor="mask", armpit="r14", hem="garment", cuff="hem",
                             fringe="drop")
+            else:  # docs/09 #112
+                want["keep_scale"] = "fit"
             self.assertEqual(cfg[gid], want)
             self.assertEqual(self._result_shape(outfit), (1200, 600))
 

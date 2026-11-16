@@ -1683,7 +1683,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True,
                  mls_sleeve: str = "C", mls_tube: bool = False, mls_side_floor: str = "off",
                  mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
-                 finish: str = "r60", finish_pants: bool = False, pants_tuck: bool = False):
+                 finish: str = "r60", finish_pants: bool = False, pants_tuck: bool = False,
+                 mls_keep_scale: str = "shoulder"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1736,6 +1737,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     "off"; debug["tshirt_final"] = the T-shirt layer as composited, debug["arm_weight"] = the arm overlay weight.
     finish_pants (setting TRYON_FINISH_PANTS, docs/09 #108, docs/06 "Finish pass on pants, round 17b"; the default
     here is the off value): finish "r17" also on the pants layer. debug["final_layers"] = {garment type: the layer as composited}.
+    mls_keep_scale (setting TRYON_MLS_KEEP_SCALE, docs/09 #112; the default here is the off value): "fit" = a
+    keep_shape MLS T-shirt is scaled by mls.keep_shape_scale; `tshirt_config.keep_scale` is then "fit".
     pants_tuck (setting TRYON_PANTS_TUCK, docs/09 #109; the default here is the off value): MLS T-shirt + pants: the
     adapt T-shirt hangs over the pants: its sides are stretched to cover them (drape_over_pants) and what is still
     beside it above the hem is dropped unless it lies on the figure (tuck_pants). keep_shape is not touched.
@@ -1774,6 +1777,9 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         cfg = {"fit_mode": fit, "engine": "mls", "sleeve": None, "tube": False, "side_floor": "off", "armpit": "off",
                "hem": "mls", "cuff": "chord", "fringe": "keep"}
         adapt_kw = {}
+        if fit == "keep_shape" and mls_keep_scale != "shoulder":  # docs/09 #112
+            adapt_kw = {"keep_scale": mls_keep_scale}
+            cfg["keep_scale"] = mls_keep_scale
         if fit != "keep_shape":  # docs/09 #105; keep_shape is called exactly as before
             cfg.update(sleeve=mls_sleeve, tube=bool(mls_tube), side_floor=mls_side_floor, hem=mls_hem,
                        armpit=mls_armpit if mls_tube and mls_side_floor == "mask" else "off",
