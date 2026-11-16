@@ -507,3 +507,30 @@ _(none blocking P0)_
     (before: about 0.15 s), to optimize later, likely the "mask" last guard's comparison layer; (3) a stepped torso
     edge (2-5 px) beside the gap below the armpit on #28; (4) demo-mode results were built with `parts` and are
     stale (owner: do not rebuild now). Still open: the hem rule (#91, proposed).
+106. **2026-11-15: the cuff hem (round 15) and the tube fringe drop (round 16) are in production** (owner: "deploy
+     everything to prod", after the round 15 sheets). Adapt T-shirts with tube sleeves get `cuff_mode="hem"` +
+     `tube_fringe="drop"` through `render_tryon` (`warp._mls_adapt_kwargs`). Settings (first value = default, second =
+     the behaviour before #106; an invalid value stops startup): `TRYON_MLS_CUFF` (hem | chord), `TRYON_MLS_FRINGE`
+     (drop | keep). Both need the tube: with `TRYON_MLS_TUBE=0` or after a `tube_fallback` they are `chord` / `keep`
+     and `tshirt_config` says so (new fields `cuff`, `fringe`; docs/04, `types.ts`). keep_shape ignores both.
+     `render_tryon`'s own defaults stay the off values. Gates: benchmark round 15 0 / 18 (before 8 / 18), round 16
+     0 / 18; production layer = the benchmark call 0 px on #28 / #43 / #40 x 6 avatars and keep_shape #44 / #45 x 6
+     = 0 px (`tools/tryon_check/prod_vs_bench.py`, `ProductionTshirtConfigTests`); each flag off = the benchmark call
+     without that keyword; 379 backend tests, 78 vitest, tsc. This closes known issue (1) of #105 (cuff slivers).
+     **Recorded, not blockers:** the cuff edge is a straight cut 2 body px inside the garment's hem (a curved hem is
+     drawn straight); the lower half of the sleeve is stretched by the hem rise (up to 8.8 px on #40); render time of
+     an adapt T-shirt 1.08-1.46 s (mean 1.24); the stepped torso edge on #28, the r14 skip on older landmarks, the
+     stale demo results and the hem rule (#91) are unchanged.
+107. **2026-11-16: the round 17 finish is in production, T-shirts only** (owner: "r17, wire it into production",
+     then "wire t-shirts only now"; docs/06 "Finish pass, round 17" + "Production wiring of the round 17 finish").
+     Setting `TRYON_FINISH` (r17 | off, default r17; an invalid value stops startup). r17 = smooth anti-aliased
+     edge with nothing eroded (`warp.smooth_edges`) + form shading from the garment's outline
+     (`warp.form_shading_map`, the avatar is not read) + contact shadow, also on the arm under the cuff; T-shirt
+     layer only, every engine and fit mode. With r17 the flags `TRYON_SHADING` / `TRYON_CONTACT_SHADOW` /
+     `TRYON_EDGE_FEATHER` are not read; off = the behaviour before #107 (those three flags decide, default 0). Job
+     result field `finish` (r17 | off; docs/04, `types.ts`). Gates: production image = the benchmark r17 call 0 px
+     and `TRYON_FINISH=off` = the off call 0 px on 30 renders (#28, #43, #40, #44, #45 x 6 avatars), new holes
+     0 / 30; 389 backend tests, 78 vitest, tsc. **Pants are not touched** (only one pair, #18, in the DB): their
+     own round after the owner uploads 2-4 pants (tight / loose, dark / light, optionally shorts). The old realism
+     effects (#60, r60) stay available with `TRYON_FINISH=off`; they fail the no-new-holes gate (516-1319 px per
+     render). Demo results not rebuilt.

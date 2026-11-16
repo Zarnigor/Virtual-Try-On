@@ -1502,3 +1502,199 @@ m-plus, 1 px #40 m-slim); render time about 1.1 s per adapt T-shirt layer (to op
 guard's comparison layer, which builds a second full layer); a stepped torso edge (2-5 px) beside the gap below the
 armpit on #28; r14 skips a side when `torso_side_edges` finds no arm-touch rows (older landmarks).
 
+
+### Cuff hem, round 15 (2026-11-15; in production since docs/09 #106)
+Owner 2026-11-15: close the cuff slivers of round 14 (arm skin above the cuff line on #43 / #40), option A = the hem
+lands on the cuff line (not option B, a metric change). Base for both columns = the production config (docs/09
+#105): adapt + sleeve C + side_floor_mode "mask" + hem_mode "garment" + tube "finished" + armpit_mode "r14"
+(+ collar_floor, neck_hole polygon); data `data/side12`. Runner `run_cuff15.py` -> `out/table_cuff15.md`,
+`out/results_cuff15.json`, `out/sheet_cuff15_<id>.png` (per avatar: current L | R, fixed L | R, 3x crops at the inner
+cuff end, clean; `OVERLAY=1` = wedge px red, px lost vs current yellow).
+
+**Causes found (pixels, #43 / #40).**
+- The tube maps the straight chord between the cuff landmarks to the body cuff line. Where the garment's hem lies
+  above the chord, transparent garment px land above the cuff line (#40 both sides, #43 right: hem 2.7-6.8 body px
+  above the chord).
+- #43 left: the inner cuff landmark lies outside the fabric, so the chord leaves the fabric 3 garment px from its
+  midpoint (through the hem). The marched garment half-width was 3.0 px of a 49.5 px half chord: the whole inner
+  half of the output cuff (48-52 body px on m-average / m-plus) sampled a 3 px strip.
+- The tube's end on the cuff line is an outer contour: remove_halo took HALO_ERODE = 2 px off it, so the edge sat
+  2-3 px above the line (the wedge metric's margin is 2 px) with the leftover MLS px below it as lumps.
+
+**Fix** (keyword `mls.tshirt_layer(cuff_mode="chord" | "hem")`, default "chord" = pixel-identical; tube sleeves
+only, so a no-op without a tube and in keep_shape; `render_tryon` never passes it). "hem", per side in `tube_sleeves`:
+- Cuff width: a marched half-width below `CUFF_HEM_SHORT` = 0.85 x the landmark half-chord is measured again by
+  `_hem_half_width` (the fabric counts when it is on the chord or within `CUFF_HEM_MAX` = 0.25 x the sleeve axis
+  behind it), up to the cuff landmark. Above 0.85 the march stands (the chord left through the sleeve's side edge).
+- Hem: per strip column the garment's t = 1 point moves back along the column to HALO_ERODE body px inside the
+  fabric edge (rise = distance back; 0 where the fabric reaches further than that beyond the chord); the garment
+  rows are pulled back by rise x smoothstep over t >= `CUFF_HEM_FROM` = 0.5. The body cuff line does not move.
+- The tube's end on the cuff line is kept out of remove_halo (a cut of clean fabric, same mechanism as the rule
+  (b) cut, `cut_b`; report `cuff_cut_px`).
+- Edge guard: a px of the tube domain the chord mapping covers with more alpha keeps the chord source (the pull
+  moves the sleeve's wavy side edges by up to 1 px; report `cuff_guard_px`).
+Tried and dropped during the round: the hem pull alone (gate 3 / 18: #43 left, rise 0 measured inside the 3 px
+strip); the landmark cuff width on every side (the outer edge moved in, 2 px lost on 3 runs); the edge guard on
+figure px only (2 px lost on #43 f-plus through the erosion from background px).
+
+Hem rise = max over the columns, body px, the 2 px inset included.
+
+| garment | avatar | hem rise L / R (body px) | wedge L / R current | fixed | arm above cuff current | fixed | fragments fixed | spikes L / R current | fixed | new holes fixed (+ arm skin below the cuff) | arm covered below cuff | neck | outside | runtime s current / fixed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| #28 | m-slim | 1.5 / 1.1 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 6 / 6 | 4 / 5 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.976 / 1.003 |
+| #28 | m-average | 1.5 / 1.0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.952 / 1.008 |
+| #28 | m-plus | 1.5 / 0.9 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 2 / 2 | 2 / 2 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.028 / 1.064 |
+| #28 | f-slim | 1.6 / 1.1 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 3 / 1 | 3 / 1 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.999 / 1.059 |
+| #28 | f-average | 1.5 / 1.0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 2 / 2 | 3 / 2 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.994 / 1.068 |
+| #28 | f-plus | 1.5 / 1.1 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 2 | 0 / 2 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.105 / 1.246 |
+| #43 | m-slim | 3.7 / 4.8 | 5 / 21 | 0 / 0 | 5 / 21 | 0 / 0 | 0 / 0 | 9 / 12 | 1 / 4 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.125 / 1.189 |
+| #43 | m-average | 3.8 / 5.0 | 7 / 26 | 2 / 0 | 5 / 26 | 0 / 0 | 0 / 0 | 0 / 5 | 0 / 2 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.015 / 1.061 |
+| #43 | m-plus | 4.0 / 5.4 | 7 / 31 | 1 / 0 | 6 / 31 | 0 / 0 | 0 / 0 | 6 / 4 | 0 / 4 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.135 / 1.166 |
+| #43 | f-slim | 3.6 / 4.7 | 7 / 25 | 1 / 0 | 6 / 25 | 0 / 0 | 0 / 0 | 8 / 14 | 4 / 9 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.051 / 1.113 |
+| #43 | f-average | 3.8 / 5.0 | 5 / 23 | 0 / 0 | 5 / 23 | 0 / 0 | 0 / 0 | 9 / 11 | 2 / 4 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.067 / 1.167 |
+| #43 | f-plus | 3.7 / 4.9 | 4 / 13 | 1 / 0 | 3 / 13 | 0 / 0 | 0 / 0 | 3 / 8 | 0 / 2 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.207 / 1.265 |
+| #40 | m-slim | 7.6 / 7.4 | 3 / 3 | 0 / 0 | 3 / 3 | 0 / 0 | 0 / 0 | 14 / 10 | 2 / 4 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.906 / 0.961 |
+| #40 | m-average | 8.1 / 7.8 | 2 / 0 | 0 / 0 | 2 / 0 | 0 / 0 | 0 / 0 | 6 / 4 | 1 / 1 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.852 / 0.933 |
+| #40 | m-plus | 8.8 / 8.5 | 10 / 1 | 0 / 0 | 10 / 1 | 0 / 0 | 0 / 0 | 13 / 4 | 2 / 0 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.005 / 1.072 |
+| #40 | f-slim | 7.3 / 7.1 | 4 / 0 | 0 / 0 | 4 / 0 | 0 / 0 | 0 / 0 | 15 / 11 | 2 / 4 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.99 / 1.068 |
+| #40 | f-average | 8.0 / 7.8 | 1 / 2 | 0 / 0 | 1 / 2 | 0 / 0 | 0 / 0 | 10 / 18 | 3 / 7 | 0 (+ 0 arm) | 0 | 0 | 0 | 0.869 / 0.938 |
+| #40 | f-plus | 7.8 / 7.5 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 8 / 5 | 0 / 0 | 0 (+ 0 arm) | 0 | 0 | 0 | 1.142 / 1.218 |
+
+Totals (L / R): wedge current 55 / 145 (torso side 5 / 0, arm above cuff 50 / 145), fixed 5 / 0 (torso side 5 / 0,
+arm above cuff 0 / 0); fragments 0 / 0 in both; spikes current 114 / 119, fixed 29 / 53 (below current on 24 / 36
+sides, above on 1: #28 f-average L + 1); new holes fixed 0 (+ 0 arm skin below the cuff); arm covered below the
+cuff 0, neck 0, px that differ outside the sleeve zone (+ 12 px) 0, in 18 / 18 runs.
+**GATE (fixed: wedge <= 5 per side, fragments 0, new holes 0): 0 / 18 runs fail** (current: 8 / 18).
+Runtime per T-shirt layer: current 0.85-1.21 s (mean 1.02), fixed 0.93-1.27 s (mean 1.09).
+**Limits / not done.** (1) The cuff edge is a straight cut 2 body px inside the garment's hem: a curved or wavy hem
+is drawn straight. (2) The pull stretches the lower half of the sleeve by the rise (up to 8.8 body px on #40).
+(3) Wired into production later the same day (docs/09 #106, `TRYON_MLS_CUFF`); the demo results are not rebuilt. (4) keep_shape
+sleeves (#44 / #45) are not tube sleeves and are unchanged.
+Tests: `CuffHemTests` (unknown mode, default = chord, tube default = round 14 again, no-op without a tube and in
+keep_shape on #44 / #45, arm above cuff 0 / nothing lost / outside the sleeve zone identical on #43 x 4, #40 x 2,
+#28 x 2 avatars, `_hem_half_width`). 375 backend tests pass, none skipped.
+
+### Tube fringe, round 16 (2026-11-15; in production since docs/09 #106)
+Owner 2026-11-15: the faint line along the sleeve's inner edge (#28 m-slim L, 3x crop; rounds 13c / 14). Base for
+both columns = the production config (docs/09 #105) + cuff_mode "hem"; data `data/side12`. Runner `run_fringe16.py`
+-> `out/table_fringe16.md`, `out/results_fringe16.json`, `out/sheet_fringe16_<id>.png` (per avatar: current L | R,
+fixed L | R, 4x crops at the middle of the tube's inner edge, clean).
+
+**Cause (pixels).** The tube layer is drawn OVER the MLS layer. Along the tube's own edge its px come from the
+garment's alpha edge = the photo's light fringe (partial alpha, lighter colour). On the outer contour remove_halo
+takes them off; where the tube's edge lies over solid MLS fabric (the sleeve underside over the torso, the inner
+cuff end) nothing does, and they show as a thin light line: #28 m-average 25 / 26 px, up to 76 grey levels lighter
+than the fabric below.
+
+**Fix** (keyword `mls.tshirt_layer(tube_fringe="keep" | "drop")`, default "keep" = pixel-identical; tube sleeves
+only, a no-op without a tube and in keep_shape). Fringe px = tube px whose source lies within HALO_ERODE body px of
+the garment's alpha edge (alpha >= 250 eroded by ceil(HALO_ERODE / s) garment px) and whose MLS px below is solid
+(alpha >= 250). They are counted in both modes (`info["tube"]`: `fringe_px`, `fringe_visible_px` = those that change
+the fabric below by more than `TUBE_FRINGE_VISIBLE` = 6 grey levels, `fringe_max_grey`, `fringe_zone`); "drop" does
+not draw them, the MLS fabric below stays (never a new hole).
+
+Line px = fringe px at least 4 px inside the final garment contour whose grey value differs between the columns by
+more than 6 (the fixed column shows the MLS fabric there). Changed outside = visible px that differ between the
+columns farther than 3 px from a fringe px.
+
+| garment | avatar | fringe px over fabric | line px L / R (current; fixed 0) | max grey difference | new holes | px changed | changed outside | runtime s current / fixed |
+|---|---|---|---|---|---|---|---|---|
+| #28 | m-slim | 572 | 6 / 30 | 26.3 | 0 | 340 | 0 | 1.059 / 1.09 |
+| #28 | m-average | 601 | 25 / 26 | 76.0 | 0 | 371 | 0 | 1.121 / 1.118 |
+| #28 | m-plus | 492 | 5 / 13 | 13.0 | 0 | 252 | 0 | 1.101 / 1.082 |
+| #28 | f-slim | 797 | 19 / 25 | 35.0 | 0 | 434 | 0 | 1.18 / 1.127 |
+| #28 | f-average | 1213 | 3 / 48 | 34.3 | 0 | 565 | 0 | 1.131 / 1.145 |
+| #28 | f-plus | 657 | 3 / 21 | 16.0 | 0 | 339 | 0 | 1.287 / 1.302 |
+| #43 | m-slim | 519 | 22 / 17 | 36.7 | 0 | 265 | 0 | 1.128 / 1.133 |
+| #43 | m-average | 419 | 20 / 12 | 34.0 | 0 | 210 | 0 | 1.088 / 1.089 |
+| #43 | m-plus | 403 | 7 / 6 | 32.7 | 0 | 96 | 0 | 1.158 / 1.177 |
+| #43 | f-slim | 589 | 34 / 34 | 38.3 | 0 | 347 | 0 | 1.226 / 1.132 |
+| #43 | f-average | 982 | 25 / 39 | 40.0 | 0 | 460 | 0 | 1.119 / 1.188 |
+| #43 | f-plus | 469 | 7 / 10 | 31.3 | 0 | 197 | 0 | 1.215 / 1.303 |
+| #40 | m-slim | 482 | 16 / 12 | 60.7 | 0 | 165 | 0 | 1.094 / 1.056 |
+| #40 | m-average | 463 | 7 / 6 | 58.7 | 0 | 183 | 0 | 0.991 / 0.969 |
+| #40 | m-plus | 848 | 11 / 4 | 43.3 | 0 | 305 | 0 | 1.215 / 1.215 |
+| #40 | f-slim | 585 | 26 / 17 | 55.3 | 0 | 204 | 0 | 1.14 / 1.144 |
+| #40 | f-average | 738 | 12 / 15 | 47.3 | 0 | 120 | 0 | 1.082 / 1.074 |
+| #40 | f-plus | 481 | 15 / 8 | 44.0 | 0 | 303 | 0 | 1.42 / 1.389 |
+
+Totals: fringe px 11310; line px current 263 / 343 (L / R), fixed 0 / 0; new holes 0; changed outside 0 in 18 / 18
+runs. **GATE (fixed: new holes 0, changed outside 0): 0 / 18 runs fail.** Runtime per T-shirt layer (mean): current
+1.15 s, fixed 1.15 s.
+**Limits / not done.** (1) The join between the sleeve fabric and the torso fabric stays visible where their
+shading or pattern differs (#43 sleeve underside darker, #40 stripes): two fabrics, not a fringe. (2) The stepped
+torso edge on #28 is not touched.
+Tests: `TubeFringeTests` (unknown mode, default = keep, no-op without a tube and in keep_shape, fringe px reported
+/ nothing lost / nothing changed farther than 3 px on #28 x 2, #43, #40).
+
+### Production wiring of rounds 15 and 16 (2026-11-15, docs/09 #106)
+For an adapt T-shirt with tube sleeves `render_tryon` now also passes `cuff_mode="hem"` and `tube_fringe="drop"`
+(`warp._mls_adapt_kwargs`). Settings `TRYON_MLS_CUFF` (hem | chord) and `TRYON_MLS_FRINGE` (drop | keep), first
+value = default, second = the behaviour before; both are off whenever the tube is off or fell back
+(`tshirt_config.cuff` / `.fringe`). Numbers: production layer vs the benchmark call 0 px on #28 / #43 / #40 x 6
+avatars, keep_shape #44 / #45 x 6: 0 px (`tools/tryon_check/prod_vs_bench.py`, DB data); `render_tryon` for an adapt
+T-shirt 1075-1457 ms (mean 1235), keep_shape 100-130 ms. 379 backend tests, 78 vitest, tsc. The round 15 section
+above is "in production" since #106 too. The demo results are not rebuilt.
+
+### Finish pass, round 17 (2026-11-16; "r17" in production since docs/09 #107)
+Edges, shading and contact shadow on the production T-shirt render. Keyword `render_tryon(finish="r60" | "r17")`
+(own default "r60") changes what the three effects (`shading`, `contact_shadows`, `edge_feather`) do when they are
+on; as a benchmark round nothing changed by default (the wiring is the next section). New in `warp.py`: `soft_coverage`, `smooth_edges`, `form_shading_map`; debug keys `tshirt_final`
+(the T-shirt layer as composited) and `arm_weight` (arm overlay weight, float).
+- **finish "r60"** (docs/09 #60, as before): `soften_edges` drops the 1 px rim and feathers; shading = avatar
+  luminance; contact shadow under the garment only (the arm overlay pastes the unshaded arm back).
+- **finish "r17":** edge = `smooth_edges`: alpha = ramp(Gaussian(alpha >= 128, sigma 1.2 px), gain 2.0), every
+  covered px keeps >= 128 / 255 and every uncovered px stays < 128 / 255 (nothing eroded), colour under the fringe
+  grown from the covered px; the arm overlay border gets the same soft weight. Shading = `form_shading_map`: up to
+  10 % darker at the left / right end of each row run of the garment, falling to 1 / e in 14 px, blurred 2 px; the
+  avatar is not read. Contact shadow as before (2 px inward, 3 px down, sigma 4, opacity 0.25) and also on the arm
+  under the cuff.
+
+Runner `tools/warp-benchmark/run_finish17.py` (DB garments and avatars, through `render_tryon` with the settings
+flags): adapt #28, #43, #40 and keep_shape #44, #45 x 6 avatars = 30 renders per variant. Variants: off | all (the
+three effects, r60) | smooth (edge only, r17) | smooth_shadow (edge + shadow, r17) | r17 (edge + shadow + form
+shading). Metric definitions in the runner's docstring. Totals over 30 renders:
+
+| variant | hard edge px | hard cuff px | new holes | lost px | gained px | mean dL fabric | mean dL skin near | changed outside | runtime s mean |
+|---|---|---|---|---|---|---|---|---|---|
+| off | 25001 | 1253 | 0 | 0 | 0 | 0.00 | 0.00 | 0 | 0.858 |
+| all (r60) | 0 | 1064 | 25192 | 49975 | 0 | -0.31 | -6.53 | 0 | 0.923 |
+| smooth | 8424 | 1108 | 0 | 0 | 0 | 0.07 | -0.28 | 0 | 0.883 |
+| smooth_shadow | 8424 | 1108 | 0 | 0 | 0 | 0.04 | -8.41 | 0 | 0.903 |
+| r17 | 8424 | 1108 | 0 | 0 | 0 | -2.79 | -8.64 | 0 | 0.918 |
+
+(Table of the last run, 2026-11-16 11:25. The first run at 10:36, which the owner's sheets came from, had off
+24911 / 1249 and smooth 8437 / 1104: #43 and #40 differ by 4-44 px per render between the two runs, #28, #44, #45
+are identical; three fresh processes now give identical layers, so the DB data of #43 / #40 changed in between
+(cause not confirmed).)
+Hard edge px per garment, off -> smooth: #28 7532 -> 1558, #43 7770 -> 1527, #40 8044 -> 1732, #44 688 -> 1766,
+#45 967 -> 1841 (the keep_shape layers already have a bilinear alpha edge; `smooth_edges` rebuilds the edge from
+alpha >= 128). Hard cuff px per garment, off -> smooth: #28 28 -> 17, #43 13 -> 13, #40 39 -> 39, #44 900 -> 793,
+#45 273 -> 246. **GATE (new holes 0, changed outside 0): "all" (r60) fails 30 / 30 runs (516-1319 new holes per
+render, the eroded rim); smooth, smooth_shadow, r17 fail 0 / 30.** Extra time per render: smooth + 0.025 s,
+smooth_shadow + 0.045 s, r17 + 0.060 s.
+**Seen in the sheets.** The r60 shading prints the avatar's tank-top strap on white T-shirts (#43, #45 shoulder
+crops); the r17 form shading does not read the avatar.
+**Limits / not done.** (1) The px that remain "hard" are the ones the no-uncover clamp holds at 128 / 255 (corners,
+1 px wide features). (2) The contour is not moved: the 2-5 px torso steps of #28, the armpit flap of #43 and the
+ragged cuff of #40 are only anti-aliased. (3) Pants go through the same code but are not in the runner.
+(4) Moire on #40 not touched.
+Sheets: `out/sheet_finish17_<id>.png` (rows = avatars, columns = variants, clean), `out/zoom_finish17_<id>.png` (3x
+crops shoulder / cuff / side / hem), `out/table_finish17.md`. Tests: `FinishR17Tests` (5). 384 backend tests pass,
+`tools/tryon_check/prod_vs_bench.py` 0 px on 30 pairs.
+
+### Production wiring of the round 17 finish (2026-11-16, docs/09 #107)
+Owner chose "r17" on the round 17 sheets, T-shirts only. Setting `TRYON_FINISH` (r17 | off, default r17; an
+invalid value stops startup): with r17 `flags.render_flags` passes `finish="r17"` and the three effects on
+(`TRYON_SHADING` / `TRYON_CONTACT_SHADOW` / `TRYON_EDGE_FEATHER` are then not read); with off the three flags decide
+as before (`finish="r60"`). In `render_tryon`, finish "r17" applies to the T-shirt layer only, every engine (MLS,
+`parts`, fallbacks) and fit mode: a pants layer is composited plain, and the arm overlay border is soft only within
+`FINISH_ARM_NEAR` = 12 px of the T-shirt layer. `debug["finish"]` and the job result `finish` = "r17" when a T-shirt
+got it, else "off". `render_tryon`'s own default stays "r60".
+Gates (`run_finish17.py` with `VARIANTS=off,r17,prod,setting_off`, 30 renders): final image production flags vs the
+benchmark r17 call 0 px; flags under `TRYON_FINISH=off` vs the off call 0 px; new holes 0 / 30, changed outside
+0 / 30. T-shirt layer before the finish vs the benchmark layer: 0 px on 30 pairs (`prod_vs_bench.py`).
+`render_tryon` adapt T-shirt 1095-1431 ms (mean 1280). Tests: `FinishWiringTests` (4), `TaskTests` (result
+`finish`); the fixture tests of `tests_neck_hole.py` pin the finish off (the fixtures predate #107). 389 backend
+tests, 78 vitest, tsc. **Not done:** pants (one pair in the DB, #18; a later round once more pants are uploaded);
+the demo results are not rebuilt.

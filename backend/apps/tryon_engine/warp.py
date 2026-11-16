@@ -1442,6 +1442,56 @@ def soften_edges(layer: np.ndarray) -> np.ndarray:
     return out
 
 
+FINISH_EDGE_SIGMA = 1.2  # px: blur of the 0 / 1 coverage before the ramp (takes the 1 px stair steps out)
+FINISH_EDGE_GAIN = 2.0  # ramp steepness around 50 % coverage: a straight edge becomes about 0.82 | 0.18
+
+
+def soft_coverage(solid: np.ndarray, sigma: float = FINISH_EDGE_SIGMA, gain: float = FINISH_EDGE_GAIN) -> np.ndarray:
+    """HxW float32 0..1: the bool coverage with an anti-aliased, de-stepped edge. The 50 % contour stays on the
+    pixel edge of straight runs; every covered px keeps at least 128 / 255 (nothing is uncovered)."""
+    s = cv2.GaussianBlur(solid.astype(np.float32), (0, 0), sigma)
+    out = np.clip((s - 0.5) * gain + 0.5, 0.0, 1.0)
+    return np.where(solid, np.maximum(out, 128 / 255.0), np.minimum(out, 127 / 255.0)).astype(np.float32)
+
+
+def smooth_edges(layer: np.ndarray) -> np.ndarray:
+    """Round 17 edge finish (docs/06): the alpha edge of soft_coverage(alpha >= 128), nothing eroded; the colour
+    under the outer fringe is grown from the nearest covered px."""
+    solid = layer[:, :, 3] >= 128
+    if not solid.any():
+        return layer
+    k = np.ones((3, 3), np.uint8)
+    fill = layer[:, :, :3] * solid[:, :, None]
+    known = solid
+    for _ in range(3):
+        grown = cv2.dilate(fill, k)
+        fill = np.where(known[:, :, None], fill, grown)
+        known = cv2.dilate(known.astype(np.uint8), k) > 0
+    out = np.empty_like(layer)
+    out[:, :, :3] = fill
+    out[:, :, 3] = np.rint(soft_coverage(solid) * 255)
+    return out
+
+
+FINISH_ARM_NEAR = 12  # px around the T-shirt layer where the arm overlay border is soft (finish "r17")
+FORM_SHADE = 0.10  # darkening at the garment's left / right outline (form shading, round 17)
+FORM_SHADE_LENGTH = 14.0  # px: the darkening falls to 1 / e this far inside the outline
+
+
+def form_shading_map(alpha: np.ndarray, strength: float = FORM_SHADE, length: float = FORM_SHADE_LENGTH) -> np.ndarray:
+    """HxW float32 shade (1 - strength .. 1) from the garment's own outline: each covered px is darkened by its
+    horizontal distance to the end of its row run (a rounded body / sleeve), smoothed. Nothing is read from the
+    avatar, so the avatar's own clothes cannot print through. 1.0 outside the garment."""
+    cov = alpha >= 128
+    idx = np.arange(alpha.shape[1], dtype=np.float32)[None, :]
+    left = idx - np.maximum.accumulate(np.where(cov, -1.0, idx), axis=1)
+    rev = idx - np.maximum.accumulate(np.where(cov[:, ::-1], -1.0, idx), axis=1)  # the same, from the right
+    d = np.minimum(left, rev[:, ::-1])
+    shade = 1.0 - strength * np.exp(-np.maximum(d - 1, 0) / length)
+    shade = cv2.GaussianBlur(np.where(cov, shade, 1.0 - strength).astype(np.float32), (0, 0), 2.0)
+    return np.where(alpha > 0, shade, 1.0).astype(np.float32)
+
+
 def contact_shadow(alpha: np.ndarray, figure: np.ndarray, axis_x: float,
                    opacity: float = SHADOW_OPACITY) -> np.ndarray:
     """HxW float32 darkening (0..opacity) cast by the garment on the avatar: blurred alpha shifted down and
@@ -1512,6 +1562,10 @@ def _mls_adapt_kwargs(cfg: dict) -> dict:
         kw["armpit_mode"] = "r14"
     if cfg["hem"] == "garment":
         kw["hem_mode"] = "garment"
+    if cfg["cuff"] == "hem":  # docs/09 #106
+        kw["cuff_mode"] = "hem"
+    if cfg["fringe"] == "drop":
+        kw["tube_fringe"] = "drop"
     return kw
 
 
@@ -1523,7 +1577,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  hem_hip_fraction: float = 0.35, hem_crotch_margin: float = 10.0,
                  fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True,
                  mls_sleeve: str = "C", mls_tube: bool = False, mls_side_floor: str = "off",
-                 mls_armpit: str = "off", mls_hem: str = "mls"):
+                 mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
+                 finish: str = "r60"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1556,19 +1611,34 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     mls_side_floor (TRYON_MLS_SIDE_FLOOR) "mask" | "off": the side coverage floor from the figure mask (round 12 / 12b).
     mls_armpit (TRYON_MLS_ARMPIT) "r14" | "off": the torso seam on the arm/torso boundary (round 14); needs the tube
     and the side floor, otherwise it is off. mls_hem (TRYON_MLS_HEM) "garment" | "mls": the garment's own hem shape
-    (round 12b) or no hem post-processing. debug["tshirt_config"] = what was actually used: {fit_mode, engine, sleeve,
-    tube, side_floor, armpit, hem} (engine "parts": {fit_mode, engine} only).
+    (round 12b) or no hem post-processing. Tube sleeves only (docs/09 #106, off without the tube): mls_cuff
+    (TRYON_MLS_CUFF) "hem" | "chord": the garment's real sleeve hem lands on the cuff line (round 15); mls_fringe
+    (TRYON_MLS_FRINGE) "drop" | "keep": the tube's photo-fringe px over solid fabric are not drawn (round 16).
+    debug["tshirt_config"] = what was actually used: {fit_mode, engine, sleeve, tube, side_floor, armpit, hem, cuff,
+    fringe} (engine "parts": {fit_mode, engine} only).
     neck_hole (setting TRYON_NECK_HOLE, docs/09 #102): MLS only, adapt and keep_shape. When the T-shirt landmarks carry
     `neck_hole.polygon` and it passes landmark_checks.neck_hole_problem (same rules as PATCH), the MLS layer is made
     with neckline_variant="hole" + that polygon (never neck_clip); a failing polygon is skipped with quality warning
     "neck_hole_invalid". parts and neck_hole=False ignore the polygon. debug["neck_hole"] = used or not.
 
+    finish (setting TRYON_FINISH, docs/09 #107, docs/06 "Finish pass, round 17"; the default here is the off value):
+    "r60" = the realism effects as before, on every garment layer; "r17" = the effects that are on apply to the
+    T-shirt layer only (pants are composited plain, exactly as with every effect off) and work differently:
+    edge_feather = smooth_edges (nothing eroded) and a soft border of the arm overlay within FINISH_ARM_NEAR px of
+    the T-shirt; shading = form_shading_map (from the garment's outline, the avatar's luminance is not read);
+    contact_shadows also falls on the arm below the cuff. debug["finish"] = "r17" when a T-shirt got it, else
+    "off"; debug["tshirt_final"] = the T-shirt layer as composited, debug["arm_weight"] = the arm overlay weight.
+
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
     if warp_engine not in ("parts", "mls"):
         raise ValueError(f"unknown warp engine: {warp_engine!r}")
-    if mls_side_floor not in ("mask", "off") or mls_armpit not in ("r14", "off") or mls_hem not in ("garment", "mls"):
-        raise ValueError(f"unknown MLS T-shirt option: {mls_side_floor!r}, {mls_armpit!r}, {mls_hem!r}")
+    if finish not in ("r60", "r17"):
+        raise ValueError(f"unknown finish: {finish!r}")
+    if mls_side_floor not in ("mask", "off") or mls_armpit not in ("r14", "off") or mls_hem not in ("garment", "mls") \
+            or mls_cuff not in ("hem", "chord") or mls_fringe not in ("drop", "keep"):
+        raise ValueError(f"unknown MLS T-shirt option: {mls_side_floor!r}, {mls_armpit!r}, {mls_hem!r}, "
+                         f"{mls_cuff!r}, {mls_fringe!r}")
     fit_modes = fit_modes or {}
     base = cv2.resize(_bgra(base), (W, H))
     mask = figure_mask(base)
@@ -1590,11 +1660,12 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         hole_kw = _neck_hole_kwargs(*by_type["tshirt"], neck_hole, info)
         fit = fit_modes.get("tshirt", "adapt")
         cfg = {"fit_mode": fit, "engine": "mls", "sleeve": None, "tube": False, "side_floor": "off", "armpit": "off",
-               "hem": "mls"}
+               "hem": "mls", "cuff": "chord", "fringe": "keep"}
         adapt_kw = {}
         if fit != "keep_shape":  # docs/09 #105; keep_shape is called exactly as before
             cfg.update(sleeve=mls_sleeve, tube=bool(mls_tube), side_floor=mls_side_floor, hem=mls_hem,
-                       armpit=mls_armpit if mls_tube and mls_side_floor == "mask" else "off")
+                       armpit=mls_armpit if mls_tube and mls_side_floor == "mask" else "off",
+                       cuff=mls_cuff if mls_tube else "chord", fringe=mls_fringe if mls_tube else "keep")
             adapt_kw = _mls_adapt_kwargs(cfg)
         try:
             mls_layer, mls_info = mls_engine.tshirt_layer(
@@ -1602,7 +1673,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                 (hem_hip_fraction, hem_crotch_margin), sleeve_variant=mls_sleeve, **adapt_kw, **hole_kw)
             skipped = [s for s, r in (mls_info.get("tube") or {}).items() if isinstance(r, dict) and "skipped" in r]
             if skipped:  # the tube could not be built on a side: the whole T-shirt with MLS sleeves
-                cfg.update(tube=False, armpit="off")
+                cfg.update(tube=False, armpit="off", cuff="chord", fringe="keep")
                 info["quality_warnings"].append("tube_fallback")
                 warnings.append(f"tshirt: tube fallback to MLS sleeves ({', '.join(skipped)}: "
                                 f"{mls_info['tube'][skipped[0]]['skipped']})")
@@ -1648,14 +1719,27 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         layers.append(("tshirt", warped))
     else:
         head = head_neck_overlay(mask, body_lm, NECK_FEATHER_FIX if neck_fix else NECK_FEATHER)
+    r17 = finish == "r17"
+    arm_dark = np.zeros((H, W), np.float32)
+    info["finish"] = "off"
     for gtype, warped in layers:
+        if r17 and gtype != "tshirt":  # docs/09 #107: T-shirts only, pants as with every effect off
+            canvas = _alpha_composite(canvas, warped)
+            continue
+        if r17 and (edge_feather or shading or contact_shadows):
+            info["finish"] = "r17"
         if edge_feather:
-            warped = soften_edges(warped)
-        if shading:
+            warped = smooth_edges(warped) if r17 else soften_edges(warped)
+        if shading and r17:
+            warped = apply_shading(warped, form_shading_map(warped[:, :, 3]), 1.0)
+        elif shading:
             warped = apply_shading(warped, shading_map(base, mask & (warped[:, :, 3] > 0)), shading_strength)
         if contact_shadows:
             dark = contact_shadow(warped[:, :, 3], mask, _crotch_x(body_lm))
             canvas[:, :, :3] = (canvas[:, :, :3].astype(np.float32) * (1 - dark[:, :, None])).astype(np.uint8)
+            arm_dark = np.maximum(arm_dark, dark)
+        if gtype == "tshirt":
+            info["tshirt_final"] = warped
         canvas = _alpha_composite(canvas, warped)
     if neck_gap_fill and source == "avatar" and "tshirt_layer" in info and info["engine"] == "parts":
         canvas, info["neck_gap"] = neck_gap_fill_fn(canvas, base, mask, body_lm, head,
@@ -1666,7 +1750,19 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     canvas = np.clip(np.rint(canvas.astype(np.float32) * (1 - head) + base.astype(np.float32) * head),
                      0, 255).astype(np.uint8)
     keep = arm_overlay_mask(mask, arms, info.get("sleeve_hems"))
-    canvas[keep] = base[keep]
+    info["arm_weight"] = keep.astype(np.float32)
+    if r17 and (edge_feather or contact_shadows) and "tshirt_final" in info:
+        arm_px = base.astype(np.float32)
+        if contact_shadows:  # the cuff's shadow on the arm (the plain overlay would paste the unshaded arm back)
+            arm_px[:, :, :3] *= (1 - arm_dark)[:, :, None]
+        if edge_feather:  # soft only beside the T-shirt: the hands over the pants stay a plain paste
+            k = 2 * FINISH_ARM_NEAR + 1
+            near = cv2.dilate((info["tshirt_final"][:, :, 3] > 0).astype(np.uint8), np.ones((k, k), np.uint8)) > 0
+            info["arm_weight"] = np.where(near, soft_coverage(keep) * mask, keep).astype(np.float32)
+        wgt = info["arm_weight"][:, :, None]
+        canvas = np.clip(np.rint(canvas.astype(np.float32) * (1 - wgt) + arm_px * wgt), 0, 255).astype(np.uint8)
+    else:
+        canvas[keep] = base[keep]
     for side in ("left", "right"):
         if not arms.get(side):
             warnings.append(f"arm {side}: not separated from the body in the mask, hands may be covered")

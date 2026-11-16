@@ -22,11 +22,11 @@ from apps.tryon_engine.flags import render_flags
 ADAPT = [int(v) for v in os.environ.get("ADAPT", "28,43,40").split(",")]
 KEEP = [int(v) for v in os.environ.get("KEEP", "44,45").split(",")]
 BENCH = dict(sleeve_variant="C", side_floor=True, side_floor_mode="mask", hem_mode="garment", sleeve_mode="tube",
-             tube_arm="finished", armpit_mode="r14")
-OFF = dict(mls_tube=False, mls_side_floor="off", mls_armpit="off", mls_hem="mls")
+             tube_arm="finished", armpit_mode="r14", cuff_mode="hem", tube_fringe="drop")  # docs/09 #105, #106
+OFF = dict(mls_tube=False, mls_side_floor="off", mls_armpit="off", mls_hem="mls", mls_cuff="chord", mls_fringe="keep")
 flags = render_flags("avatar")
 print("flags:", {k: flags[k] for k in ("warp_engine", "mls_sleeve", "mls_tube", "mls_side_floor", "mls_armpit",
-                                       "mls_hem", "neck_hole", "hem_rule")})
+                                       "mls_hem", "mls_cuff", "mls_fringe", "neck_hole", "hem_rule")})
 bad, times = 0, []
 for gid in ADAPT + KEEP:
     g = Garment.objects.get(pk=gid)

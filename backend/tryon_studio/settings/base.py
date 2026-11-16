@@ -200,8 +200,13 @@ TRYON_MLS_SLEEVE = parse_mls_sleeve(os.environ.get("TRYON_MLS_SLEEVE"))
 #   TRYON_MLS_ARMPIT      r14 (default) = torso seam on the arm/torso boundary (round 14; needs the tube and the
 #                         side floor, otherwise it is off and tshirt_config says so) | off
 #   TRYON_MLS_HEM         garment (default) = the garment's own hem shape (round 12b) | mls = no hem post-processing
+# docs/09 #106 (rounds 15 / 16), tube sleeves only (without the tube both are off and tshirt_config says so):
+#   TRYON_MLS_CUFF        hem (default) = the garment's real sleeve hem lands on the cuff line | chord = before #106
+#   TRYON_MLS_FRINGE      drop (default) = the tube's photo-fringe px over solid fabric are not drawn | keep
 TRYON_MLS_CHOICES = {"TRYON_MLS_TUBE": ("1", "0"), "TRYON_MLS_SIDE_FLOOR": ("mask", "off"),
-                     "TRYON_MLS_ARMPIT": ("r14", "off"), "TRYON_MLS_HEM": ("garment", "mls")}
+                     "TRYON_MLS_ARMPIT": ("r14", "off"), "TRYON_MLS_HEM": ("garment", "mls"),
+                     "TRYON_MLS_CUFF": ("hem", "chord"), "TRYON_MLS_FRINGE": ("drop", "keep"),
+                     "TRYON_FINISH": ("r17", "off")}
 
 
 def parse_mls_choice(name, value):
@@ -217,6 +222,13 @@ TRYON_MLS_TUBE = parse_mls_choice("TRYON_MLS_TUBE", os.environ.get("TRYON_MLS_TU
 TRYON_MLS_SIDE_FLOOR = parse_mls_choice("TRYON_MLS_SIDE_FLOOR", os.environ.get("TRYON_MLS_SIDE_FLOOR"))
 TRYON_MLS_ARMPIT = parse_mls_choice("TRYON_MLS_ARMPIT", os.environ.get("TRYON_MLS_ARMPIT"))
 TRYON_MLS_HEM = parse_mls_choice("TRYON_MLS_HEM", os.environ.get("TRYON_MLS_HEM"))
+TRYON_MLS_CUFF = parse_mls_choice("TRYON_MLS_CUFF", os.environ.get("TRYON_MLS_CUFF"))
+TRYON_MLS_FRINGE = parse_mls_choice("TRYON_MLS_FRINGE", os.environ.get("TRYON_MLS_FRINGE"))
+# docs/09 #107 (round 17): the finish of the T-shirt layer, every engine and fit mode; pants are not touched.
+#   TRYON_FINISH  r17 (default) = smooth anti-aliased edge (nothing eroded) + form shading from the garment's outline
+#                 + contact shadow (also on the arm under the cuff); TRYON_SHADING / TRYON_CONTACT_SHADOW /
+#                 TRYON_EDGE_FEATHER are then not read | off = the behaviour before #107 (those three flags decide)
+TRYON_FINISH = parse_mls_choice("TRYON_FINISH", os.environ.get("TRYON_FINISH"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

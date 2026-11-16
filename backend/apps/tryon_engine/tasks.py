@@ -31,9 +31,10 @@ def run_tryon(job_pk: int):
 
 def _do_warp(outfit):
     """Renders and saves the result. Returns {engine: "parts" | "mls", quality_warnings: [...], neck_hole: {garment
-    id: bool}, tshirt_config: {garment id: {...}}, render_ms} for the job result (neck_hole: the owner polygon was
-    used, debug, docs/09 #102; tshirt_config: what the T-shirt render actually used, docs/09 #105; render_ms: the
-    render_tryon call, without file I/O)."""
+    id: bool}, tshirt_config: {garment id: {...}}, finish, render_ms} for the job result (neck_hole: the owner
+    polygon was used, debug, docs/09 #102; tshirt_config: what the T-shirt render actually used, docs/09 #105;
+    finish: "r17" when the T-shirt got the round 17 finish, else "off", docs/09 #107; render_ms: the render_tryon
+    call, without file I/O)."""
     import time
     import cv2
     from django.core.files.base import ContentFile
@@ -77,4 +78,4 @@ def _do_warp(outfit):
     return {"engine": debug.get("engine", "parts"), "quality_warnings": quality,
             "neck_hole": {str(g.pk): used and g.type == "tshirt" for g in outfit.garments.all()},
             "tshirt_config": {str(g.pk): cfg for g in outfit.garments.all() if g.type == "tshirt" and cfg},
-            "render_ms": render_ms}
+            "finish": debug.get("finish", "off"), "render_ms": render_ms}

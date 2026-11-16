@@ -360,6 +360,125 @@ class OpaqueGarmentTests(SimpleTestCase):
         self.assertFalse((shaded[solid] == np.array(PANTS[:3])).all())
 
 
+class FinishR17Tests(SimpleTestCase):
+    """Benchmark round 17 (docs/06 "Finish pass, round 17"): finish="r17", off by default."""
+
+    def blob(self):
+        solid = np.zeros((H, W), bool)
+        solid[300:500, 200:400] = True
+        for i in range(60):  # a 1 px stair-stepped slanted edge and a sharp corner
+            solid[300 + i, 400:400 + i] = True
+        return solid
+
+    def test_soft_coverage_uncovers_nothing_and_softens_the_step(self):
+        solid = self.blob()
+        soft = warp.soft_coverage(solid)
+        self.assertTrue((soft[solid] >= 128 / 255.0).all())
+        self.assertTrue((soft[~solid] < 128 / 255.0).all())
+        self.assertLess(soft[400, 199], 0.5)  # just outside a straight edge: partly covered, not 0
+        self.assertGreater(soft[400, 199], 0.05)
+        self.assertEqual(soft[400, 300], 1.0)
+        self.assertEqual(soft[100, 100], 0.0)
+
+    def test_smooth_edges_keeps_coverage_and_grows_colour(self):
+        layer = np.zeros((H, W, 4), np.uint8)
+        layer[self.blob()] = (10, 200, 30, 255)
+        out = warp.smooth_edges(layer)
+        self.assertFalse(((layer[:, :, 3] >= 128) & (out[:, :, 3] < 128)).any())
+        self.assertFalse(((layer[:, :, 3] < 128) & (out[:, :, 3] >= 128)).any())
+        fringe = (out[:, :, 3] > 0) & (layer[:, :, 3] == 0)
+        self.assertTrue(fringe.any())
+        self.assertTrue((out[fringe][:, :3] == np.array([10, 200, 30])).all())  # no dark halo under the feather
+        empty = np.zeros((H, W, 4), np.uint8)
+        self.assertIs(warp.smooth_edges(empty), empty)
+
+    def test_form_shading_map_range_and_shape(self):
+        alpha = np.where(self.blob(), 255, 0).astype(np.uint8)
+        shade = warp.form_shading_map(alpha)
+        self.assertTrue((shade[alpha == 0] == 1.0).all())
+        self.assertGreaterEqual(shade.min(), 1 - warp.FORM_SHADE - 1e-6)
+        self.assertLessEqual(shade.max(), 1.0 + 1e-6)
+        self.assertLess(shade[400, 201], shade[400, 300])  # darker at the outline than in the middle
+        self.assertAlmostEqual(float(shade[400, 201]), float(shade[400, 398]), places=3)  # left = right
+        self.assertGreater(shade[400, 300], 0.995)
+
+    def test_default_finish_is_unchanged_and_unknown_is_rejected(self):
+        base, lm = avatar()
+        g, glm = tshirt()
+        kw = dict(edge_feather=True, shading=True, contact_shadows=True)
+        a, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)], **kw)
+        b, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)], finish="r60", **kw)
+        self.assertTrue((a == b).all())
+        with self.assertRaises(ValueError):
+            warp.render_tryon(base, lm, [("tshirt", g, glm)], finish="nope")
+        off, _, d0 = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        same, _, d1 = warp.render_tryon(base, lm, [("tshirt", g, glm)], finish="r17")  # no effect is on
+        self.assertTrue((off == same).all())
+        self.assertTrue((d0["tshirt_final"] == d0["tshirt_layer"]).all())
+
+    def test_r17_render_uncovers_nothing(self):
+        base, lm = avatar()
+        g, glm = tshirt()
+        _, _, d0 = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        rgb, _, d1 = warp.render_tryon(base, lm, [("tshirt", g, glm)], edge_feather=True, shading=True,
+                                       contact_shadows=True, finish="r17")
+        c0, c1 = d0["tshirt_final"][:, :, 3] >= 128, d1["tshirt_final"][:, :, 3] >= 128
+        self.assertTrue((c0 == c1).all())
+        self.assertLessEqual(d1["arm_weight"].max(), 1.0)
+        self.assertTrue((d1["arm_weight"][d1["arm_mask"]] >= 128 / 255.0).all())
+        self.assertEqual(rgb.shape, (H, W, 3))
+
+
+class FinishWiringTests(SimpleTestCase):
+    """docs/09 #107: TRYON_FINISH = r17 (default) | off; the T-shirt layer only."""
+
+    def test_flags_default_r17_and_off_is_the_three_flags(self):
+        from django.test import override_settings
+        f = render_flags("avatar")
+        self.assertEqual((f["finish"], f["edge_feather"], f["shading"], f["contact_shadows"]),
+                         ("r17", True, True, True))
+        with override_settings(TRYON_FINISH="off"):
+            f = render_flags("avatar")
+            self.assertEqual((f["finish"], f["edge_feather"], f["shading"], f["contact_shadows"]),
+                             ("r60", False, False, False))
+            with override_settings(TRYON_SHADING=True):
+                self.assertTrue(render_flags("avatar")["shading"])
+
+    def test_invalid_setting_value_is_rejected(self):
+        from django.conf import settings
+        from django.core.exceptions import ImproperlyConfigured
+        from tryon_studio.settings.base import parse_mls_choice
+        self.assertEqual(parse_mls_choice("TRYON_FINISH", None), "r17")
+        self.assertEqual(parse_mls_choice("TRYON_FINISH", "OFF"), "off")
+        with self.assertRaises(ImproperlyConfigured):
+            parse_mls_choice("TRYON_FINISH", "r60")
+        self.assertIn(settings.TRYON_FINISH, ("r17", "off"))
+
+    def test_pants_alone_are_untouched_and_report_off(self):
+        base, lm = avatar()
+        p, plm = pants()
+        plain, _, d0 = warp.render_tryon(base, lm, [("pants", p, plm)])
+        r17, _, d1 = warp.render_tryon(base, lm, [("pants", p, plm)], edge_feather=True, shading=True,
+                                       contact_shadows=True, finish="r17")
+        self.assertTrue((plain == r17).all())
+        self.assertEqual((d0["finish"], d1["finish"]), ("off", "off"))
+
+    def test_with_a_tshirt_the_pants_px_away_from_it_are_untouched(self):
+        base, lm = avatar()
+        g, glm = tshirt()
+        p, plm = pants()
+        both = [("tshirt", g, glm), ("pants", p, plm)]
+        plain, _, d0 = warp.render_tryon(base, lm, both)
+        r17, _, d1 = warp.render_tryon(base, lm, both, edge_feather=True, shading=True, contact_shadows=True,
+                                       finish="r17")
+        self.assertEqual(d1["finish"], "r17")
+        far = ~(cv2.dilate((d0["tshirt_final"][:, :, 3] > 0).astype(np.uint8), np.ones((49, 49), np.uint8)) > 0)
+        self.assertTrue((plain[far] == r17[far]).all())
+        self.assertTrue((plain != r17).any())
+        c0, c1 = d0["tshirt_final"][:, :, 3] >= 128, d1["tshirt_final"][:, :, 3] >= 128
+        self.assertTrue((c0 == c1).all())  # nothing uncovered
+
+
 class TshirtFitTests(SimpleTestCase):
     def layer(self, g, glm, lm=None):
         base, lm0 = avatar()

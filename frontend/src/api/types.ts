@@ -310,6 +310,10 @@ export interface TshirtConfig {
   armpit?: 'r14' | 'off'
   /** "mls" = no hem post-processing. */
   hem?: 'garment' | 'mls'
+  /** Tube sleeves (docs/09 #106): the garment's real sleeve hem on the cuff line; "chord" also when the tube is off. */
+  cuff?: 'hem' | 'chord'
+  /** Tube sleeves (docs/09 #106): photo-fringe px over solid fabric not drawn; "keep" also when the tube is off. */
+  fringe?: 'drop' | 'keep'
 }
 
 /** job.result of a finished try-on job (docs/04). */
@@ -323,6 +327,8 @@ export interface TryOnJobResult {
   neck_hole: Record<string, boolean>
   /** Debug (docs/09 #105): per T-shirt garment id, the config used. Absent in demo results. */
   tshirt_config?: Record<string, TshirtConfig>
+  /** Debug (docs/09 #107): "r17" = the T-shirt got the finish (smooth edge, form shading, contact shadow). Absent in demo results. */
+  finish?: 'r17' | 'off'
   /** Debug (docs/09 #105): time of the render call in ms. Absent in demo results. */
   render_ms?: number
   demo?: boolean

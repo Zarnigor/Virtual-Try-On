@@ -176,12 +176,14 @@ class TaskTests(MediaTestCase):
             report = tasks._do_warp(outfit)
             self.assertIsInstance(report.pop("render_ms"), int)
             cfg = report.pop("tshirt_config")
-            self.assertEqual(report, {"engine": "mls", "quality_warnings": [], "neck_hole": {gid: False}})
+            self.assertEqual(report, {"engine": "mls", "quality_warnings": [], "neck_hole": {gid: False},
+                                      "finish": "r17"})  # the settings default (docs/09 #107)
             self.assertEqual(list(cfg), [gid])
             want = {"fit_mode": mode, "engine": "mls", "sleeve": None, "tube": False, "side_floor": "off",
-                    "armpit": "off", "hem": "mls"}
-            if mode == "adapt":  # the settings defaults (docs/09 #105)
-                want.update(sleeve="C", tube=True, side_floor="mask", armpit="r14", hem="garment")
+                    "armpit": "off", "hem": "mls", "cuff": "chord", "fringe": "keep"}
+            if mode == "adapt":  # the settings defaults (docs/09 #105, #106)
+                want.update(sleeve="C", tube=True, side_floor="mask", armpit="r14", hem="garment", cuff="hem",
+                            fringe="drop")
             self.assertEqual(cfg[gid], want)
             self.assertEqual(self._result_shape(outfit), (1200, 600))
 
@@ -194,7 +196,8 @@ class TaskTests(MediaTestCase):
         gid = str(outfit.garments.get().pk)
         self.assertIsInstance(report.pop("render_ms"), int)
         self.assertEqual(report, {"engine": "parts", "quality_warnings": ["mls_fallback"], "neck_hole": {gid: False},
-                                  "tshirt_config": {gid: {"fit_mode": "adapt", "engine": "parts"}}})
+                                  "tshirt_config": {gid: {"fit_mode": "adapt", "engine": "parts"}},
+                                  "finish": "r17"})
         self.assertEqual(self._result_shape(outfit), (1200, 600))
 
     @override_settings(TRYON_WARP="parts")
@@ -204,7 +207,13 @@ class TaskTests(MediaTestCase):
         report = tasks._do_warp(outfit)
         self.assertIsInstance(report.pop("render_ms"), int)
         self.assertEqual(report, {"engine": "parts", "quality_warnings": [], "neck_hole": {gid: False},
-                                  "tshirt_config": {gid: {"fit_mode": "adapt", "engine": "parts"}}})
+                                  "tshirt_config": {gid: {"fit_mode": "adapt", "engine": "parts"}},
+                                  "finish": "r17"})
+
+    @override_settings(TRYON_FINISH="off")
+    def test_finish_off_is_reported(self):
+        report = tasks._do_warp(self._outfit())
+        self.assertEqual(report["finish"], "off")
 
     @mock.patch("apps.tryon_engine.views.run_tryon.delay")
     def test_response_names_the_engine(self, _):
@@ -1344,9 +1353,136 @@ class ArmpitWedgeTests(SimpleTestCase):
             self.assertGreater(notch[1], float(glm["armpit"]["y"]))  # the alpha notch lies below the marked armpit
 
 
-ON = dict(warp_engine="mls", mls_sleeve="C", mls_tube=True, mls_side_floor="mask", mls_armpit="r14", mls_hem="garment")
+R15 = dict(armpit_mode="r14", **R14)
+
+
+class CuffHemTests(SimpleTestCase):
+    """Round 15 benchmark (docs/06 "Cuff hem, round 15"): cuff_mode="hem" lands the garment's real sleeve hem on the
+    body cuff line (tube sleeves only); keyword only, default "chord"; render_tryon never passes it."""
+
+    def test_unknown_mode_raises(self):
+        with self.assertRaises(ValueError):
+            _layer(cuff_mode="curve")
+
+    def test_default_is_chord(self):
+        a = _layer()[0]
+        b = _layer(cuff_mode="chord")[0]
+        self.assertEqual(int((a != b).any(2).sum()), 0)
+
+    @skipUnless((R10_FIXTURE / "expected").is_dir(), "round 10 fixture missing (see MlsSideFloorOffRegressionTests)")
+    def test_tube_default_is_round_14_again(self):
+        g, glm, blm, mask = _r10_case("43", 3)
+        a, ia = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, **R15)
+        b, _ = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, cuff_mode="chord", **R15)
+        self.assertEqual(int((a != b).any(2).sum()), 0)
+        for side in ("left", "right"):
+            self.assertNotIn("cuff_hem", ia["tube"][side])
+            self.assertNotIn("cuff_cut_px", ia["tube"][side])
+
+    @skipUnless((R10_FIXTURE / "expected").is_dir(), "round 10 fixture missing (see MlsSideFloorOffRegressionTests)")
+    def test_without_a_tube_and_in_keep_shape_it_is_a_no_op(self):
+        g, glm, blm, mask = _r10_case("43", 1)
+        a, _ = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, sleeve_variant="C")
+        b, ib = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, sleeve_variant="C", cuff_mode="hem")
+        self.assertEqual(int((a != b).any(2).sum()), 0)
+        self.assertNotIn("tube", ib)
+        for gid in ("44", "45"):
+            g, glm, blm, mask = _r10_case(gid, 3)
+            a, _ = mls.tshirt_layer(g, glm, blm, mask, "keep_shape", 1200, 600, **R15)
+            b, _ = mls.tshirt_layer(g, glm, blm, mask, "keep_shape", 1200, 600, cuff_mode="hem", **R15)
+            with self.subTest(garment=gid):
+                self.assertEqual(int((a != b).any(2).sum()), 0)
+
+    @skipUnless((R10_FIXTURE / "expected").is_dir(), "round 10 fixture missing (see MlsSideFloorOffRegressionTests)")
+    def test_no_skin_above_the_cuff_nothing_lost_rest_untouched(self):
+        """#43, #40, #28: no arm skin above the cuff line beside the boundary, never more wedge px than "chord", no
+        fragment, no figure px the "chord" layer covers is lost (arm skin at / below the cuff line apart), no arm px
+        more than 1 px below the cuff line newly covered, nothing changes outside the sleeve zone (+ 12 px)."""
+        for gid, pks in (("43", (1, 3, 5, 6)), ("40", (3, 6)), ("28", (1, 6))):
+            for pk in pks:
+                g, glm, blm, mask = _r10_case(gid, pk)
+                a, ia = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, **R15)
+                b, ib = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, cuff_mode="hem", **R15)
+                with self.subTest(garment=gid, avatar=pk):
+                    c0, c1 = a[:, :, 3] >= 128, b[:, :, 3] >= 128
+                    w0 = mls.armpit_wedge(a, mask, blm, ia["sleeve_hems"])
+                    w1 = mls.armpit_wedge(b, mask, blm, ib["sleeve_hems"])
+                    rag = mls.armpit_ragged(b, mask, blm)
+                    for side in ("left", "right"):
+                        self.assertIn("rise_max_body_px", ib["tube"][side]["cuff_hem"])
+                        self.assertEqual(w1[side]["arm_px"], 0)
+                        self.assertLessEqual(w1[side]["px"], w0[side]["px"])
+                        self.assertEqual(rag[side]["fragment_px"], 0)
+                        self.assertEqual(ia["tube"][side]["cuff"], ib["tube"][side]["cuff"])  # the body cuff line stays
+                    self.assertEqual(int((mask & c0 & ~c1 & ~_arm_at_cuff(mask, blm, ia["sleeve_hems"],
+                                                                         mls.WEDGE_CUFF_MARGIN)).sum()), 0)
+                    self.assertEqual(int((c1 & ~c0 & _arm_at_cuff(mask, blm, ib["sleeve_hems"], -1.0)).sum()), 0)
+                    zone = cv2.dilate(mls.sleeve_zone(ia["pairs"], blm, 1200, 600).astype(np.uint8),
+                                      np.ones((25, 25), np.uint8)) > 0
+                    self.assertEqual(int(((a != b).any(2) & ~zone).sum()), 0)
+
+    def test_hem_half_width_follows_a_hem_behind_the_chord(self):
+        fabric = np.zeros((60, 60), bool)
+        fabric[10:30, 5:55] = True  # the hem (row 29) lies 3 px above the chord row 32 beyond x = 33
+        fabric[30:34, 5:34] = True
+        g_in = lambda q: bool(fabric[int(round(q[1])), int(round(q[0]))])  # noqa: E731
+        c, d, back = np.array([30.0, 32.0]), np.array([1.0, 0.0]), np.array([0.0, 1.0])
+        self.assertLess(mls._march(g_in, c, d, 40), 5)
+        self.assertEqual(mls._hem_half_width(g_in, c, d, back, 20.0, 6.0), 20.0)
+        self.assertEqual(mls._hem_half_width(g_in, c, d, back, 40.0, 6.0), 24.5)  # the fabric ends at x = 54
+        self.assertLess(mls._hem_half_width(g_in, c, d, back, 20.0, 1.0), 5)  # the hem is farther than max_r
+
+
+class TubeFringeTests(SimpleTestCase):
+    """Round 16 benchmark (docs/06 "Tube fringe, round 16"): tube_fringe="drop" does not draw the tube's photo-fringe
+    px over solid MLS fabric (the faint line along the sleeve's inner edge); keyword only, default "keep"."""
+
+    def test_unknown_mode_raises(self):
+        with self.assertRaises(ValueError):
+            _layer(tube_fringe="erode")
+
+    def test_default_is_keep(self):
+        a = _layer()[0]
+        b = _layer(tube_fringe="keep")[0]
+        self.assertEqual(int((a != b).any(2).sum()), 0)
+
+    @skipUnless((R10_FIXTURE / "expected").is_dir(), "round 10 fixture missing (see MlsSideFloorOffRegressionTests)")
+    def test_without_a_tube_and_in_keep_shape_it_is_a_no_op(self):
+        g, glm, blm, mask = _r10_case("28", 2)
+        a, _ = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, sleeve_variant="C")
+        b, ib = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, sleeve_variant="C", tube_fringe="drop")
+        self.assertEqual(int((a != b).any(2).sum()), 0)
+        self.assertNotIn("tube", ib)
+        g, glm, blm, mask = _r10_case("44", 3)
+        a, _ = mls.tshirt_layer(g, glm, blm, mask, "keep_shape", 1200, 600, **R15)
+        b, _ = mls.tshirt_layer(g, glm, blm, mask, "keep_shape", 1200, 600, tube_fringe="drop", **R15)
+        self.assertEqual(int((a != b).any(2).sum()), 0)
+
+    @skipUnless((R10_FIXTURE / "expected").is_dir(), "round 10 fixture missing (see MlsSideFloorOffRegressionTests)")
+    def test_fringe_px_not_drawn_nothing_lost_rest_untouched(self):
+        """#28, #43, #40: the fringe px are reported in both modes; with "drop" no figure px the "keep" layer covers
+        is lost and nothing visible changes farther than 3 px from a fringe px."""
+        for gid, pk in (("28", 2), ("28", 4), ("43", 4), ("40", 1)):
+            g, glm, blm, mask = _r10_case(gid, pk)
+            a, ia = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, cuff_mode="hem", **R15)
+            b, ib = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, cuff_mode="hem", tube_fringe="drop", **R15)
+            with self.subTest(garment=gid, avatar=pk):
+                zone = ia["tube"]["fringe_zone"]
+                self.assertGreater(ia["tube"]["fringe_px"], 0)
+                self.assertEqual(ia["tube"]["fringe_px"], int(zone.sum()))
+                self.assertEqual((ia["tube"]["fringe_mode"], ib["tube"]["fringe_mode"]), ("keep", "drop"))
+                self.assertEqual(int((mask & (a[:, :, 3] >= 128) & (b[:, :, 3] < 128)).sum()), 0)
+                near = cv2.dilate(zone.astype(np.uint8), np.ones((7, 7), np.uint8)) > 0
+                changed = (a != b).any(2) & ((a[:, :, 3] > 0) | (b[:, :, 3] > 0))
+                self.assertGreater(int(changed.sum()), 0)
+                self.assertEqual(int((changed & ~near).sum()), 0)
+
+
+ON = dict(warp_engine="mls", mls_sleeve="C", mls_tube=True, mls_side_floor="mask", mls_armpit="r14", mls_hem="garment",
+          mls_cuff="hem", mls_fringe="drop")
 BENCH = dict(sleeve_variant="C", side_floor=True, side_floor_mode="mask", hem_mode="garment", sleeve_mode="tube",
-             tube_arm="finished", armpit_mode="r14")  # the approved benchmark call (docs/06 round 14)
+             tube_arm="finished", armpit_mode="r14", cuff_mode="hem",
+             tube_fringe="drop")  # the benchmark call (docs/06 rounds 14, 15, 16)
 
 
 def _prod_layer(gid, pk, mode="adapt", **flags):
@@ -1360,7 +1496,8 @@ def _prod_layer(gid, pk, mode="adapt", **flags):
 @skipUnless((R10_FIXTURE / "expected").is_dir(), "round 10 fixture missing (see MlsSideFloorOffRegressionTests)")
 class ProductionTshirtConfigTests(SimpleTestCase):
     """docs/09 #105: render_tryon gives adapt T-shirts sleeve C + tube "finished" + armpit r14 + side floor "mask" +
-    hem "garment"; flags TRYON_MLS_TUBE / _SIDE_FLOOR / _ARMPIT / _HEM, each off value = the behaviour before."""
+    hem "garment" (+ docs/09 #106: cuff "hem" + fringe "drop"); flags TRYON_MLS_TUBE / _SIDE_FLOOR / _ARMPIT / _HEM /
+    _CUFF / _FRINGE, each off value = the behaviour before."""
 
     def test_production_is_the_benchmark_call_on_28_43_40(self):
         for gid in ("28", "43", "40"):
@@ -1372,7 +1509,7 @@ class ProductionTshirtConfigTests(SimpleTestCase):
                     self.assertEqual(dbg["engine"], "mls")
                     self.assertEqual(dbg["tshirt_config"], {"fit_mode": "adapt", "engine": "mls", "sleeve": "C",
                                                             "tube": True, "side_floor": "mask", "armpit": "r14",
-                                                            "hem": "garment"})
+                                                            "hem": "garment", "cuff": "hem", "fringe": "drop"})
                     self.assertNotIn("tube_fallback", dbg["quality_warnings"])
 
     def test_keep_shape_is_unchanged_on_44_45(self):
@@ -1384,7 +1521,7 @@ class ProductionTshirtConfigTests(SimpleTestCase):
                     self.assertEqual(int((a != b).any(2).sum()), 0)
                     self.assertEqual(db["tshirt_config"], {"fit_mode": "keep_shape", "engine": "mls", "sleeve": None,
                                                            "tube": False, "side_floor": "off", "armpit": "off",
-                                                           "hem": "mls"})
+                                                           "hem": "mls", "cuff": "chord", "fringe": "keep"})
                     self.assertEqual(da["tshirt_config"], db["tshirt_config"])
 
     def test_all_flags_off_is_the_previous_production_call(self):
@@ -1397,7 +1534,7 @@ class ProductionTshirtConfigTests(SimpleTestCase):
                 self.assertEqual(int((layer != want).any(2).sum()), 0)
                 self.assertEqual(dbg["tshirt_config"], {"fit_mode": "adapt", "engine": "mls", "sleeve": "C",
                                                         "tube": False, "side_floor": "off", "armpit": "off",
-                                                        "hem": "mls"})
+                                                        "hem": "mls", "cuff": "chord", "fringe": "keep"})
         a = _prod_layer("28", 1, warp_engine="mls")[0]  # a direct call without the new arguments = the same
         self.assertEqual(int((a != _prod_layer("28", 1, warp_engine="mls", mls_tube=False)[0]).any(2).sum()), 0)
 
@@ -1405,14 +1542,17 @@ class ProductionTshirtConfigTests(SimpleTestCase):
         """One flag off = the benchmark call without that keyword. The armpit mode needs the tube and the side floor:
         without one of them it is off and tshirt_config says so."""
         cases = {
-            "tube": (dict(mls_tube=False), ("sleeve_mode", "tube_arm", "armpit_mode"), dict(tube=False, armpit="off")),
+            "tube": (dict(mls_tube=False), ("sleeve_mode", "tube_arm", "armpit_mode", "cuff_mode", "tube_fringe"),
+                     dict(tube=False, armpit="off", cuff="chord", fringe="keep")),
             "side_floor": (dict(mls_side_floor="off"), ("side_floor", "side_floor_mode", "armpit_mode"),
                            dict(side_floor="off", armpit="off")),
             "armpit": (dict(mls_armpit="off"), ("armpit_mode",), dict(armpit="off")),
             "hem": (dict(mls_hem="mls"), ("hem_mode",), dict(hem="mls")),
+            "cuff": (dict(mls_cuff="chord"), ("cuff_mode",), dict(cuff="chord")),
+            "fringe": (dict(mls_fringe="keep"), ("tube_fringe",), dict(fringe="keep")),
         }
         on_cfg = {"fit_mode": "adapt", "engine": "mls", "sleeve": "C", "tube": True, "side_floor": "mask",
-                  "armpit": "r14", "hem": "garment"}
+                  "armpit": "r14", "hem": "garment", "cuff": "hem", "fringe": "drop"}
         for name, (off, drop, cfg) in cases.items():
             with self.subTest(flag=name):
                 layer, dbg, (g, glm, blm, mask) = _prod_layer("28", 3, **{**ON, **off})
@@ -1434,6 +1574,7 @@ class ProductionTshirtConfigTests(SimpleTestCase):
         self.assertEqual(tube.call_count, 2)  # the layer and the "mask" guard's reference layer; none in the re-render
         self.assertEqual(dbg["quality_warnings"], ["tube_fallback"])
         self.assertEqual((dbg["tshirt_config"]["tube"], dbg["tshirt_config"]["armpit"]), (False, "off"))
+        self.assertEqual((dbg["tshirt_config"]["cuff"], dbg["tshirt_config"]["fringe"]), ("chord", "keep"))
         self.assertEqual(dbg["engine"], "mls")
         want, _ = mls.tshirt_layer(g, glm, blm, mask, "adapt", 1200, 600, (0.35, 10.0), sleeve_variant="C",
                                    side_floor=True, side_floor_mode="mask", hem_mode="garment")
@@ -1441,7 +1582,8 @@ class ProductionTshirtConfigTests(SimpleTestCase):
 
     def test_unknown_option_raises(self):
         base, lm = body()
-        for bad in (dict(mls_side_floor="landmarks"), dict(mls_armpit="r13c"), dict(mls_hem="smooth")):
+        for bad in (dict(mls_side_floor="landmarks"), dict(mls_armpit="r13c"), dict(mls_hem="smooth"),
+                    dict(mls_cuff="curve"), dict(mls_fringe="erode")):
             with self.assertRaises(ValueError):
                 warp.render_tryon(base, lm, [], warp_engine="mls", **bad)
 
@@ -1449,7 +1591,8 @@ class ProductionTshirtConfigTests(SimpleTestCase):
         from django.core.exceptions import ImproperlyConfigured
         from tryon_studio.settings.base import parse_mls_choice
         for name, (first, second) in (("TRYON_MLS_TUBE", ("1", "0")), ("TRYON_MLS_SIDE_FLOOR", ("mask", "off")),
-                                      ("TRYON_MLS_ARMPIT", ("r14", "off")), ("TRYON_MLS_HEM", ("garment", "mls"))):
+                                      ("TRYON_MLS_ARMPIT", ("r14", "off")), ("TRYON_MLS_HEM", ("garment", "mls")),
+                                      ("TRYON_MLS_CUFF", ("hem", "chord")), ("TRYON_MLS_FRINGE", ("drop", "keep"))):
             self.assertEqual(parse_mls_choice(name, None), first)
             self.assertEqual(parse_mls_choice(name, f" {second.upper()} "), second)
             with self.assertRaises(ImproperlyConfigured):
@@ -1457,6 +1600,7 @@ class ProductionTshirtConfigTests(SimpleTestCase):
         flags = render_flags("avatar")
         self.assertEqual({k: flags[k] for k in ("mls_tube", "mls_side_floor", "mls_armpit", "mls_hem")},
                          {"mls_tube": True, "mls_side_floor": "mask", "mls_armpit": "r14", "mls_hem": "garment"})
+        self.assertEqual((flags["mls_cuff"], flags["mls_fringe"]), ("hem", "drop"))
         with override_settings(TRYON_MLS_TUBE=False, TRYON_MLS_HEM="mls"):
             flags = render_flags("body")
             self.assertEqual((flags["mls_tube"], flags["mls_hem"]), (False, "mls"))

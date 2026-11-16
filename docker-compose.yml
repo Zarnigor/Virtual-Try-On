@@ -56,6 +56,9 @@ services:
       - TRYON_MLS_SIDE_FLOOR=${TRYON_MLS_SIDE_FLOOR:-mask}  # mask | off
       - TRYON_MLS_ARMPIT=${TRYON_MLS_ARMPIT:-r14}  # r14 | off (needs the tube and the side floor)
       - TRYON_MLS_HEM=${TRYON_MLS_HEM:-garment}  # garment | mls (no hem post-processing)
+      - TRYON_MLS_CUFF=${TRYON_MLS_CUFF:-hem}  # tube sleeves (docs/09 #106): hem | chord
+      - TRYON_MLS_FRINGE=${TRYON_MLS_FRINGE:-drop}  # tube sleeves (docs/09 #106): drop | keep
+      - TRYON_FINISH=${TRYON_FINISH:-r17}  # T-shirt finish (docs/09 #107): r17 | off
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
@@ -100,6 +103,9 @@ services:
       - TRYON_MLS_SIDE_FLOOR=${TRYON_MLS_SIDE_FLOOR:-mask}  # mask | off
       - TRYON_MLS_ARMPIT=${TRYON_MLS_ARMPIT:-r14}  # r14 | off (needs the tube and the side floor)
       - TRYON_MLS_HEM=${TRYON_MLS_HEM:-garment}  # garment | mls (no hem post-processing)
+      - TRYON_MLS_CUFF=${TRYON_MLS_CUFF:-hem}  # tube sleeves (docs/09 #106): hem | chord
+      - TRYON_MLS_FRINGE=${TRYON_MLS_FRINGE:-drop}  # tube sleeves (docs/09 #106): drop | keep
+      - TRYON_FINISH=${TRYON_FINISH:-r17}  # T-shirt finish (docs/09 #107): r17 | off
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}

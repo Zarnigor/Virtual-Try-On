@@ -23,7 +23,8 @@ but the frontend must fully work too (React is required). The owner works and re
   Garment real size is NOT entered. No tight/loose fit label. **keep_shape = MLS per-point k preset A** (docs/09 #96,
   shoulder_* marked at the sleeve seam); wired only in the MLS engine (docs/09 #98). **MLS is the default T-shirt
   engine (`TRYON_WARP=mls`, docs/09 #105);** adapt T-shirts = sleeve C + tube + armpit r14 + side floor "mask" +
-  garment hem (flags `TRYON_MLS_*`); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
+  garment hem + cuff hem + fringe drop (flags `TRYON_MLS_*`, docs/09 #105, #106); every T-shirt gets the r17
+  finish (`TRYON_FINISH`, docs/09 #107; pants do not); `parts` = pants, the MLS fallback, and warps keep_shape like adapt.
   **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
@@ -106,9 +107,9 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-**Latest handoff: `docs/11-session-handoff.md` (2026-11-15): uncommitted rounds 11-14, open problems, next
+**Latest handoff: `docs/11-session-handoff.md` (2026-11-15, round 17 added 2026-11-16): uncommitted rounds 11-14, open problems, next
 steps, how to run. Read it first.**
-Last updated: 2026-11-15. The first task (summary + plan) is done. The owner approved the 10-step plan below.
+Last updated: 2026-11-16. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
 - [ ] 1. Day-1 experiment, properly: 3 real male avatars (avatar-prep + landmark editor), fix sleeves
@@ -220,6 +221,20 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `_HEM` (off = before); `tube_fallback`; job result `tshirt_config` + `render_ms`; r13c deleted. Gates: production
       = benchmark 0 px (18 pairs), keep_shape 0 px. Known issues in #105 (gate 8 / 18, ~1.1 s render, demo results
       stale). Check tools: `tools/tryon_check/prod_vs_bench.py`, `post_path.py`. 369 backend tests, 78 vitest, tsc.
+      **2026-11-15 rounds 15 / 16 + production (docs/09 #106, docs/06 "Cuff hem, round 15", "Tube fringe, round 16",
+      uncommitted):** keywords `cuff_mode` (chord | hem) and `tube_fringe` (keep | drop), tube sleeves only. hem = the
+      garment's real sleeve hem lands on the cuff line (owner option A): gate 0 / 18 (before 8 / 18), arm skin above
+      the cuff 0 px, spikes 233 -> 82. drop = the tube's photo-fringe px over solid fabric are not drawn (the faint
+      line on the sleeve's inner edge): 606 line px -> 0, 0 new holes. **Both in production:** flags `TRYON_MLS_CUFF`
+      (hem | chord), `TRYON_MLS_FRINGE` (drop | keep), `tshirt_config.cuff` / `.fringe`; production = benchmark 0 px
+      (18 pairs), keep_shape 0 px. `run_cuff15.py`, `run_fringe16.py`. 379 backend tests, 78 vitest, tsc.
+      Still open: stepped torso edge on #28, render ~1.2 s, r14 skip on older landmarks, demo results stale.
+      **2026-11-16 round 17 + production (docs/09 #107, docs/06 "Finish pass, round 17", uncommitted):** keyword
+      `render_tryon(finish="r60" | "r17")`; r17 = `smooth_edges` (nothing eroded) + form shading from the garment
+      outline + contact shadow (also on the arm under the cuff). **In production for T-shirts only:** setting
+      `TRYON_FINISH` (r17 | off, default r17), job result `finish`; pants untouched (their own round after the owner
+      uploads 2-4 pants). Gates: production = benchmark r17 0 px, off = before 0 px, new holes 0 / 30
+      (`run_finish17.py`, `VARIANTS=off,r17,prod,setting_off`). 389 backend tests, 78 vitest, tsc.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

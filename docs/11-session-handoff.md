@@ -3,6 +3,52 @@
 Read this first in a new session, together with CLAUDE.md "Status and next step". It records what is finished,
 what is NOT finished, and what to do next. Details and numbers: docs/06 (engine rounds), docs/09 (decisions).
 
+## 0. Next session (written 2026-11-15, end of day): start here
+
+**State.** Branch `tshirt-mls-default` (from `landmark-editor-variant-c`, not merged, not pushed): `9584166` bench:
+rounds 11-14, `104c891` feat: MLS default + adapt config in production (docs/09 #105). On top of it (2026-11-16): one
+`feat:` commit with rounds 15 / 16 (docs/09 #106) and the round 17 finish (docs/09 #107), one `bench:` commit with
+the runners `run_cuff15.py`, `run_fringe16.py`, `run_finish17.py`; where sections below say "uncommitted" for
+rounds 15-17, that is history. Rounds 11-14 are CLOSED by
+#105 (sections 1 and 3 below describe them as open / uncommitted: history only). `smt.txt` stays untracked. This
+section itself is not committed yet.
+
+**First, ask the owner** what they saw when testing on localhost:5173 after the wiring, and log it in docs/09.
+
+**Open work, in the order proposed (owner decides; plan first, one item per round):**
+1. Render time of an adapt T-shirt, about 1.0-1.5 s (was about 0.15 s). Likely the side floor "mask" last guard,
+   which builds a second full layer (`mls.tshirt_layer` calls itself), plus the second MLS solve of r14. Measure per
+   step first; the output must stay pixel-identical (`ProductionTshirtConfigTests`, `tools/tryon_check/prod_vs_bench.py`).
+2. **DONE, in production, uncommitted (docs/09 #106): rounds 15 (cuff hem) and 16 (tube fringe drop).** Flags
+   `TRYON_MLS_CUFF`, `TRYON_MLS_FRINGE`; gates 0 / 18, production = benchmark 0 px, 379 backend tests. Ask the owner
+   whether to commit (suggested: one `bench:` commit for the keywords + runners, one `feat:` commit for the wiring).
+   The item as it was before round 15:
+   #43 cuff slivers: arm skin 2.5-5.8 px above the nominal cuff line under the garment's curved cuff (round 14
+   gate fails on 8 / 18 runs; also #40 m-plus, 1 px on #40 m-slim). A cuff-shape change in the tube (the tube maps
+   the straight chord between the cuff landmarks to the cuff line), not the armpit code.
+2b. **Round 17, finish pass (2026-11-16, benchmark only, uncommitted; docs/06 "Finish pass, round 17"):**
+   `render_tryon(finish="r17")` + `warp.soft_coverage` / `smooth_edges` / `form_shading_map`, runner
+   `tools/warp-benchmark/run_finish17.py`, tests `FinishR17Tests`. Defaults unchanged (realism flags 0, finish r60).
+   **Owner chose r17; in production for T-shirts only (docs/09 #107, uncommitted):** setting `TRYON_FINISH`
+   (r17 | off), job result `finish`, tests `FinishWiringTests`; 389 backend tests, 78 vitest, tsc. Pants: their own
+   round after the owner uploads 2-4 pants (only #18 exists). Open: the reference layers of #43 / #40 changed by
+   4-44 hard edge px between the 10:36 and 11:25 runs on 2026-11-16 (DB data, cause not confirmed; ask the owner
+   whether they re-marked landmarks). Ideas after it, in the proposed order: side ease + smooth side line, hem rule (#91),
+   armpit / cuff leftovers, keep_shape shoulder triangle, 2x resampling for moire.
+3. Stepped torso edge (2-5 px) beside the gap below the armpit on #28 (seen in the `POST tryon/` check sheet).
+4. Robustness of r14: it skips a side when `torso_side_edges` finds no arm-touch rows (older landmarks); r14 without
+   a tube is built but not benchmarked (production switches the armpit mode off without the tube).
+5. Demo mode: the 18 stored results were built with `parts` and are stale; rebuild with `build_demo` only when the
+   owner says so.
+6. Still undecided: the T-shirt hem rule (docs/09 #91). Merge / push of `tshirt-mls-default`: owner's call.
+7. Then back to the 10-step plan in CLAUDE.md: 3b (owner's findings with real clothes), 4 (own-body pipeline, spec in
+   docs/09 #22-36), 5 (BodyConfirm wiring), 6 (garment pipeline: quality check, Save / Cancel), 7 (avatar path).
+
+**How to check by hand:** localhost:5173, log in as the garments' owner, try #28 on a male avatar, #43 / #40 on a
+female avatar, #44 / #45 (keep_shape) on any; the job result (`GET /api/jobs/{id}/`) shows `tshirt_config` and
+`render_ms`. Old behaviour for comparison: set `TRYON_MLS_TUBE=0`, `TRYON_MLS_SIDE_FLOOR=off`, `TRYON_MLS_ARMPIT=off`,
+`TRYON_MLS_HEM=mls` in `.env`, then `docker compose up -d backend worker`.
+
 ## 1. Git state
 
 - Branch: `landmark-editor-variant-c` (not merged to main, not pushed).
@@ -75,7 +121,7 @@ what is NOT finished, and what to do next. Details and numbers: docs/06 (engine 
   for #28, #40, #43, #45, #47.
 - **Collar floor** is the MLS default (docs/09 #100).
 - **MLS sleeve variant C** in production (docs/09 #104): setting `TRYON_MLS_SLEEVE` (default C).
-- `TRYON_WARP` defaults to `mls` since docs/09 #105 (2026-11-15, uncommitted until the owner approves the diff);
+- `TRYON_WARP` defaults to `mls` since docs/09 #105 (2026-11-15, committed in `104c891`);
   `parts` = pants, the MLS fallback, or `TRYON_WARP=parts`. The hem rule (#91) is still open.
 - Not in production (render_tryon never passes them): `side_floor` (round 10), shoulder line (round 9 / 9b),
   tube sleeves (round 11), side_floor_mode / hem_mode (round 12).
