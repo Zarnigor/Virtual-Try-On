@@ -451,6 +451,7 @@ class FinishWiringTests(SimpleTestCase):
         from django.core.exceptions import ImproperlyConfigured
         from tryon_studio.settings.base import parse_mls_choice
         self.assertEqual(parse_mls_choice("TRYON_FINISH_PANTS", None), "1")
+        self.assertEqual(parse_mls_choice("TRYON_PANTS_TUCK", None), "1")
         with self.assertRaises(ImproperlyConfigured):
             parse_mls_choice("TRYON_FINISH_PANTS", "yes")
         self.assertEqual(parse_mls_choice("TRYON_FINISH", None), "r17")
@@ -495,6 +496,55 @@ class FinishWiringTests(SimpleTestCase):
         self.assertTrue((plain != r17).any())
         c0, c1 = d0["tshirt_final"][:, :, 3] >= 128, d1["tshirt_final"][:, :, 3] >= 128
         self.assertTrue((c0 == c1).all())  # nothing uncovered
+
+
+class PantsTuckTests(SimpleTestCase):
+    """docs/09 #109: an adapt MLS T-shirt hangs over the pants (drape_over_pants + tuck_pants)."""
+
+    @staticmethod
+    def layers():
+        shirt = np.zeros((400, 300, 4), np.uint8)
+        shirt[50:300, 100:200] = (10, 20, 30, 255)
+        pants = np.zeros((400, 300, 4), np.uint8)
+        for y in range(200, 400):  # body-wide at the waist, 15 px wider per side from row 230 down
+            w = 50 + min(max(y - 200, 0), 30) // 2
+            pants[y, 150 - w:150 + w] = (90, 0, 0, 255)
+        mask = np.zeros((400, 300), bool)
+        mask[40:400, 105:195] = True
+        return shirt, pants, mask
+
+    def test_flag_default_on(self):
+        from django.test import override_settings
+        self.assertTrue(render_flags("avatar")["pants_tuck"])
+        with override_settings(TRYON_PANTS_TUCK=False):
+            self.assertFalse(render_flags("avatar")["pants_tuck"])
+
+    def test_drape_covers_the_pants_and_only_grows(self):
+        shirt, pants, _ = self.layers()
+        out, k = warp.drape_over_pants(shirt, pants[:, :, 3], 150)
+        self.assertGreater(k, 1.0)
+        before, after = shirt[:, :, 3] >= 128, out[:, :, 3] >= 128
+        self.assertFalse((before & ~after).any())
+        self.assertTrue((out[:170] == shirt[:170]).all())  # rows well above the pants keep their bytes (3 sigma)
+        beside = (pants[:, :, 3] >= 128)[230:295] & ~after[230:295]
+        self.assertLess(int(beside.sum()), int(((pants[:, :, 3] >= 128)[230:295] & ~before[230:295]).sum()) // 4)
+
+    def test_no_pants_wider_than_the_shirt_is_a_no_op(self):
+        shirt, pants, _ = self.layers()
+        pants[:, :110] = 0
+        pants[:, 190:] = 0
+        out, k = warp.drape_over_pants(shirt, pants[:, :, 3], 150)
+        self.assertEqual(k, 1.0)
+        self.assertIs(out, shirt)
+
+    def test_tuck_never_uncovers_the_figure(self):
+        shirt, pants, mask = self.layers()
+        mask[200:400, 95:205] = True  # hips wider than the shirt
+        out, n = warp.tuck_pants(pants, shirt[:, :, 3], mask, 150)
+        self.assertGreater(n, 0)
+        gone = (pants[:, :, 3] > 0) & (out[:, :, 3] == 0)
+        self.assertFalse((gone & mask).any())
+        self.assertFalse(gone[301:].any())  # below the shirt's hem the pants are whole
 
 
 class TshirtFitTests(SimpleTestCase):

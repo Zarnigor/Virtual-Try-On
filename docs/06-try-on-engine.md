@@ -1752,3 +1752,27 @@ the r17 call of #107, `TRYON_FINISH=off` = "off". New holes 0 in every run. Real
 (`tools/tryon_check/post_path.py`, `GARMENTS=48,49,51,28`): 18 pants jobs + 3 T-shirt jobs done, all `finish: r17`.
 Tests: `FinishWiringTests` (5). 390 backend tests, 78 vitest, tsc. **Not done:** shorts and white / black pants
 are not measured; the demo results are not rebuilt.
+
+### Pants under the T-shirt, round 18 (2026-11-16; in production, docs/09 #109)
+Seen on the round 17c sheets: from the waist row to the T-shirt hem the pants were wider than an adapt MLS T-shirt
+and showed beside it (the `parts` engine widens the T-shirt over the pants with `under`; MLS did not).
+Keyword `render_tryon(pants_tuck=True)` (own default False; setting `TRYON_PANTS_TUCK`, default 1), MLS + adapt +
+pants only, before the finish pass:
+1. `drape_over_pants(shirt, pants alpha, axis)`: per side, row stretch k = (pants edge + 2 px) / shirt half width
+   where the pants are wider, the hem's own rows (half width < 97 % of the side's median) ask for nothing, k held
+   from its widest row down to the hem, Gaussian along y (sigma 6 rows), clipped to 1..1.35; one premultiplied
+   `cv2.remap`; rows with k = 1 keep their bytes; coverage only grows.
+2. `tuck_pants(pants, shirt alpha, mask, axis)`: pants px left / right of the T-shirt's torso run above its hem
+   corner (10-row taper) are dropped unless within 3 px of the figure mask.
+
+| outfit | runs | pants px beside the T-shirt, off | with pants_tuck | figure px uncovered |
+|---|---|---|---|---|
+| #28 + #51 | 6 | 25573 | 1273 | 0 |
+| #43 + #48 | 6 | 19121 | 2618 | 0 |
+| #40 + #49 | 6 | 12349 | 2468 | 0 |
+| #44 + #18 (keep_shape) | 6 | 1375 | 1375 | 0 |
+| #45 + #51 (keep_shape) | 6 | 8210 | 8210 | 0 |
+
+Runner `tools/warp-benchmark/run_tuck18.py`, sheets `out/sheet_tuck18_<tshirt>_<pants>.png` (per avatar: off |
+tuck), `out/table_tuck18.md`. **Not done:** keep_shape (the pants still show beside #45 on wide hips); the px left
+are pants on the figure beside a T-shirt narrower than the hips; the stretch is not in the job result.

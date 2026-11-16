@@ -206,7 +206,8 @@ TRYON_MLS_SLEEVE = parse_mls_sleeve(os.environ.get("TRYON_MLS_SLEEVE"))
 TRYON_MLS_CHOICES = {"TRYON_MLS_TUBE": ("1", "0"), "TRYON_MLS_SIDE_FLOOR": ("mask", "off"),
                      "TRYON_MLS_ARMPIT": ("r14", "off"), "TRYON_MLS_HEM": ("garment", "mls"),
                      "TRYON_MLS_CUFF": ("hem", "chord"), "TRYON_MLS_FRINGE": ("drop", "keep"),
-                     "TRYON_FINISH": ("r17", "off"), "TRYON_FINISH_PANTS": ("1", "0")}
+                     "TRYON_FINISH": ("r17", "off"), "TRYON_FINISH_PANTS": ("1", "0"),
+                     "TRYON_PANTS_TUCK": ("1", "0")}
 
 
 def parse_mls_choice(name, value):
@@ -232,6 +233,9 @@ TRYON_FINISH = parse_mls_choice("TRYON_FINISH", os.environ.get("TRYON_FINISH"))
 # docs/09 #108 (rounds 17b / 17c): the same finish on the pants layer. Needs TRYON_FINISH=r17.
 #   TRYON_FINISH_PANTS  1 (default) | 0 = T-shirts only, the behaviour before #108
 TRYON_FINISH_PANTS = parse_mls_choice("TRYON_FINISH_PANTS", os.environ.get("TRYON_FINISH_PANTS")) == "1"
+# docs/09 #109 (round 18): an adapt MLS T-shirt hangs over the pants (its sides cover them, no pants beside it).
+#   TRYON_PANTS_TUCK  1 (default) | 0 = the behaviour before #109
+TRYON_PANTS_TUCK = parse_mls_choice("TRYON_PANTS_TUCK", os.environ.get("TRYON_PANTS_TUCK")) == "1"
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

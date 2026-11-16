@@ -1569,6 +1569,111 @@ def _mls_adapt_kwargs(cfg: dict) -> dict:
     return kw
 
 
+PANTS_TUCK_TAPER = 10  # rows above the T-shirt's hem corner over which the pants widen back to their own edge
+PANTS_TUCK_RELEASE = 40  # px the pants edge is let out across the taper
+PANTS_TUCK_BODY = 3  # px around the figure that the pants always keep (nothing of the body is uncovered)
+
+
+DRAPE_MARGIN = 2  # px the T-shirt's side reaches past the pants it hangs over
+DRAPE_MAX = 1.35  # largest row stretch of a side; what is left beside the shirt is tucked (tuck_pants)
+DRAPE_SIGMA = 6.0  # rows: the stretch is smoothed along y, the side line stays one curve
+
+
+def _torso_runs(solid: np.ndarray, ax: int) -> tuple[np.ndarray, np.ndarray]:
+    """Per row the (left, right) x of the solid run that holds the axis column; -1 where there is none."""
+    H = solid.shape[0]
+    left, right = np.full(H, -1), np.full(H, -1)
+    for y in np.where(solid.any(axis=1))[0]:
+        run = next((q for q in _runs(solid[y]) if q[0] <= ax <= q[1]), None)
+        if run is not None:
+            left[y], right[y] = run
+    return left, right
+
+
+def drape_over_pants(shirt: np.ndarray, pants_alpha: np.ndarray, axis: float) -> tuple[np.ndarray, float]:
+    """An untucked T-shirt hangs over the pants: on the rows where the pants are wider than the shirt, each half of
+    the shirt row is stretched about the axis until its side covers the pants (+ DRAPE_MARGIN), at most DRAPE_MAX.
+    The stretch is smoothed along y and held from the widest row down to the hem, so the hem is as wide as the row
+    above it. Rows that need nothing keep their bytes. Coverage only grows. Returns (layer, largest stretch)."""
+    H, W = pants_alpha.shape
+    ax = int(np.clip(round(axis), 1, W - 2))
+    sl, sr = _torso_runs(shirt[:, :, 3] >= 128, ax)
+    pl, pr = _torso_runs(pants_alpha >= 128, ax)
+    scales = []
+    for s_edge, p_edge, sign in ((sl, pl, -1), (sr, pr, 1)):
+        half = np.where(s_edge >= 0, (s_edge - ax) * sign, 0).astype(np.float64)
+        want = np.where((s_edge >= 0) & (p_edge >= 0), (p_edge - ax) * sign + DRAPE_MARGIN, 0)
+        k = np.where((half > 4) & (want > half), want / np.maximum(half, 1), 1.0)
+        rows = np.where(s_edge >= 0)[0]
+        if len(rows) > 75:  # the hem's own rows (a curved hem narrows there) do not ask for a stretch of their own
+            ref = np.median(half[rows[-60]:rows[-15]])
+            side_rows = rows[half[rows] >= 0.97 * ref]
+            k[(side_rows[-1] if len(side_rows) else rows[-15]) + 1:] = 1.0
+        if len(rows) and (k > 1).any():
+            k[np.argmax(k):rows[-1] + 1] = k.max()  # the hem keeps the widest row's stretch
+            k = np.maximum(cv2.GaussianBlur(k.reshape(-1, 1), (1, 0), DRAPE_SIGMA, borderType=cv2.BORDER_REPLICATE)[:, 0], 1.0)
+            k[rows[-1] + 1:] = 1.0
+        scales.append(np.clip(k, 1.0, DRAPE_MAX))
+    kl, kr = scales
+    todo = np.where((kl > 1.001) | (kr > 1.001))[0]
+    if not len(todo):
+        return shirt, 1.0
+    y0, y1 = int(todo[0]), int(todo[-1]) + 1
+    xs = np.arange(W, dtype=np.float32)[None, :]
+    c = ax + 0.5
+    k = np.where(xs + 0.5 < c, kl[y0:y1, None], kr[y0:y1, None]).astype(np.float32)
+    map_x = (c + (xs + 0.5 - c) / k - 0.5).astype(np.float32)
+    map_y = np.repeat(np.arange(y0, y1, dtype=np.float32)[:, None], W, axis=1)
+    f = shirt.astype(np.float32)
+    f[:, :, :3] *= f[:, :, 3:4] / 255.0
+    w = cv2.remap(f, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    a = w[:, :, 3:4] / 255.0
+    w[:, :, :3] = np.where(a > 0, w[:, :, :3] / np.maximum(a, 1e-6), 0)
+    out = shirt.copy()
+    changed = (kl[y0:y1] > 1.001) | (kr[y0:y1] > 1.001)
+    out[y0:y1][changed] = np.clip(np.rint(w), 0, 255).astype(np.uint8)[changed]
+    return out, float(max(kl.max(), kr.max()))
+
+
+def tuck_pants(pants: np.ndarray, shirt_alpha: np.ndarray, mask: np.ndarray, axis: float) -> tuple[np.ndarray, int]:
+    """Pants worn under an untucked T-shirt: above the shirt's hem the pants do not show beside the shirt.
+    Per side, a pants px left / right of the shirt's torso run is dropped down to the shirt's hem corner (the
+    last PANTS_TUCK_TAPER rows widen back smoothly), unless it lies within PANTS_TUCK_BODY px of the figure: the
+    body is never uncovered. Returns (pants layer, px dropped)."""
+    H, W = shirt_alpha.shape
+    solid = shirt_alpha >= 128
+    ax = int(np.clip(round(axis), 0, W - 1))
+    left, right = _torso_runs(solid, ax)
+    ys = np.where(left >= 0)[0]
+    if len(ys) < 2 * PANTS_TUCK_TAPER:
+        return pants, 0
+    y_bot = int(ys[-1])
+    ref = ys[(ys >= y_bot - 60) & (ys <= y_bot - 15)]
+    if not len(ref):
+        return pants, 0
+    k = 2 * PANTS_TUCK_BODY + 1
+    body = cv2.dilate(mask.astype(np.uint8), np.ones((k, k), np.uint8)) > 0
+    drop = np.zeros((H, W), bool)
+    xs = np.arange(W)
+    for side, edge in (("left", left), ("right", right)):
+        x_ref = int(np.median(edge[ref]))
+        col = int(np.clip(x_ref + (4 if side == "left" else -4), 0, W - 1))
+        col_rows = np.where(solid[:, col])[0]
+        corner = int(col_rows[-1]) if len(col_rows) else y_bot  # the hem's bottom row at this side
+        for y in ys[ys <= corner]:
+            t = _smooth((y - (corner - PANTS_TUCK_TAPER)) / PANTS_TUCK_TAPER)  # 0 above the taper, 1 at the corner
+            if side == "left":
+                drop[y] |= xs < edge[y] - t * PANTS_TUCK_RELEASE
+            else:
+                drop[y] |= xs > edge[y] + t * PANTS_TUCK_RELEASE
+    drop &= (pants[:, :, 3] > 0) & ~body
+    if not drop.any():
+        return pants, 0
+    out = pants.copy()
+    out[drop] = 0
+    return out, int(drop.sum())
+
+
 def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200, W: int = 600,
                  shading: bool = False, contact_shadows: bool = False, edge_feather: bool = False,
                  shading_strength: float = SHADING_STRENGTH, shoulder_cap: bool = True, hem_snap: bool = True,
@@ -1578,7 +1683,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  fit_modes: dict | None = None, warp_engine: str = "parts", neck_hole: bool = True,
                  mls_sleeve: str = "C", mls_tube: bool = False, mls_side_floor: str = "off",
                  mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
-                 finish: str = "r60", finish_pants: bool = False):
+                 finish: str = "r60", finish_pants: bool = False, pants_tuck: bool = False):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -1631,6 +1736,10 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     "off"; debug["tshirt_final"] = the T-shirt layer as composited, debug["arm_weight"] = the arm overlay weight.
     finish_pants (setting TRYON_FINISH_PANTS, docs/09 #108, docs/06 "Finish pass on pants, round 17b"; the default
     here is the off value): finish "r17" also on the pants layer. debug["final_layers"] = {garment type: the layer as composited}.
+    pants_tuck (setting TRYON_PANTS_TUCK, docs/09 #109; the default here is the off value): MLS T-shirt + pants: the
+    adapt T-shirt hangs over the pants: its sides are stretched to cover them (drape_over_pants) and what is still
+    beside it above the hem is dropped unless it lies on the figure (tuck_pants). keep_shape is not touched.
+    debug["pants_drape"] = largest row stretch, debug["pants_tuck_px"] = pants px dropped.
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -1691,6 +1800,12 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         except mls_engine.MlsUnavailable as e:
             info["quality_warnings"].append("mls_fallback")
             warnings.append(f"tshirt: mls fallback to parts: {e}")
+    info["pants_tuck_px"], info["pants_drape"] = 0, 1.0
+    if pants_tuck and mls_layer is not None and "pants" in by_type \
+            and fit_modes.get("tshirt", "adapt") != "keep_shape":  # docs/09 #109 (parts widens the shirt itself)
+        mls_layer, info["pants_drape"] = drape_over_pants(mls_layer, layers[0][1][:, :, 3], _crotch_x(body_lm))
+        tucked, info["pants_tuck_px"] = tuck_pants(layers[0][1], mls_layer[:, :, 3], mask, _crotch_x(body_lm))
+        layers[0] = ("pants", tucked)
     if mls_layer is not None:
         opening = info["mls"].get("neck_opening") if neck_fix else None
         head = head_neck_overlay(mask, body_lm, NECK_FEATHER_FIX if neck_fix else NECK_FEATHER, opening)

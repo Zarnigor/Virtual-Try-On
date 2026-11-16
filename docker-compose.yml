@@ -60,6 +60,7 @@ services:
       - TRYON_MLS_FRINGE=${TRYON_MLS_FRINGE:-drop}  # tube sleeves (docs/09 #106): drop | keep
       - TRYON_FINISH=${TRYON_FINISH:-r17}  # T-shirt finish (docs/09 #107): r17 | off
       - TRYON_FINISH_PANTS=${TRYON_FINISH_PANTS:-1}  # the finish on pants too (docs/09 #108): 1 | 0
+      - TRYON_PANTS_TUCK=${TRYON_PANTS_TUCK:-1}  # T-shirt hangs over the pants (docs/09 #109): 1 | 0
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
@@ -108,6 +109,7 @@ services:
       - TRYON_MLS_FRINGE=${TRYON_MLS_FRINGE:-drop}  # tube sleeves (docs/09 #106): drop | keep
       - TRYON_FINISH=${TRYON_FINISH:-r17}  # T-shirt finish (docs/09 #107): r17 | off
       - TRYON_FINISH_PANTS=${TRYON_FINISH_PANTS:-1}  # the finish on pants too (docs/09 #108): 1 | 0
+      - TRYON_PANTS_TUCK=${TRYON_PANTS_TUCK:-1}  # T-shirt hangs over the pants (docs/09 #109): 1 | 0
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
