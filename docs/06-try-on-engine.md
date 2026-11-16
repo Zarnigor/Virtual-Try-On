@@ -1840,3 +1840,15 @@ slit, "fit" draws the slit, the ankle shows through it). Warnings = distortion /
 1.00 on every render. Sheets: `out/sheet_pants21_<id>.png` (the garment, then per avatar rows | fit),
 `out/table_pants21.md`. Tests: `PantsTuckTests.test_pants_fit_engine_covers_the_legs_and_keeps_a_wide_leg_wide`,
 `test_pants_leg_profile_is_smooth_and_above_the_need`. With a T-shirt (`run_tuck18.py`): figure px uncovered 0 / 30.
+
+### Pants leftovers, round 22 (2026-11-16; in production, docs/09 #115)
+Crotch fringe cleaning (`clean_crotch_gap`), outward-only edge smoothing (`_smooth_outward`), a slower hip taper,
+a hem square to a leaning leg (`_tilt_hem`) and the open gap between the legs kept out of the hole filling; details
+and numbers in docs/09 #115. `run_pants21.py` after round 22:
+
+| garment | engine | body px uncovered | new holes vs rows | outer edge kinks (sum) | thigh width / body | warnings |
+|---|---|---|---|---|---|---|
+| #18 | fit | 6286 | 0 | 110 | 1.17 | 0 |
+| #48 | fit | 6380 | 223 | 105 | 1.09 | 1 |
+| #49 | fit | 6410 | 0 | 87 | 1.21 | 0 |
+| #51 | fit | 6365 | 0 | 98 | 1.32 | 0 |

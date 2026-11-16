@@ -263,6 +263,8 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       `warp.warp_pants_fit` (setting `TRYON_PANTS_ENGINE`, default fit; `rows` = the old `warp_pants`): the garment's
       own outline x a smooth width factor, legs hang from the hip, hem slits kept. Render warnings 33 -> 1 on 24
       renders, new holes 0 except the hem slit of #48 (`run_pants21.py`). 404 backend tests.
+      **2026-11-16 round 22 (docs/09 #115):** pants leftovers fixed in `warp_pants_fit`: crotch fringe cleaned,
+      knee bump smoothed, hem square to a leaning leg, the gap between the legs kept open. 407 backend tests.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

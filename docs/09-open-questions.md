@@ -626,3 +626,24 @@ _(none blocking P0)_
      **Not fixed:** a grey fringe at the crotch notch of #49 (in the garment cutout), a small bump on the inner
      edge at the knee of wide legs where the body knee pushes (#18), the hip bump on plus bodies with slim jeans
      (#48 needs 1.73 x, limit 1.7, warning), shorts are not measured, the hem stays horizontal on a tilted leg.
+115. **2026-11-16: the leftovers of the pants engine are fixed** (round 22; owner: "fix what is not fixed, reduce
+     the folds further if possible"). All in `warp_pants_fit` (setting `TRYON_PANTS_ENGINE=fit`), no new setting:
+     - **Crotch fringe** (#49 grey line): `clean_crotch_gap` on the cutout before the warp: in the polygon between
+       the legs (crotch -> inner knee and hem points, grown 1.2 %), px nearer the photo background than the fabric
+       are made transparent when they belong to a thin component (<= 2 x 12 px) that touches the transparent
+       background; a print, an embroidery or a seam line inside the fabric stays. Skipped when fabric and
+       background are alike (contrast < 30). Cleared: #18 57, #48 1178, #49 3900, #51 1240 px (garment px).
+     - **Knee bump** (#18): the leg edges are smoothed outward only (`_smooth_outward`, the inner edge twice as
+       much): never inside the computed edge, so the body leg stays covered without the kink of a hard limit.
+     - **Hip bulge on plus bodies**: the leg's width factor leaves the hip factor more slowly when it is large
+       (blur `PANTS_FIT_SIGMA + 20 x (fx - 1)` rows).
+     - **Hem on a leaning leg** (`_tilt_hem`): below the knee the content is moved DOWN towards the side the leg
+       leans away from, so the hem stays square to the leg; nothing moves up (nothing uncovered); 0 below a
+       2 % lean. Drop 2.3-15.5 px on the legs that lean.
+     - **Gap between the legs** stays open: `garment_layer`'s hole filling no longer paints over it where the
+       legs touch again lower down (#18 smeared a patch into the gap).
+     Gates (`run_pants21.py`, `run_tuck18.py`): new holes 0 on #18, #49, #51; #48 223 px (its own hem slit, as in
+     #114); with a T-shirt 0 / 30. Tests: `test_smooth_outward_never_comes_inside_the_edge`,
+     `test_clean_crotch_gap_clears_background_between_the_legs_only`, `test_tilt_hem_only_moves_content_down`.
+     **Still open:** slim jeans on the plus woman need 1.75 x the garment width (limit 1.7, warning); shorts are
+     not measured.

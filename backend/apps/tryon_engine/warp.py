@@ -1253,7 +1253,14 @@ PANTS_FIT_MAX = 1.7  # "fit": the one horizontal factor is at most this (beyond 
 PANTS_FIT_JOIN = 0.3  # "fit": share of crotch..knee over which a leg leaves the waist block's edges
 PANTS_FIT_TOP = 0.4  # "fit": share of crotch..knee whose rows count for the hip factor (below: the leg factor)
 PANTS_FIT_SIGMA = 7.0  # "fit": rows (x ROW_STEP px) of the blur behind a leg's factor profile
+HEM_TILT_MIN = 0.02  # a leg leaning less than this (px sideways per px down, about 1 degree) keeps a level hem
+HEM_TILT_MAX = 0.2  # at most this lean is followed
+PANTS_EDGE_SIGMA = 3.0  # "fit": rows of the outward-only smoothing of a leg's edges
+CROTCH_GAP_MIN_CONTRAST = 30.0  # colour distance fabric <-> photo background below which the gap is left alone
+CROTCH_GAP_MAX_HALF = 12  # px: a cleared component is at most about twice this wide (a gap strip, not a print)
+CROTCH_GAP_BG_SHARE = 0.5  # a gap px goes when its distance to the background is under this x that to the fabric
 PANTS_FIT_SEAM = 2.0  # "fit": px the two legs overlap where they meet on the crotch axis
+PANTS_FIT_TAPER = 20.0  # "fit": extra blur rows per unit of (fx - 1)
 PANTS_FIT_COVER = 3.0  # px the pants reach past the body leg in the mask
 
 
@@ -1285,6 +1292,103 @@ def _torso_cover(mask, y: float, axis: float, bl: float, br: float) -> tuple[flo
         return bl, br
     lim = 0.1 * (br - bl)
     return max(run[0] - PANTS_FIT_COVER, bl - lim), min(run[1] + 1 + PANTS_FIT_COVER, br + lim)
+
+
+def _tilt_hem(strip: np.ndarray, dst_rows: list, knee_y: float, hem_y: float) -> tuple[np.ndarray, float]:
+    """A leg that leans keeps its hem square to the leg: below the knee the strip's content is moved DOWN, more
+    towards the side the leg leans away from (0 px on the side it leans to), growing from the knee to the hem.
+    Nothing moves up, so nothing is uncovered. Returns (strip, the hem's drop in px on the far side)."""
+    rows = [r_ for r_ in dst_rows if knee_y <= r_[0] <= hem_y]
+    if len(rows) < 3 or hem_y - knee_y < 20:
+        return strip, 0.0
+    c0, c1 = (rows[0][1] + rows[0][2]) / 2, (rows[-1][1] + rows[-1][2]) / 2
+    slope = (c1 - c0) / max(rows[-1][0] - rows[0][0], 1e-6)  # px sideways per px down
+    l, r = rows[-1][1], rows[-1][2]
+    drop = abs(slope) * (r - l)
+    if abs(slope) < HEM_TILT_MIN or drop < 1.0:
+        return strip, 0.0
+    slope = float(np.clip(slope, -HEM_TILT_MAX, HEM_TILT_MAX))
+    H, W = strip.shape[:2]
+    xs = np.arange(W, dtype=np.float32)[None, :]
+    ys = np.arange(H, dtype=np.float32)[:, None]
+    far = np.clip(xs - l, 0, r - l) if slope < 0 else np.clip(r - xs, 0, r - l)  # distance from the high side
+    ramp = np.clip((ys - knee_y) / max(hem_y - knee_y, 1e-6), 0, 1) ** 2
+    map_y = (ys - abs(slope) * far * ramp).astype(np.float32)
+    map_x = np.repeat(xs, H, axis=0).astype(np.float32)
+    f = strip.astype(np.float32)
+    f[:, :, :3] *= f[:, :, 3:4] / 255.0
+    w = cv2.remap(f, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    a = w[:, :, 3:4] / 255.0
+    w[:, :, :3] = np.where(a > 0, w[:, :, :3] / np.maximum(a, 1e-6), 0)
+    return np.clip(np.rint(w), 0, 255).astype(np.uint8), float(abs(slope) * (r - l))
+
+
+def _smooth_outward(xs: list, sign: int, sigma: float = PANTS_EDGE_SIGMA) -> list:
+    """A smooth version of an edge that lies on or outside it everywhere (sign -1: a left edge, never larger x;
+    +1: a right edge, never smaller x): blur, push back out to the edge, three times, then a light blur and a last
+    push. Valleys narrower than about sigma rows are bridged, the outline's own curves stay."""
+    v = np.asarray(xs, np.float64) * sign
+    if len(v) < 3:
+        return list(xs)
+    f = v.copy()
+    for s_ in (sigma, sigma, sigma, sigma / 3):
+        f = np.maximum(cv2.GaussianBlur(f.reshape(-1, 1), (1, 0), s_, borderType=cv2.BORDER_REPLICATE)[:, 0], v)
+    return [float(x) * sign for x in f]
+
+
+def clean_crotch_gap(img: np.ndarray, glm: dict) -> tuple[np.ndarray, int]:
+    """Pants cutout: opaque px between the legs that still carry the photo's background (the cutout model keeps
+    the narrow gap below the crotch) are made transparent. Only inside the gap polygon (crotch -> the legs' inner
+    knee and hem points, grown a little) and only when the fabric is clearly not background-coloured; a px goes
+    when it is nearer the background colour than the fabric's. Returns (image, px cleared)."""
+    bg = background_color(img)
+    if bg is None:
+        return img, 0
+    try:
+        cx, cy = _f(glm["crotch"]["center_x"]), _f(glm["crotch"]["y"])
+        kl, kr = _f(glm["knee"]["left_leg"]["right_x"]), _f(glm["knee"]["right_leg"]["left_x"])
+        hl, hr = _f(glm["hem"]["left_leg"]["right_x"]), _f(glm["hem"]["right_leg"]["left_x"])
+        ky = _f(glm["knee"]["y"])
+        hy = max(_f(glm["hem"]["left_leg"]["y"]), _f(glm["hem"]["right_leg"]["y"]))
+    except (KeyError, TypeError):
+        return img, 0
+    h, w = img.shape[:2]
+    grow = max(4.0, 0.012 * w)
+    poly = np.array([(cx - grow, cy - grow), (min(kl, cx) - grow, ky), (min(hl, cx) - grow, hy),
+                     (max(hr, cx) + grow, hy), (max(kr, cx) + grow, ky), (cx + grow, cy - grow)], np.int32)
+    zone = np.zeros((h, w), np.uint8)
+    cv2.fillPoly(zone, [poly], 1)
+    opaque = img[:, :, 3] > 128
+    rgb = img[:, :, :3].astype(np.float32)
+    legs = opaque & (zone == 0)
+    legs[:int(cy)] = False
+    if legs.sum() < 50:
+        return img, 0
+    fabric = np.median(rgb[legs], axis=0)
+    if float(np.linalg.norm(fabric - bg)) < CROTCH_GAP_MIN_CONTRAST:
+        return img, 0
+    d_bg = np.linalg.norm(rgb - np.asarray(bg, np.float32), axis=2)
+    d_fab = np.linalg.norm(rgb - fabric, axis=2)
+    cand = (zone > 0) & opaque & (d_bg < CROTCH_GAP_BG_SHARE * d_fab)
+    if not cand.any():
+        return img, 0
+    # only background-coloured px that reach the transparent background (the fringe and the gap strip); a light
+    # print, an embroidery or a white seam line inside the fabric stays, even near the edge
+    n, lab = cv2.connectedComponents(cand.astype(np.uint8), connectivity=8)
+    edge = cv2.dilate((~opaque).astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    touching = np.unique(lab[edge & cand])
+    gone = np.isin(lab, touching[touching > 0])
+    small = np.zeros(n, bool)  # a component is a fringe or a gap only when it is thin: at most a few px wide
+    for i in touching[touching > 0]:
+        m = lab == i
+        if int(cv2.distanceTransform(m.astype(np.uint8), cv2.DIST_L2, 3).max()) <= CROTCH_GAP_MAX_HALF:
+            small[i] = True
+    gone &= small[lab]
+    if not gone.any():
+        return img, 0
+    out = img.copy()
+    out[:, :, 3][gone] = 0
+    return out, int(gone.sum())
 
 
 def _pants_leg_profile(need: list, fx: float, sigma: float = PANTS_FIT_SIGMA) -> list:
@@ -1390,7 +1494,8 @@ def warp_pants_fit(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: 
         need_all += need
     fx = _pants_fit_factor(top)
     for side in legs:
-        leg[side]["factor"] = _pants_leg_profile(leg[side]["need"], fx)
+        # a large hip factor leaves the leg slowly (no bulge that ends just under the hip)
+        leg[side]["factor"] = _pants_leg_profile(leg[side]["need"], fx, PANTS_FIT_SIGMA + PANTS_FIT_TAPER * (fx - 1))
     need = max(top + need_all) if top or need_all else 1.0
     fx_low = float(min(min(leg[side]["factor"]) for side in legs))
     if need > PANTS_FIT_MAX:
@@ -1419,6 +1524,7 @@ def warp_pants_fit(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: 
     block_l, block_r = dst_rows[-1][1], dst_rows[-1][2]
 
     # ---- legs
+    tilt = {}
     for side in legs:
         L = leg[side]
         k1, k0 = L["line"]
@@ -1450,21 +1556,42 @@ def warp_pants_fit(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: 
             dst_rows.append((y, l, r))
         if info is not None:
             info.setdefault("pants_leg_rows", {})[side] = dst_rows
-        src_rows[1:], dst_rows[1:] = _smooth_rows(src_rows[1:]), _smooth_rows(dst_rows[1:])
-        for i, (y, sy, sl, sr, run) in enumerate(L["rows"]):  # the smoothing never uncovers the body leg
-            if run is not None and i:
-                _, l, r = dst_rows[i]
-                dst_rows[i] = (y, min(l, run[0] - PANTS_FIT_COVER), max(r, run[1] + 1 + PANTS_FIT_COVER))
+        src_rows[1:] = _smooth_rows(src_rows[1:])
+        # the edges are smoothed outward only: a smooth curve that never comes inside the computed edge, so the
+        # body leg stays covered without the kink a hard per-row limit leaves (the bump at a knee that pushes)
+        # (the inner edge more: where the legs touch in the garment photo the leg is cut on the axis and its
+        # width steps when they part, usually near the knee)
+        ls = _smooth_outward([r_[1] for r_ in dst_rows[1:]], -1, PANTS_EDGE_SIGMA * (1 if side == "left" else 2))
+        rs = _smooth_outward([r_[2] for r_ in dst_rows[1:]], 1, PANTS_EDGE_SIGMA * (2 if side == "left" else 1))
+        dst_rows[1:] = [(r_[0], l, r) for r_, l, r in zip(dst_rows[1:], ls, rs)]
         _tail_rows(g_alpha, src_rows, dst_rows, 1 / L["v"])
         leg_img = img.copy()
         other = slice(int(np.ceil(g_cx)), None) if side == "left" else slice(0, int(g_cx))
         leg_img[int(g_cr):, other, 3] = 0
-        result = _alpha_composite(result, _warp_rows(leg_img, src_rows, dst_rows, H, W))
+        strip = _warp_rows(leg_img, src_rows, dst_rows, H, W)
+        strip, tilt[side] = _tilt_hem(strip, dst_rows, L["knee_dst"], L["hem_dst"])
+        result = _alpha_composite(result, strip)
+        L["dst"] = dst_rows
+
+    # the open space between the legs stays open (the hole filling of garment_layer would paint it over when the
+    # legs touch again lower down)
+    gap = np.zeros((H, W), bool)
+    dl, dr = np.array(leg["left"]["dst"], np.float64), np.array(leg["right"]["dst"], np.float64)
+    y_lo, y_hi = int(np.ceil(cr_dst)), int(min(dl[-1, 0], dr[-1, 0]))
+    if y_hi > y_lo:
+        ys_ = np.arange(y_lo, min(y_hi, H - 1) + 1)
+        inner_l = np.interp(ys_, dl[:, 0], dl[:, 2])
+        inner_r = np.interp(ys_, dr[:, 0], dr[:, 1])
+        xs_ = np.arange(W)[None, :]
+        gap[ys_] = (xs_ >= np.ceil(inner_l)[:, None] + 1) & (xs_ <= np.floor(inner_r)[:, None] - 1)
+        gap &= result[:, :, 3] < 128
 
     result[:max(int(np.ceil(a_wy)), 0)] = 0
     if info is not None:
         info["pants_waist_y"] = a_wy
         info["pants_top_dip"] = top_dip
+        info["pants_hem_tilt"] = tilt
+        info["pants_gap"] = gap
         info["pants_fit"] = {"engine": "fit", "fx": fx, "fx_low": fx_low, "need": float(need), "s": float(s), "full": bool(full)}
     return result, warnings
 
@@ -1602,6 +1729,8 @@ def garment_layer(gtype: str, gimg: np.ndarray, glm: dict, body_lm: dict, H: int
         aux[openings] = 255
     if gtype == "tshirt":
         glm, _ = normalize_tshirt_landmarks(glm, src[:, :, 3] > 128)
+    elif kw.get("engine") == "fit":  # docs/09 #115: the photo background left between the legs
+        src, info["crotch_gap_px"] = clean_crotch_gap(src, glm)
     k = tshirt_scale(glm, body_lm) if gtype == "tshirt" else pants_scale(glm, body_lm, H)[0]
     if k < PRESCALE_BELOW:
         src, glm = _prescale(src, k), _scale_landmarks(glm, k)
@@ -1613,6 +1742,8 @@ def garment_layer(gtype: str, gimg: np.ndarray, glm: dict, body_lm: dict, H: int
     if aux is not None:
         aux_w, _ = fn(body_lm, glm, aux, H, W, arms=arms, info={}, mask=mask, **kw)
         keep = aux_w[:, :, 3] > 128
+    if info.get("pants_gap") is not None and info["pants_gap"].any():  # docs/09 #115
+        keep = info["pants_gap"] if keep is None else keep | info["pants_gap"]
     out = fill_alpha_holes(warped, keep, inpaint=True)
     if halo_removal and gtype == "tshirt":  # T-shirt: once, on the outer contour of the composited pieces only
         out = remove_halo(out, outer_only=True)

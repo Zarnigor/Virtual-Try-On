@@ -584,6 +584,50 @@ class PantsTuckTests(SimpleTestCase):
         self.assertLess(f[-1], 1.05)  # back to the garment's own width where it is loose
         self.assertEqual(warp._pants_fit_factor([0.8, 1.2, 9.0]), warp.PANTS_FIT_MAX)
 
+    def test_smooth_outward_never_comes_inside_the_edge(self):
+        left = [100.0] * 10 + [90.0] * 3 + [100.0] * 10  # a left edge pushed out by 10 px over three rows
+        out = warp._smooth_outward(left, -1)
+        self.assertTrue(all(o <= x + 1e-9 for o, x in zip(out, left)))
+        self.assertLess(max(abs(a - b) for a, b in zip(out, out[1:])), 6.0)  # the 10 px step is spread out
+        right = warp._smooth_outward([-x for x in left], 1)
+        self.assertTrue(all(o >= -x - 1e-9 for o, x in zip(right, left)))
+
+    def test_clean_crotch_gap_clears_background_between_the_legs_only(self):
+        img = np.zeros((400, 300, 4), np.uint8)
+        img[:, :, :3] = 230  # the photo background under alpha 0
+        img[20:380, 60:240] = (40, 40, 200, 255)  # fabric
+        img[200:380, 144:156] = (230, 230, 230, 255)  # the gap below the crotch, kept opaque by the cutout
+        img[100:110, 100:110] = (230, 230, 230, 255)  # a light patch on the fabric: not in the gap
+        span = lambda l, r: {"left_x": l, "right_x": r}  # noqa: E731
+        lm = {"crotch": {"center_x": 150, "y": 200}, "knee": {"y": 290, "left_leg": span(60, 144),
+              "right_leg": span(156, 240)}, "hem": {"left_leg": {"y": 380, **span(60, 144)},
+                                                    "right_leg": {"y": 380, **span(156, 240)}}}
+        out, n = warp.clean_crotch_gap(img, lm)
+        self.assertGreater(n, 1500)
+        self.assertEqual(int(out[220:370, 146:154, 3].max()), 0)
+        self.assertTrue((out[100:110, 100:110, 3] == 255).all())
+        self.assertTrue((out[:, :, 3][img[:, :, 2] == 200] == 255).all())  # no fabric px is touched
+        same = img.copy()
+        same[20:380, 60:240, :3] = 225  # fabric as light as the background: left alone
+        self.assertEqual(warp.clean_crotch_gap(same, lm)[1], 0)
+
+    def test_tilt_hem_only_moves_content_down(self):
+        strip = np.zeros((300, 200, 4), np.uint8)
+        rows = [(y, 60.0 - 0.1 * (y - 100), 120.0 - 0.1 * (y - 100)) for y in range(100, 260, 6)]  # leans left
+        for y in range(100, 256):
+            l = int(60 - 0.1 * (y - 100))
+            strip[y, l:l + 60] = (50, 60, 70, 255)
+        out, drop = warp._tilt_hem(strip, rows, 100.0, 250.0)
+        self.assertGreater(drop, 3.0)
+        before, after = strip[:, :, 3] >= 128, out[:, :, 3] >= 128
+        bot = lambda m, x: int(np.where(m[:, x])[0].max())  # noqa: E731
+        self.assertGreater(bot(after, 95) - bot(before, 95), 2)  # the far (inner) side hangs lower
+        self.assertLessEqual(abs(bot(after, 48) - bot(before, 48)), 1)  # the side the leg leans to stays
+        self.assertFalse((before[:240] & ~after[:240]).any())  # nothing above the hem rows is uncovered
+        level, d0 = warp._tilt_hem(strip, [(y, 60.0, 120.0) for y in range(100, 260, 6)], 100.0, 250.0)
+        self.assertEqual(d0, 0.0)
+        self.assertIs(level, strip)
+
     def test_tuck_never_uncovers_the_figure(self):
         shirt, pants, mask = self.layers()
         mask[200:400, 95:205] = True  # hips wider than the shirt
