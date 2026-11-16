@@ -21,7 +21,10 @@ Metrics per run and variant, on the T-shirt layer as it is composited (debug["ts
   contact shadow is a Gaussian of sigma 4 px shifted 3 px: its tail ends inside that distance).
 GATE per variant: new holes = 0, changed outside = 0. Production gates (docs/09 #107), when both variants of a pair
 are in VARIANTS: final image "prod" (the settings flags) = "r17", and "setting_off" (the flags under
-TRYON_FINISH=off) = "off", 0 px each: VARIANTS=off,r17,prod,setting_off.
+TRYON_FINISH=off) = "off", 0 px each: VARIANTS=off,r17,prod,setting_off. With PANTS=1 (docs/09 #108) also
+"setting_pants_off" (the flags under TRYON_FINISH_PANTS=0) = "off": VARIANTS=off,r17,prod,setting_off,setting_pants_off.
+Round 17b, pants (docs/06 "Finish pass on pants, round 17b"): PANTS=1 GARMENTS=18,48,49,51 renders pants alone
+with finish_pants=True in every variant and writes the same files as *_finish17b_*.
 Writes out/table_finish17.md, out/results_finish17.json, out/sheet_finish17_<id>.png (rows = avatars, columns =
 variants, clean), out/zoom_finish17_<id>.png (first avatar of the garment's sex: 3x crops shoulder / cuff / side /
 hem per variant, clean). Exit status 1 when a gate fails.
@@ -57,16 +60,25 @@ ALL = {  # every variant sets the four finish keywords itself (the settings defa
 }
 VARIANTS = os.environ.get("VARIANTS", "off,all,smooth,smooth_shadow,r17").split(",")
 GARMENTS = [int(v) for v in os.environ.get("GARMENTS", "28,43,40,44,45").split(",")]
+PANTS = os.environ.get("PANTS", "0") == "1"  # round 17b: the garments are pants, finish_pants=True in every variant
+if PANTS:
+    ALL = {k: (v if v is None or k == "prod" else {**v, "finish_pants": True}) for k, v in ALL.items()}
 ZOOMS = os.environ.get("ZOOMS", "1") == "1"
 H, W = 1200, 600
 OUT = "/tmp/warp_benchmark"
-Y0, Y1, X0, X1 = 170, 730, 40, 560  # sheet crop: neck to below the hem
+Y0, Y1, X0, X1 = (520, 1180, 100, 500) if PANTS else (170, 730, 40, 560)  # sheet crop
 Z, ZS = 3, 110  # zoom factor and crop size
+TAG = "finish17b" if PANTS else "finish17"
 os.makedirs(OUT, exist_ok=True)
 flags = render_flags("avatar")
 with override_settings(TRYON_FINISH="off"):
     ALL["setting_off"] = render_flags("avatar")
-PAIRS = [p for p in (("prod", "r17"), ("setting_off", "off")) if p[0] in VARIANTS and p[1] in VARIANTS]
+with override_settings(TRYON_FINISH_PANTS=False):
+    ALL["setting_pants_off"] = render_flags("avatar")  # docs/09 #108: must equal "off" for pants alone
+if not PANTS:
+    ALL["r17"] = {**ALL["r17"], "finish_pants": False}
+PAIRS = [p for p in (("prod", "r17"), ("setting_off", "off"), ("setting_pants_off", "off"))
+         if p[0] in VARIANTS and p[1] in VARIANTS]
 pair_diff = {p: 0 for p in PAIRS}
 
 
@@ -94,9 +106,17 @@ def hard_edge(a, where=None):
 
 
 def zoom_points(a, body_lm):
-    """Crop centres on the image's right side: shoulder, cuff, side below the armpit, hem corner."""
+    """Crop centres on the image's right side: shoulder, cuff, side below the armpit, hem corner. Pants: waist
+    corner, hip side, crotch, leg hem."""
     ys, xs = np.where(a >= 128)
     x1, y0, y1 = xs.max(), ys.min(), ys.max()
+    if PANTS:
+        cx = int(round((xs[ys == y0 + 10].min() + xs[ys == y0 + 10].max()) / 2))
+        open_rows = [y for y in range(y0 + 10, y1) if a[y, cx] < 128]
+        cy = open_rows[0] if open_rows else (y0 + y1) // 2
+        hip = y0 + (cy - y0) * 2 // 3
+        return {"waist": (xs[ys == y0 + 8].max() - 30, y0 + 20), "hip": (xs[ys == hip].max() - 10, hip),
+                "crotch": (cx, cy + 15), "hem": (xs[ys == y1 - 6].max() - 25, y1 - 20)}
     cuff_y = int(ys[xs >= x1 - 3].max())
     mid = (cuff_y + y1) // 2
     return {"shoulder": (x1 - 45, y0 + 60), "cuff": (x1 - 35, cuff_y), "side": (xs[ys == mid].max(), mid),
@@ -118,8 +138,9 @@ for gid in GARMENTS:
         out = {}
         for name in VARIANTS:
             t0 = time.perf_counter()
-            rgb, _, dbg = warp.render_tryon(base, av.landmarks, [("tshirt", g_img, glm)], H, W,
-                                            fit_modes={"tshirt": g.fit_mode}, **{**flags, **ALL[name]})
+            rgb, _, dbg = warp.render_tryon(base, av.landmarks, [(g.type, g_img, glm)], H, W,
+                                            fit_modes={g.type: g.fit_mode}, **{**flags, **ALL[name]})
+            dbg["tshirt_final"] = dbg["final_layers"][g.type]
             out[name] = (rgb, dbg, time.perf_counter() - t0)
         for pr_ in PAIRS:  # docs/09 #107 gates: production = the benchmark call, setting off = before
             pair_diff[pr_] += int((out[pr_[0]][0] != out[pr_[1]][0]).any(2).sum())
@@ -155,11 +176,11 @@ for gid in GARMENTS:
             for part, (cx, cy) in pts.items():
                 zoom_rows.append(np.hstack([label(crop(out[n][0], cx, cy), f"{part} {n} #{gid} {who}")
                                             for n in VARIANTS]))
-    cv2.imwrite(f"{OUT}/sheet_finish17_{gid}.png", np.vstack(rows))
+    cv2.imwrite(f"{OUT}/sheet_{TAG}_{gid}.png", np.vstack(rows))
     if zoom_rows:
-        cv2.imwrite(f"{OUT}/zoom_finish17_{gid}.png", np.vstack(zoom_rows))
+        cv2.imwrite(f"{OUT}/zoom_{TAG}_{gid}.png", np.vstack(zoom_rows))
 
-with open(f"{OUT}/results_finish17.json", "w") as fh:
+with open(f"{OUT}/results_{TAG}.json", "w") as fh:
     json.dump({"runs": results, "fails": fails}, fh, indent=1)
 
 cols = ("hard_edge", "hard_cuff", "new_holes", "lost", "gained", "dl_fabric", "dl_skin", "changed_outside", "runtime")
@@ -179,7 +200,7 @@ for (a_, b_), px in pair_diff.items():
     if px:
         fails.append(f"{a_} vs {b_}: {px} px")
 lines += [f"- {f}" for f in fails]
-with open(f"{OUT}/table_finish17.md", "w") as fh:
+with open(f"{OUT}/table_{TAG}.md", "w") as fh:
     fh.write("\n".join(lines) + "\n")
 print("\n".join(lines))
 if fails:
