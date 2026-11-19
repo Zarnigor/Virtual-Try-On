@@ -647,3 +647,51 @@ _(none blocking P0)_
      `test_clean_crotch_gap_clears_background_between_the_legs_only`, `test_tilt_hem_only_moves_content_down`.
      **Still open:** slim jeans on the plus woman need 1.75 x the garment width (limit 1.7, warning); shorts are
      not measured.
+116. **2026-11-19: pants are rendered with `rows` again** (owner, after comparing rows / fit, alone and with a
+     T-shirt, on avatar 4 with T-shirt #43 + pants #49: "rows + T eng yaxshi chiqqani ekan, o'shani prodga").
+     Setting `TRYON_PANTS_ENGINE` default `rows` (= `warp.warp_pants`, the engine before #114); `fit`
+     (`warp_pants_fit`, rounds 21-22, #114, #115) stays in the code behind the setting, unchanged. Every pants
+     render is affected (alone and with a T-shirt). Trade-off the owner accepted: the #114 / #115 gains are off
+     by default (round 21: render warnings 33 vs 1 on 24 renders; #48 hem slit, crotch fringe clean-up, knee bump
+     smoothing, hem on a leaning leg). Found on the way: the Celery worker does not reload code; after an engine
+     change run `docker compose restart worker` (results made before the restart keep the old look).
+117. **2026-11-19: rows pants without the per-row bumps** (**superseded by #118 the same day: `smooth` and
+     `TRYON_PANTS_SMOOTH` removed from the code**; round 23; owner chose option A: "keep rows, replace the
+     per-row widening at the hips with one smooth factor"). Cause (pants #49, 6 avatars): the uniform scale s comes
+     from the length, so only the slim woman (#4) has body hip / garment hip x s = 0.99; on the others it is
+     1.06-1.43 and `pants_width` widens each row to "garment or body, whichever is wider": a bump and a bend at the
+     hips (#3, #6 warnings 1.30-1.50x). `warp_pants(smooth=True)`: one factor fx for the hip block (largest
+     body / garment ratio over the hip rows and the top PANTS_FIT_TOP of the thighs, max PANTS_FIT_MAX) and down
+     each leg `_pants_leg_profile` (the same profile as `fit`); a row that needs more than 1.7x still covers the
+     body. Centring, hang, hem, finish and tuck as in rows. Setting `TRYON_PANTS_SMOOTH` (0 | 1, **default 0**
+     until the owner reviews), render keyword `pants_smooth`; ignored with `TRYON_PANTS_ENGINE=fit`.
+     Gates (`tools/warp-benchmark/run_smooth23.py`, 4 pants x 6 avatars, alone and with T-shirt #43): off = HEAD
+     0 px (48 renders); new holes 0 on #18, #49, #51; #48 5 px (1-2 px of its own hem slit moved sideways, as in
+     #114). Outward step under the crotch (max px): #18 6 -> 5, #48 8 -> 4, #49 6 -> 4, #51 5 -> 5. fx mean:
+     #18 1.44, #48 1.43, #49 1.26, #51 1.10. Pants "distorted" warnings rise a little (#18 11 -> 13, #48 14 -> 17,
+     #49 4 -> 6): the whole hip block is wider than the uniform scale, not only the bump rows.
+     **Not changed:** legs that bend towards the body's knees (#1, #6 with #49) come from the centre line, not
+     the width. Test: `test_rows_pants_smooth_covers_the_legs_and_is_off_by_default`.
+118. **2026-11-19: rows pants get one horizontal scale (`fit_x`), in production** (round 24; owner: "smooth hal
+     bo'lmagan" -> options A-D -> "Adan foydalanamiz, prodga implement qil"). Cause of the bumps: s comes from the
+     length only, so the scaled garment is narrower than the hips on 5 of 6 avatars (body / garment x s at the hip
+     1.06-1.43 on #49; only #4 0.99) and the rows engine patched each row. Check D first: garment landmarks are
+     within ~1-5 canvas px, but avatar hip ticks are 2.5-11.5 px off the silhouette (#1 11.5 / 7.5, #6 knees up to
+     17.5), so the width is measured on the figure mask, not on the landmarks.
+     - `warp_pants(fit_x=True)`: one horizontal scale sx for the whole garment (waist block and both legs) = the
+       largest mask / garment width ratio over the hip rows and the top PANTS_FIT_TOP of the thighs, at least s,
+       at most 1.7 x s. Vertical scale, centring, hem, waistband, finish, tuck unchanged. Rows that still need more
+       cover the body as before. "distorted" warnings are measured against sx.
+     - Under each leg the leg without fit_x (its width and centre line) is drawn on the figure only: a hem slit
+       widened by sx (#48) never shows more body than before. The waistband curve keeps the top row of the widths
+       without fit_x (same dip).
+     - Setting `TRYON_PANTS_FIT_X` (1 | 0, **default 1**), render keyword `pants_fit_x`; ignored with
+       `TRYON_PANTS_ENGINE=fit`. B = `TRYON_PANTS_HANG` / `pants_hang` (loose legs hang straight from the hip
+       block) stays in the code, **default 0, not used**: legs straighter (#18 centre-line deviation 10.5 -> 4.1 px
+       on #3, 5.1 -> 0.4 on #5) but a new step under the hip (#18 6 -> 13 px, #51 5 -> 12) and #48 slit holes.
+     Gates (`tools/warp-benchmark/run_fitx24.py`, 4 pants x 6 avatars, alone and with T-shirt #43): off = HEAD 0 px
+     (48 renders), new holes 0 / 48. A vs off: pants warnings #48 14 -> 5, #49 4 -> 0, #51 4 -> 1, #18 11 -> 11;
+     hip step (max px) #48 8 -> 1, #49 6 -> 4; sx / s mean #18 1.44, #48 1.48, #49 1.26, #51 1.10.
+     Sheets: `tools/warp-benchmark/out/sheet_fitx24_<id>.png` (per avatar: off | A).
+     **Still open:** wide legs still follow the body's knees a little (B is the start); the plus bodies get
+     visibly wider pants (that is the intent: a larger size).

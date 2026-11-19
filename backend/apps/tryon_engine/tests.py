@@ -454,7 +454,7 @@ class FinishWiringTests(SimpleTestCase):
         self.assertEqual(parse_mls_choice("TRYON_PANTS_TUCK", None), "1")
         self.assertEqual(parse_mls_choice("TRYON_MLS_KEEP_SCALE", None), "fit")
         self.assertEqual(parse_mls_choice("TRYON_MLS_TUBE_CLIP", None), "arm")
-        self.assertEqual(parse_mls_choice("TRYON_PANTS_ENGINE", None), "fit")
+        self.assertEqual(parse_mls_choice("TRYON_PANTS_ENGINE", None), "rows")
         with self.assertRaises(ImproperlyConfigured):
             parse_mls_choice("TRYON_FINISH_PANTS", "yes")
         self.assertEqual(parse_mls_choice("TRYON_FINISH", None), "r17")
@@ -563,7 +563,7 @@ class PantsTuckTests(SimpleTestCase):
         base, lm = avatar()
         p, plm = pants()
         mask = warp.figure_mask(base)
-        self.assertEqual(render_flags("avatar")["pants_engine"], "fit")
+        self.assertEqual(render_flags("avatar")["pants_engine"], "rows")  # docs/09 #116
         _, _, d0 = warp.render_tryon(base, lm, [("pants", p, plm)])
         _, w1, d1 = warp.render_tryon(base, lm, [("pants", p, plm)], pants_engine="fit")
         self.assertEqual(d1["pants_fit"]["engine"], "fit")
@@ -573,6 +573,30 @@ class PantsTuckTests(SimpleTestCase):
         legs = mask[y0:y1] & ~d1["arm_mask"][y0:y1]
         self.assertEqual(int((legs & c0[y0:y1] & ~c1[y0:y1]).sum()), 0)  # nothing the old engine covered is bare
         self.assertEqual(int((legs & ~c1[y0:y1]).sum()), 0)
+
+    def test_rows_pants_fit_x_covers_the_legs_and_is_on_by_default(self):
+        """docs/09 #118: rows + fit_x = one horizontal scale sx >= s for the whole garment; on by default;
+        nothing the per-row widths covered is bare; off = no fit_x info."""
+        from tryon_studio.settings.base import parse_mls_choice
+        self.assertEqual(parse_mls_choice("TRYON_PANTS_FIT_X", None), "1")
+        self.assertEqual(parse_mls_choice("TRYON_PANTS_HANG", None), "0")
+        self.assertTrue(render_flags("avatar")["pants_fit_x"])
+        self.assertFalse(render_flags("avatar")["pants_hang"])
+        base, lm = avatar()
+        p, plm = pants()
+        mask = warp.figure_mask(base)
+        _, _, d0 = warp.render_tryon(base, lm, [("pants", p, plm)])  # the keyword default: off
+        self.assertNotIn("pants_fit_x", d0)
+        _, _, d1 = warp.render_tryon(base, lm, [("pants", p, plm)], pants_fit_x=True)
+        fx = d1["pants_fit_x"]
+        self.assertGreaterEqual(fx["sx"], fx["s"])
+        self.assertLessEqual(fx["ratio"], warp.PANTS_FIT_MAX + 1e-9)
+        c0, c1 = d0["final_layers"]["pants"][:, :, 3] >= 128, d1["final_layers"]["pants"][:, :, 3] >= 128
+        y0, y1 = int(lm["waist"]["y"]) + 8, int(lm["ankle"]["left_leg"]["y"]) - 8
+        legs = mask[y0:y1] & ~d1["arm_mask"][y0:y1]
+        self.assertEqual(int((legs & c0[y0:y1] & ~c1[y0:y1]).sum()), 0)
+        _, _, d2 = warp.render_tryon(base, lm, [("pants", p, plm)], pants_engine="fit", pants_fit_x=True)
+        self.assertNotIn("pants_fit_x", d2)  # ignored with the fit engine
 
     def test_pants_leg_profile_is_smooth_and_above_the_need(self):
         need = [1.0] * 5 + [1.3] * 4 + [1.0] * 60

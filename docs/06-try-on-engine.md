@@ -1818,7 +1818,7 @@ one #47 render. Not done: see docs/09 #113.
 
 ### Pants fit, round 21 (2026-11-16; in production, docs/09 #114)
 `warp.warp_pants_fit` (keyword `warp_pants(engine="fit")`, `render_tryon(pants_engine="fit")`, setting
-`TRYON_PANTS_ENGINE`, default fit). Pants #18, #48, #49, #51 alone x 6 avatars, production flags
+`TRYON_PANTS_ENGINE`, default fit until docs/09 #116, now rows). Pants #18, #48, #49, #51 alone x 6 avatars, production flags
 (`tools/warp-benchmark/run_pants21.py`):
 
 | garment | engine | body px uncovered | new holes vs rows | outer edge kinks (sum) | thigh width / body, mean | warnings |
@@ -1852,3 +1852,12 @@ and numbers in docs/09 #115. `run_pants21.py` after round 22:
 | #48 | fit | 6380 | 223 | 105 | 1.09 | 1 |
 | #49 | fit | 6410 | 0 | 87 | 1.21 | 0 |
 | #51 | fit | 6365 | 0 | 98 | 1.32 | 0 |
+
+### Rows pants, one horizontal scale, round 24 (docs/09 #117, #118)
+Round 23 (`smooth`: one hip factor + a fading leg profile) was replaced the same day and removed. Round 24:
+`warp_pants(fit_x=True)` (render keyword `pants_fit_x`, setting `TRYON_PANTS_FIT_X`, default 1). One horizontal scale
+sx >= s for the whole garment, from the figure mask (avatar hip ticks are up to 11.5 px off the silhouette). An
+underlay (the leg without fit_x, on the figure only) keeps new holes at 0 where a hem slit widens. `hang_straight`
+(`pants_hang`, `TRYON_PANTS_HANG`, default 0) is in the code but not used (a step under the hip). Runner
+`tools/warp-benchmark/run_fitx24.py` (off gate needs the HEAD engine as `apps/tryon_engine/warp_before.py`;
+`HANG=1` adds A+B); table `out/table_fitx24.md`, sheets `out/sheet_fitx24_<id>.png`.

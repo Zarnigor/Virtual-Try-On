@@ -25,8 +25,8 @@ but the frontend must fully work too (React is required). The owner works and re
   engine (`TRYON_WARP=mls`, docs/09 #105);** adapt T-shirts = sleeve C + tube + armpit r14 + side floor "mask" +
   garment hem + cuff hem + fringe drop (flags `TRYON_MLS_*`, docs/09 #105, #106); every T-shirt gets the r17
   finish (`TRYON_FINISH`, docs/09 #107) and so do pants (`TRYON_FINISH_PANTS`, docs/09 #108); an adapt T-shirt hangs
-  over the pants (`TRYON_PANTS_TUCK`, docs/09 #109); `parts` = the MLS fallback, and warps keep_shape like adapt; pants use `warp_pants_fit`
-  (`TRYON_PANTS_ENGINE`, docs/09 #114).
+  over the pants (`TRYON_PANTS_TUCK`, docs/09 #109); `parts` = the MLS fallback, and warps keep_shape like adapt; pants use `warp_pants` (`rows`,
+  `TRYON_PANTS_ENGINE`, docs/09 #116; `fit` = `warp_pants_fit`, #114) with one horizontal scale (`TRYON_PANTS_FIT_X`, #118).
   **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
@@ -265,6 +265,11 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       renders, new holes 0 except the hem slit of #48 (`run_pants21.py`). 404 backend tests.
       **2026-11-16 round 22 (docs/09 #115):** pants leftovers fixed in `warp_pants_fit`: crotch fringe cleaned,
       knee bump smoothed, hem square to a leaning leg, the gap between the legs kept open. 407 backend tests.
+      **2026-11-19 (docs/09 #116):** owner: pants back on `rows` (`TRYON_PANTS_ENGINE` default rows, `fit` kept
+      behind the setting). The Celery worker does not reload code: `docker compose restart worker` after engine changes.
+      **2026-11-19 round 24 + production (docs/09 #118; #117 `smooth` removed):** rows pants get one horizontal
+      scale for the whole garment from the figure mask (`TRYON_PANTS_FIT_X`, default 1); hem-slit underlay; new holes
+      0 / 48 (`run_fitx24.py`). `TRYON_PANTS_HANG` (straight legs) in the code, default 0, not used. 408 backend tests.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

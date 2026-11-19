@@ -23,7 +23,7 @@ Har bir bandni boshlashdan oldin reja koʻrsatiladi va egasining roziligi kutila
   `TRYON_WARP=mls`, `TRYON_MLS_SLEEVE=C`, `TRYON_MLS_TUBE=1`, `TRYON_MLS_SIDE_FLOOR=mask`, `TRYON_MLS_ARMPIT=r14`,
   `TRYON_MLS_HEM=garment`, `TRYON_MLS_CUFF=hem`, `TRYON_MLS_FRINGE=drop`, `TRYON_FINISH=r17`,
   `TRYON_FINISH_PANTS=1`, `TRYON_PANTS_TUCK=1` (#109), `TRYON_MLS_KEEP_SCALE=fit` (#112),
-  `TRYON_MLS_TUBE_CLIP=arm` (#113), `TRYON_PANTS_ENGINE=fit` (#114, #115).
+  `TRYON_MLS_TUBE_CLIP=arm` (#113), `TRYON_PANTS_ENGINE=rows` (#116; `fit` = #114, #115), `TRYON_PANTS_FIT_X=1` (#118).
 - Garments in the DB used for checks: T-shirts #28 (black, male), #40 (blue V, female), #43 (white fitted,
   female), #47 (brown square neck, female), #44 / #45 (oversized; #44 keep_shape, #45 currently stored as
   adapt); pants #18 (demo), #48 (slit-hem jeans), #49 (pink), #51 (red joggers). 6 avatars: m/f x slim/average/plus.

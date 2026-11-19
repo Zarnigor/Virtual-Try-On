@@ -208,7 +208,8 @@ TRYON_MLS_CHOICES = {"TRYON_MLS_TUBE": ("1", "0"), "TRYON_MLS_SIDE_FLOOR": ("mas
                      "TRYON_MLS_CUFF": ("hem", "chord"), "TRYON_MLS_FRINGE": ("drop", "keep"),
                      "TRYON_FINISH": ("r17", "off"), "TRYON_FINISH_PANTS": ("1", "0"),
                      "TRYON_PANTS_TUCK": ("1", "0"), "TRYON_MLS_KEEP_SCALE": ("fit", "shoulder"),
-                     "TRYON_MLS_TUBE_CLIP": ("arm", "armhole"), "TRYON_PANTS_ENGINE": ("fit", "rows")}
+                     "TRYON_MLS_TUBE_CLIP": ("arm", "armhole"), "TRYON_PANTS_ENGINE": ("rows", "fit"),
+                     "TRYON_PANTS_FIT_X": ("1", "0"), "TRYON_PANTS_HANG": ("0", "1")}
 
 
 def parse_mls_choice(name, value):
@@ -245,10 +246,15 @@ TRYON_MLS_KEEP_SCALE = parse_mls_choice("TRYON_MLS_KEEP_SCALE", os.environ.get("
 #   TRYON_MLS_TUBE_CLIP  arm (default) = the arm/torso boundary (no sleeve flap over the chest)
 #                        | armhole = the extended armhole line (before #113)
 TRYON_MLS_TUBE_CLIP = parse_mls_choice("TRYON_MLS_TUBE_CLIP", os.environ.get("TRYON_MLS_TUBE_CLIP"))
-# docs/09 #114 (round 21): the pants engine.
-#   TRYON_PANTS_ENGINE  fit (default) = warp.warp_pants_fit (the garment's own outline x a smooth width factor,
-#                       legs hang from the hip) | rows = warp.warp_pants as before #114
+# docs/09 #114 (round 21), #116 (owner: rows is the default again): the pants engine.
+#   TRYON_PANTS_ENGINE  rows (default, docs/09 #116) = warp.warp_pants | fit = warp.warp_pants_fit (the garment's own
+#                       outline x a smooth width factor, legs hang from the hip; rounds 21-22)
 TRYON_PANTS_ENGINE = parse_mls_choice("TRYON_PANTS_ENGINE", os.environ.get("TRYON_PANTS_ENGINE"))
+# docs/09 #118 (round 24), rows pants (ignored with TRYON_PANTS_ENGINE=fit):
+#   TRYON_PANTS_FIT_X  1 (default) = one horizontal scale for the whole garment, from the figure mask | 0 = before
+#   TRYON_PANTS_HANG   0 (default) | 1 = loose legs hang straight from the hip block (tight legs unchanged)
+TRYON_PANTS_FIT_X = parse_mls_choice("TRYON_PANTS_FIT_X", os.environ.get("TRYON_PANTS_FIT_X")) == "1"
+TRYON_PANTS_HANG = parse_mls_choice("TRYON_PANTS_HANG", os.environ.get("TRYON_PANTS_HANG")) == "1"
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
