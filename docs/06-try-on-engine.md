@@ -75,15 +75,36 @@ Scanline strips (torso, pants) + rigid affine sleeves. Diagnosed on the 6 real a
 - **Warnings** report distortion (horizontal / vertical scale of one segment > 1.4x), not width change.
 - Order: pants under the T-shirt.
 
-### Pants fit (2026-11-10, docs/09 #59, `warp_pants`, `pants_width`)
-- One uniform scale `s` for both axes: garment waist..hem -> body waist..ankle (full length) or the rise (shorter pants).
-  The garment keeps its own leg width, taper and cuffs (loose joggers stay loose).
-- Waistband: body waist + 4 % ease, smoothly blended (smoothstep) to the garment's own scaled width at its hip row.
-- Below the hip: `pants_width = min(max(garment * s, body + 4 %), 1.8 * ref)`, `ref` = the row's body width, or the
-  body knee width below the knee (a flared cuff is not squeezed to the ankle). The body leg in the mask is always covered.
-- Each leg is centred on the body leg's centreline (crotch -> knee -> ankle landmarks), so wide stances get legs on legs;
-  near the crotch the leg blends into the waist block. A full-length hem sits on the ankle line.
-- Warning: a row's horizontal scale vs `s` beyond 1.3x (e.g. narrow pants widened over a plus-size body).
+### Pants fit, round 26 (2026-11-20, docs/09 #120, `warp_pants`, `pants_edge`)
+Replaces #59 (waistband blend, `pants_width` below the hip), the pants hang of #60, the loose-leg centreline of
+#61 / #62, "Pants keep their own row widths" (#70), `fit_x` + its underlay + `hang_straight` (#118) and the round 25
+benchmark (`pants_top`, deleted). The `fit` engine (`TRYON_PANTS_ENGINE=fit`, #114) is not touched.
+- **Length:** the garment's waist..crotch lands on the body's waist..crotch (rise scale); its crotch..own bottom edge
+  on the body's crotch..ankle (full length, `pants_scale`), or at the uniform scale `s` for shorter pants. The hem is
+  the leg's own last row on the ankle line: no tail rows (`_tail_rows` is not used for pants any more).
+- **Waist -> crotch (body crotch):** ONE piece. Every row = the figure's run through the crotch axis (clamped to
+  10 % of the landmark width past the waist/hip landmarks, so a touching arm is not the hip) + 3 % ease
+  (`PANTS_BODY_EASE`). The garment's own width is not used. Each row is mapped in two halves that meet on the axis:
+  the garment's `crotch.center_x` lands on the body's crotch x in every row (`_warp_pieces`), so a fly, a drawstring
+  or a print crosses the axis without a step.
+- **Legs (below the body crotch only):** body leg run (clamped 25 % past the leg landmarks) + 3 % ease, opening to
+  the garment's own leg width x `s` with a smoothstep over the first 20 % of crotch -> knee (`PANTS_LEG_OPEN`); cap
+  1.8 x the body leg (below the knee: x the knee width). Centred on the body leg. The inner edge never comes closer to
+  the axis than the garment's own gap between its legs (x `s`), or than the body leg's inner edge where that is
+  further out; the rest of the width goes outward (a wide leg stays a leg, no skirt). Both edges leave the block's
+  last row with the same smoothstep (no step at the crotch row). Every edge is monotonic from crotch to hem and
+  smooth (`_leg_edges`: outward-only monotonic pass, blur, pushed back out); the body leg is always inside.
+- **Outline alpha:** the geometric coverage of the model's span edges (about 1 px antialiased, the same every row),
+  not the photo's soft edge; where the two halves / legs meet there is no edge.
+- **Halo (`pants_edge`, after the warp):** nothing is eroded. The outer 3 px ring of the outer contour
+  (`PANTS_RING`) takes its colour from the plain fabric only: k-means colour clusters of the deep px, clusters with
+  >= 15 % of the fabric are plain, a px is plain within 40 of a plain centre; the ring is filled from the plain
+  colour field blurred with sigma 4 px (the nearest plain px where none is near). A print or stitch at the edge is
+  cut, never smeared along it. The photo background left between the legs is cleared before the warp
+  (`clean_crotch_gap`, now for both engines) and the gap between the legs is kept open by the hole fill.
+- Nothing above the body's waist row; the waistband top still dips 4 % at the centre (`curve_waistband`, used by
+  the parts T-shirt's hem snap). Warnings: a row's horizontal scale vs `s` beyond 1.3x.
+- `pants_width` / `waist_blend_width` stay only for the parts T-shirt's torso rows (`tshirt_row_width`).
 
 ### Realism pass (2026-11-10, docs/09 #60, `render_tryon`)
 All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONTACT_SHADOW`, `TRYON_EDGE_FEATHER`
@@ -92,18 +113,7 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
   smoothed; garment RGB *= shade ** 0.7 (`shading_strength`, 0 = off). Alpha is never changed.
 - Edges: the 1 px rim is dropped (photo background fringe) and the alpha feathered by ~1 px (colour grown from inside).
 - Contact shadow: blurred garment alpha, 2 px inward and 3 px down, opacity 0.25, only on the figure, under the garment.
-- Pants hang: leg centre = w * body leg line + (1 - w) * straight drop from the crotch row; w = 1 when the garment row is
-  within 1.15x of the leg, 0.5 from 1.35x (linear between). The body leg in the mask is still always covered.
 - Waistband: the top edge dips 4 % of the waist width at the centre (content bent with `cv2.remap`, fading by the hip).
-
-### Loose-leg centreline (2026-11-10, docs/09 #61, `leg_centerline`)
-- Once per garment (docs/09 #62): looseness t = smoothstep of the MEAN knee ratio (garment knee width * s / body knee
-  width, both legs) over 1.05x .. 1.15x. Both legs use the same t, so a symmetric garment fits symmetrically.
-  Centre = (1 - t) * tight line + t * loose curve; hang weight = 1 - 0.5 t.
-- Tight: the centre follows the piecewise crotch -> knee -> ankle line (hugs the leg).
-- Loose: a quadratic Bezier from the crotch-row centre to the ankle centre; the knee pulls it by at most 25 % of its
-  offset from the straight line, and the control point is clamped between the ends, so the edges are monotonic (no kink
-  or bulge at inward knees, e.g. male_plus).
 
 ### Opaque garments (2026-11-10, docs/09 #63, `garment_layer`, `fill_alpha_holes`)
 - After rembg (`_rembg_clean`) and again after warping: alpha = 255 inside the largest outer contour, except its outer
@@ -138,21 +148,14 @@ All three effects are OFF by default (docs/09 #63): `TRYON_SHADING`, `TRYON_CONT
 - With all TRYON_* flags 0 the warp only resamples: rows and sleeves are resized/warped premultiplied, so interior
   pixels keep the source colour exactly (test `SolidColourTests`).
 
-### Pants keep their own row widths (2026-11-10, docs/09 #70, `_garment_span`)
-- Each source row's span is read from the garment's silhouette (alpha), not interpolated between the crotch, knee
-  and hem landmarks: a balloon lower panel and a gathered cuff keep their shape. Legs: the leg's run split at the
-  crotch axis; waist..crotch: the extent within the landmark span +-15 %. Landmark span = fallback.
-- Final width = max(garment span * s, body + ease) (capped); only the centreline is smoothed. Below the knee the
-  rows keep the single vertical scale (full-length legs: hem snapped to the ankle, one linear map per leg).
-
 ### Layer order (2026-11-10, docs/09 #79-#84, `render_tryon`, `LAYER_ORDER`)
 One compositing order, bottom to top; every layer is clipped to its own region and has its own unit tests
 (`RowWarpTests`, `HaloTests`, `TshirtLayerTests`, `TshirtFitTests`). The stacked patches (armpit fill, shoulder band
 fill, hem row repetition, sleeve reach-in) were removed, not extended.
 
 1. **Avatar.**
-2. **Pants**: only from their own waist row down (`result[:waist] = 0`). Waist block + two legs, each leg warped from
-   its own half of the garment.
+2. **Pants**: only from the body's waist row down (`result[:waist] = 0`). One waist -> crotch piece in two halves on
+   the axis + two legs below the body crotch, all in one remap (`_warp_pieces`, round 26).
 3. **T-shirt torso** (`warp_tshirt`, part `torso`): row warp of the garment without its sleeve regions (it samples
    3 px past the armhole line, so its clipped edge lies inside the sleeve's territory, never on the join).
 4. **Rigid sleeves** (parts `sleeve_left`, `sleeve_right`), each pixel from exactly one piece (round 4, docs/09 #86):
@@ -249,15 +252,17 @@ head/neck edge and (neck-gap fill) a thin strip of the avatar's own tank collar 
 - **The avatar's own clothes show wherever the garment does not cover them** (never redrawn, hard rule): the grey
   top under a crop top that ends more than ~20 px above the pants (female plus + #34), and its straps beside a wide
   neckline on broad shoulders (male average / male plus + #34).
-- **A garment much wider than the body at the hip** keeps its own width (one uniform scale, set by the length): the
-  waistband is fitted to the body and the pants widen to their own hip width, which reads as a bulge on slim
-  avatars (#25 on female slim / average, male slim).
+- **Pants legs are monotonic** (round 26): a balloon keeps its width but a cuff that narrows below it (joggers) no
+  longer tapers; a calf bulge on tight pants is bridged (the leg is a little straighter than the body leg).
+- **Pants hem slits show the leg** (round 26): #48's own hem slit is drawn open (the #118 underlay that covered it
+  is gone); full-length pants end on the ankle line, so the shoe top is no longer covered by long pants.
 - **Sleeves are rigid**: a puff sleeve (#17) stands off the arm like a box; folds do not follow the arm. Above the
   arm separation row the arm is not known from the mask, so the sleeve is centred from the outer edge and the arm
   width measured lower down.
 - **Mis-marked shoulder landmarks** are only estimated (see above); marking the armhole tops is still better.
-- **Halo removal** assumes a fringe of at most ~6 px at the warped size; details thinner than 4 px (drawstrings, lace
-  tips) lose 2 px. `TRYON_HALO_REMOVAL=0` keeps the cleaned image as is.
+- **Halo removal** (T-shirts) assumes a fringe of at most ~6 px at the warped size; details thinner than 4 px
+  (drawstrings, lace tips) lose 2 px. Rows pants are not eroded (round 26, `pants_edge`): a print or stitch within
+  3 px of their outline is painted over with the plain fabric. `TRYON_HALO_REMOVAL=0` keeps the cleaned image as is.
 - **Dropped-shoulder one-piece warp** (`TRYON_DROPPED_SHOULDER_SINGLE`, default 0, docs/09 #90): removes the shoulder
   pad on #36 but shears the sleeves below the armpit into stepped blocks, so it is off; #36 uses the torso + rigid
   sleeves path described above (with its shoulder corner).
@@ -1853,11 +1858,42 @@ and numbers in docs/09 #115. `run_pants21.py` after round 22:
 | #49 | fit | 6410 | 0 | 87 | 1.21 | 0 |
 | #51 | fit | 6365 | 0 | 98 | 1.32 | 0 |
 
-### Rows pants, one horizontal scale, round 24 (docs/09 #117, #118)
-Round 23 (`smooth`: one hip factor + a fading leg profile) was replaced the same day and removed. Round 24:
-`warp_pants(fit_x=True)` (render keyword `pants_fit_x`, setting `TRYON_PANTS_FIT_X`, default 1). One horizontal scale
-sx >= s for the whole garment, from the figure mask (avatar hip ticks are up to 11.5 px off the silhouette). An
-underlay (the leg without fit_x, on the figure only) keeps new holes at 0 where a hem slit widens. `hang_straight`
-(`pants_hang`, `TRYON_PANTS_HANG`, default 0) is in the code but not used (a step under the hip). Runner
-`tools/warp-benchmark/run_fitx24.py` (off gate needs the HEAD engine as `apps/tryon_engine/warp_before.py`;
-`HANG=1` adds A+B); table `out/table_fitx24.md`, sheets `out/sheet_fitx24_<id>.png`.
+### Rows pants, one horizontal scale, round 24 (docs/09 #117, #118) - replaced by round 26
+Round 23 (`smooth`) and round 24 (`fit_x`, its underlay, `hang_straight`; settings `TRYON_PANTS_FIT_X`,
+`TRYON_PANTS_HANG`) were removed in round 26 (docs/09 #120, "Pants fit, round 26" above); so was the round 25
+benchmark (`pants_top`, variants A-E), which was never in production.
+
+### Pants fit, round 26: measurements (2026-11-20, docs/09 #120)
+Diagnosis first (`tools/tryon_check/pants_diag.py`, read-only, 4 pants x 6 avatars, production flags):
+1. **Belly bulge**: `warp.py` (e475f76, #118) widened the block to the garment's own width x `sx`, with `sx` taken
+   from the thigh rows (up to 1.7 x `s`); before #118 it blended to the garment's own hip width x `s` (#59). It never
+   followed the body.
+2. **Edge pixels**: `remove_halo` ran BEFORE the warp and recoloured a 4 px ring from the nearest interior px
+   (8b99250, round 2: ring `px` -> `2 * px`; kept for pants by 38c0517): each interior px was copied across the ring
+   (vertical stripes at the hem, print smeared sideways along the legs). Large photos are prescaled to the final size
+   before it, so the 6 px band lands 1:1; `fit_x` widened it by `sx`. No row was literally repeated (0 / 12 last rows
+   in 24 renders); the hem stripes came from the ring.
+3. **Centre seam**: the legs started at the garment's crotch mapped with `s` (19e8692c), 23-46 px above the body
+   crotch, as two strips cut at the axis (8b99250) drawn over the block with their own mapping: colour jump at the
+   axis 10-240 x the neighbouring columns in that band (block alone 0.5-4.7, source 0.9-1.8). The block itself
+   centred the garment's span middle, not its crotch x, on the body.
+
+Runner `tools/warp-benchmark/run_pants26.py` (MODE=before on the old code, then MODE=after; every pants in the DB x 6
+avatars, and 5 outfits x 6 avatars; 54 renders). Sheets `out/pants26/sheet_<case>.png` (rows = avatars, before |
+after), 3x crops for avatar 5 `out/pants26/crop_p<id>_{waist,leg,hem}.png`, table `out/pants26/table26.md`.
+
+| measure (24 pants renders) | before | after |
+|---|---|---|
+| block px past the figure's torso run (sum per pants, 6 avatars) | #18 42 743, #48 51 869, #49 29 853, #51 32 930 | 7 600 each |
+| largest row past the figure | 49-93 px | 10 px (3 % ease + px rounding) |
+| first 10 % of the block (waistband corners) | 9-25 px | 4-8 px |
+| colour jump at the axis / neighbours (source) | #49 0.4-3.2 (1.4), #48 1.7-5.5 (1.8) | #49 1.7-3.1, #48 3.8-4.8 (its own fly seam) |
+| print share in the outer ring of the warp vs deep | #18 0.16 / 0.37 | 0.02 / 0.37 |
+| pants px above the waist row | 0 | 0 |
+
+Gates (after vs before, 54 renders): pants above the waist 0; figure px uncovered above the new hem 0-383 per render
+(#48 240-348: its hem slit; the rest 1-2 px rows along the hem line and the ankles); below the new hem 343-2 853 per
+render (the hem is on the ankle line now: length rule, not holes); new holes 20 px: 18 px in #47 + #51 on avatar 4 (a
+background pocket between #47's hem "ear" corner and the narrower pants, the known #47 corner, T-shirt unchanged)
+and 1 px in #49 on avatar 6 (the open gap between the legs). T-shirt regression fixtures pixel-identical; 229
+`apps.tryon_engine` tests pass.

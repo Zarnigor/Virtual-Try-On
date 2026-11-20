@@ -206,18 +206,18 @@ _(none blocking P0)_
 58. **Demo mode** (`DEMO_MODE=1`): `build_demo --garments <folder>` precomputes every avatar x garment and T-shirt+pants
     pair; covered pairs are served as finished jobs (no Celery/Gemini), others take the normal path. Demo garments are
     approved catalog garments. Public `GET /api/config/` exposes the flag; the UI shows "DEMO".
-59. **Pants keep their own silhouette** (2026-11-10, docs/06 "Pants fit"): one uniform scale (waist..hem vs waist..ankle,
+59. (**Replaced by #120 for rows pants.**) **Pants keep their own silhouette** (2026-11-10, docs/06 "Pants fit"): one uniform scale (waist..hem vs waist..ankle,
     rise for short pants); only the waistband fits the body (+4 % ease), blended to the garment's width by the hip; below
     the hip a row is max(garment, body + 4 %), capped at 1.8x body (knee width below the knee, so cuffs are not
     squeezed); legs centred on the body's leg centreline. Warnings only when a row's scale differs from the uniform
     scale by > 1.3x. T-shirt keeps the old "widths follow the body" model for now.
-60. **Realism pass** (2026-11-10, docs/06 "Realism pass"): shading from the avatar's luminance (strength 0.7), 1 px
+60. (**Pants hang replaced by #120.**) **Realism pass** (2026-11-10, docs/06 "Realism pass"): shading from the avatar's luminance (strength 0.7), 1 px
     rim removal + feather, 0.25 contact shadow on the figure, loose pants hang half way to a vertical drop, curved
     waistband top. Pure 2D post-processing of the warped garment; nothing of the avatar is redrawn.
-61. **Loose pants do not bend at the knee** (2026-11-10, docs/06 "Loose-leg centreline"): loose legs (knee ratio
+61. (**Replaced by #120 for rows pants.**) **Loose pants do not bend at the knee** (2026-11-10, docs/06 "Loose-leg centreline"): loose legs (knee ratio
     >= 1.15x) use a smooth monotonic centreline with at most 25 % knee pull; tight legs keep the knee line. Loose/tight
     and the hang weight are decided per leg, not per row.
-62. **Looseness per garment, smooth** (2026-11-10, replaces the per-leg cut of #61): mean knee ratio of both legs,
+62. (**Replaced by #120 for rows pants.**) **Looseness per garment, smooth** (2026-11-10, replaces the per-leg cut of #61): mean knee ratio of both legs,
     smoothstep 1.05x .. 1.15x drives the knee pull (1 -> 0.25) and the hang weight (1 -> 0.5); both legs share them.
 63. **Garments are opaque, realism is optional** (2026-11-10): holes inside the garment silhouette are filled after
     rembg and after warping (background-coloured openings kept); compositing fixed to straight-alpha "over".
@@ -243,7 +243,7 @@ _(none blocking P0)_
     cleaning and by build_demo); prints are never touched. Owner-approved exception to "garment images are
     immutable": an admin maintenance step on the processed image, not a user edit. Run on #28 (the black T-shirts
     #19/#26/#27 had been deleted in the app).
-70. **Pants silhouette bug** (2026-11-10): the straight lower panel came from landmark-interpolated row spans
+70. (**Replaced by #120 for rows pants.**) **Pants silhouette bug** (2026-11-10): the straight lower panel came from landmark-interpolated row spans
     (crotch -> knee -> hem), not from the centreline rule. Rows now use the garment's own silhouette span.
 71. **Double sleeves fixed** (2026-11-10): with shoulder landmarks at the sleeve tips (garment #28), upper-sleeve
     fabric was warped by the torso rows AND sampled again by the rigid sleeve's inward reach (added in 98da3c7).
@@ -672,7 +672,7 @@ _(none blocking P0)_
      #49 4 -> 6): the whole hip block is wider than the uniform scale, not only the bump rows.
      **Not changed:** legs that bend towards the body's knees (#1, #6 with #49) come from the centre line, not
      the width. Test: `test_rows_pants_smooth_covers_the_legs_and_is_off_by_default`.
-118. **2026-11-19: rows pants get one horizontal scale (`fit_x`), in production** (round 24; owner: "smooth hal
+118. (**Replaced by #120: `fit_x`, the underlay and `TRYON_PANTS_HANG` removed.**) **2026-11-19: rows pants get one horizontal scale (`fit_x`), in production** (round 24; owner: "smooth hal
      bo'lmagan" -> options A-D -> "Adan foydalanamiz, prodga implement qil"). Cause of the bumps: s comes from the
      length only, so the scaled garment is narrower than the hips on 5 of 6 avatars (body / garment x s at the hip
      1.06-1.43 on #49; only #4 0.99) and the rows engine patched each row. Check D first: garment landmarks are
@@ -695,3 +695,35 @@ _(none blocking P0)_
      Sheets: `tools/warp-benchmark/out/sheet_fitx24_<id>.png` (per avatar: off | A).
      **Still open:** wide legs still follow the body's knees a little (B is the start); the plus bodies get
      visibly wider pants (that is the intent: a larger size).
+119. **2026-11-19: the T-shirt drape over the pants stops near the figure, in production** (belly "bulge" of an
+     adapt T-shirt over pants). `drape_over_pants(mask, body_margin)` + `_drape_body_cap`: a drape row reaches at
+     most max(its MLS edge, the figure edge + margin), the limit smoothed along y. Setting
+     `TRYON_DRAPE_BODY_MARGIN` (px, **default 6** | `off` = before #119), render keyword `drape_body_margin`. Belly
+     overhang 35-85 px -> 13-21 px (5 outfits x 6 avatars, `tools/tryon_check/belly_overlay.py`). Tests
+     `PantsTuckTests` (5 new).
+120. **2026-11-20: rows pants rewritten (round 26), in production, no new setting** (owner task: belly bulge,
+     edge pixels, centre seam on #49 + female avatars; "do not stack patches, delete what you replace"). Full rules
+     and measurements: docs/06 "Pants fit, round 26".
+     - **Replaced / removed:** #59 (waistband blend to the garment's hip width, `pants_width` below the hip for
+       pants), #60 pants hang, #61 / #62 (loose-leg centreline, looseness: `leg_centerline`, `pants_looseness`,
+       `LOOSE_KNEE_PULL`, `HANG_LOOSE`), #70 (each leg row = the garment's own span: legs are now monotonic), #118
+       (`fit_x`, its hem-slit underlay, `hang_straight`; settings `TRYON_PANTS_FIT_X`, `TRYON_PANTS_HANG` and
+       `render_tryon(pants_fit_x=, pants_hang=)` deleted), round 25 (`pants_top`, variants A-E, `run_top25.py`) and
+       `run_fitx24.py`. Pants no longer use `_tail_rows` or the pre-warp `remove_halo`. `pants_width` /
+       `waist_blend_width` / `LOOSE_FROM` stay for the parts T-shirt only.
+     - **New model (`warp_pants`, engine `rows`):** rise -> rise and crotch -> ankle vertical maps; waist -> body
+       crotch = one piece, figure run + 3 %, in two halves meeting on the axis at the garment's crotch x; legs only
+       below the body crotch: body leg + 3 % opening to own width x s over the first 20 % of crotch -> knee, cap
+       1.8 x (knee below the knee), inner edge out of the garment's own leg gap, edges monotonic and smooth,
+       leaving the block without a step; hem = the leg's own last row on the ankle line; geometric outline alpha;
+       `pants_edge` after the warp (no erosion, 3 px ring from the plain fabric); `clean_crotch_gap` for both engines.
+     - **Numbers** (24 pants renders): block past the figure 30-52 k px per pants -> 7.6 k (largest row 49-93 ->
+       10 px, waistband corners 9-25 -> 4-8 px); axis jump in the leg band 10-240x -> none (block 0.8-4.8, #48 = its
+       fly seam); print share in the warped edge ring #18 0.16 -> 0.02; pants above the waist 0.
+     - **Gates:** new holes 20 px / 54 renders (18 px #47 + #51 avatar 4: background pocket under #47's hem corner;
+       1 px gap between the legs); uncovered above the new hem 0-383 px per render (#48 hem slit 240-348); below the
+       hem 343-2 853 px (length rule: hem on the ankle line). Tests (a)-(f) `PantsFitModelTests` + `pants_edge` test.
+     - **Still open (owner):** #48's hem slit now shows the leg (keep it open as the garment's own slit, or close
+       it? **owner 2026-11-20: decide later**); long pants no longer cover the shoe top; joggers / balloon cuffs no longer taper (monotonic legs); a
+       1-3 px step can remain where a leg's outer edge leaves the block on avatar 5; the 18 px pocket under #47.
+       #119 (drape body margin) is still to be written up (HANDOFF).

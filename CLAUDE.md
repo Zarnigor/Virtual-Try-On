@@ -26,7 +26,8 @@ but the frontend must fully work too (React is required). The owner works and re
   garment hem + cuff hem + fringe drop (flags `TRYON_MLS_*`, docs/09 #105, #106); every T-shirt gets the r17
   finish (`TRYON_FINISH`, docs/09 #107) and so do pants (`TRYON_FINISH_PANTS`, docs/09 #108); an adapt T-shirt hangs
   over the pants (`TRYON_PANTS_TUCK`, docs/09 #109); `parts` = the MLS fallback, and warps keep_shape like adapt; pants use `warp_pants` (`rows`,
-  `TRYON_PANTS_ENGINE`, docs/09 #116; `fit` = `warp_pants_fit`, #114) with one horizontal scale (`TRYON_PANTS_FIT_X`, #118).
+  `TRYON_PANTS_ENGINE`, docs/09 #116; `fit` = `warp_pants_fit`, #114); rows = the round 26 fit model (#120: block =
+  body + 3 %, legs open to their own width, monotonic edges, `pants_edge`; #118 `fit_x` and round 25 removed).
   **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
@@ -76,7 +77,7 @@ but the frontend must fully work too (React is required). The owner works and re
 | `docs/08-roadmap-and-testing.md` | P0/P1/P2, day plan, tests, definition of done |
 | `docs/09-open-questions.md` | Decisions log, proposed defaults, what is still open |
 | `docs/10-frontend-and-design.md` | Screen map, what comes from the backend, states the design does not show |
-| `docs/11-session-handoff.md` | End-of-session handoff: git state, done / not done, next steps, commands |
+| `HANDOFF.md` | The one end-of-session handoff: git state, latest round, next step, open work, commands |
 | `design/` | UI reference: 12 desktop screens (`previews/*.png`, `artboards/*.dc.html`), `tokens.md` |
 | `docs/diagrams/` | UML activity diagrams (.puml source, .png/.svg rendered) |
 | `prompts/` | The 5 AI prompts (raw .txt), config and Uzbek error-message table |
@@ -109,8 +110,8 @@ for about 10 garments in case the network/API is slow.
 - Commands (fill in after scaffolding, keep README in sync): run, test, lint, seed avatars, migrate.
 
 ## Status and next step (READ THIS FIRST in a new session; keep it updated at the end of every step)
-**Latest handoff: `NEXT_STEPS.md` (repo root, 2026-11-16): state, first steps and the open work in order. Read it
-first. History: `docs/11-session-handoff.md`, docs/06, docs/09 (last #115).**
+**Latest handoff: `HANDOFF.md` (repo root, 2026-11-19; the only handoff file, the old NEXT_STEPS.md and
+docs/11 were removed): state, round 25 result, next step, open work. Read it first. History: docs/06, docs/09 (last #118).**
 Last updated: 2026-11-16. The first task (summary + plan) is done. The owner approved the 10-step plan below.
 Work it top to bottom, one step per turn, and tick the box when a step is done and tested.
 
@@ -270,6 +271,12 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       **2026-11-19 round 24 + production (docs/09 #118; #117 `smooth` removed):** rows pants get one horizontal
       scale for the whole garment from the figure mask (`TRYON_PANTS_FIT_X`, default 1); hem-slit underlay; new holes
       0 / 48 (`run_fitx24.py`). `TRYON_PANTS_HANG` (straight legs) in the code, default 0, not used. 408 backend tests.
+      **2026-11-20 round 26 + production (docs/09 #120, docs/06 "Pants fit, round 26", uncommitted):** rows pants
+      rewritten: waist -> crotch block = figure + 3 % in two halves on the axis, legs below the body crotch open to
+      their own width (20 % smoothstep, cap 1.8x), monotonic edges, hem on the ankle line, `pants_edge` (3 px ring
+      from the plain fabric, no erosion). #59 / #60 hang / #61 / #62 / #70 / #118 (`TRYON_PANTS_FIT_X`,
+      `TRYON_PANTS_HANG`) and round 25 deleted. Block past the figure 30-52 k -> 7.6 k px per pants; new holes 20 px /
+      54 (#47 corner pocket 18, leg gap 1). `run_pants26.py`, `pants_diag.py`. 229 tryon_engine tests.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

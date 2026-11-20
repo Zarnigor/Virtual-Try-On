@@ -64,8 +64,7 @@ services:
       - TRYON_MLS_KEEP_SCALE=${TRYON_MLS_KEEP_SCALE:-fit}  # keep_shape scale (docs/09 #112): fit | shoulder
       - TRYON_MLS_TUBE_CLIP=${TRYON_MLS_TUBE_CLIP:-arm}  # tube sleeve clip (docs/09 #113): arm | armhole
       - TRYON_PANTS_ENGINE=${TRYON_PANTS_ENGINE:-rows}  # pants engine (docs/09 #114, #116): rows | fit
-      - TRYON_PANTS_FIT_X=${TRYON_PANTS_FIT_X:-1}  # rows pants: one horizontal scale (docs/09 #118): 1 | 0
-      - TRYON_PANTS_HANG=${TRYON_PANTS_HANG:-0}  # rows pants: loose legs hang straight (docs/09 #118, not used): 0 | 1
+      - TRYON_DRAPE_BODY_MARGIN=${TRYON_DRAPE_BODY_MARGIN:-6}  # T-shirt drape over pants stops at figure edge + px (docs/09 #119): 6 | off
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
@@ -118,8 +117,7 @@ services:
       - TRYON_MLS_KEEP_SCALE=${TRYON_MLS_KEEP_SCALE:-fit}  # keep_shape scale (docs/09 #112): fit | shoulder
       - TRYON_MLS_TUBE_CLIP=${TRYON_MLS_TUBE_CLIP:-arm}  # tube sleeve clip (docs/09 #113): arm | armhole
       - TRYON_PANTS_ENGINE=${TRYON_PANTS_ENGINE:-rows}  # pants engine (docs/09 #114, #116): rows | fit
-      - TRYON_PANTS_FIT_X=${TRYON_PANTS_FIT_X:-1}  # rows pants: one horizontal scale (docs/09 #118): 1 | 0
-      - TRYON_PANTS_HANG=${TRYON_PANTS_HANG:-0}  # rows pants: loose legs hang straight (docs/09 #118, not used): 0 | 1
+      - TRYON_DRAPE_BODY_MARGIN=${TRYON_DRAPE_BODY_MARGIN:-6}  # T-shirt drape over pants stops at figure edge + px (docs/09 #119): 6 | off
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}

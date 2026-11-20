@@ -208,8 +208,7 @@ TRYON_MLS_CHOICES = {"TRYON_MLS_TUBE": ("1", "0"), "TRYON_MLS_SIDE_FLOOR": ("mas
                      "TRYON_MLS_CUFF": ("hem", "chord"), "TRYON_MLS_FRINGE": ("drop", "keep"),
                      "TRYON_FINISH": ("r17", "off"), "TRYON_FINISH_PANTS": ("1", "0"),
                      "TRYON_PANTS_TUCK": ("1", "0"), "TRYON_MLS_KEEP_SCALE": ("fit", "shoulder"),
-                     "TRYON_MLS_TUBE_CLIP": ("arm", "armhole"), "TRYON_PANTS_ENGINE": ("rows", "fit"),
-                     "TRYON_PANTS_FIT_X": ("1", "0"), "TRYON_PANTS_HANG": ("0", "1")}
+                     "TRYON_MLS_TUBE_CLIP": ("arm", "armhole"), "TRYON_PANTS_ENGINE": ("rows", "fit")}
 
 
 def parse_mls_choice(name, value):
@@ -250,11 +249,26 @@ TRYON_MLS_TUBE_CLIP = parse_mls_choice("TRYON_MLS_TUBE_CLIP", os.environ.get("TR
 #   TRYON_PANTS_ENGINE  rows (default, docs/09 #116) = warp.warp_pants | fit = warp.warp_pants_fit (the garment's own
 #                       outline x a smooth width factor, legs hang from the hip; rounds 21-22)
 TRYON_PANTS_ENGINE = parse_mls_choice("TRYON_PANTS_ENGINE", os.environ.get("TRYON_PANTS_ENGINE"))
-# docs/09 #118 (round 24), rows pants (ignored with TRYON_PANTS_ENGINE=fit):
-#   TRYON_PANTS_FIT_X  1 (default) = one horizontal scale for the whole garment, from the figure mask | 0 = before
-#   TRYON_PANTS_HANG   0 (default) | 1 = loose legs hang straight from the hip block (tight legs unchanged)
-TRYON_PANTS_FIT_X = parse_mls_choice("TRYON_PANTS_FIT_X", os.environ.get("TRYON_PANTS_FIT_X")) == "1"
-TRYON_PANTS_HANG = parse_mls_choice("TRYON_PANTS_HANG", os.environ.get("TRYON_PANTS_HANG")) == "1"
+# docs/09 #119: with TRYON_PANTS_TUCK the drape may widen a T-shirt row only up to max(its MLS edge, figure edge +
+# this many px), the limit smoothed along y. Every body is on the 600 x 1200 canvas, so the margin is in px.
+#   TRYON_DRAPE_BODY_MARGIN  6 (default) | off = no body limit, the behaviour before #119
+
+
+def parse_drape_margin(value):
+    value = (value or "6").strip().lower()
+    if value == "off":
+        return None
+    try:
+        margin = float(value)
+    except ValueError:
+        margin = -1.0
+    if not margin >= 0:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured(f"TRYON_DRAPE_BODY_MARGIN must be a number >= 0 or off, got {value!r}")
+    return margin
+
+
+TRYON_DRAPE_BODY_MARGIN = parse_drape_margin(os.environ.get("TRYON_DRAPE_BODY_MARGIN"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)

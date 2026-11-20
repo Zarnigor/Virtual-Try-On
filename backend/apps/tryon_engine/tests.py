@@ -277,39 +277,6 @@ class PantsCenterlineTests(SimpleTestCase):
         self.assert_monotonic(dl)
         self.assert_monotonic(dr)
 
-    def test_smooth_centerline_limits_the_knee_pull(self):
-        x = [warp.leg_centerline(y, (670, 252), (860, 267), (1040, 252), 0.25) for y in range(670, 1041, 10)]
-        self.assertLessEqual(max(x) - 252, 0.25 * 15 + 0.5)
-        x_full = warp.leg_centerline(860, (670, 252), (860, 267), (1040, 252), 1.0)
-        self.assertAlmostEqual(x_full, 267, delta=0.5)  # tight: through the knee
-        mono = [warp.leg_centerline(y, (670, 240), (860, 275), (1040, 260), 0.25) for y in range(670, 1041, 5)]
-        self.assertTrue(all(b >= a - 1e-6 for a, b in zip(mono, mono[1:])))
-
-    def test_looseness_is_one_smooth_weight_per_garment(self):
-        self.assertEqual(warp.pants_looseness([1.0, 1.02])["t"], 0)
-        self.assertEqual(warp.pants_looseness([1.2, 1.3])["t"], 1)
-        mid = warp.pants_looseness([1.12, 1.16])
-        self.assertAlmostEqual(mid["ratio"], 1.14)
-        self.assertTrue(0 < mid["t"] < 1 and warp.LOOSE_KNEE_PULL < mid["knee_pull"] < 1 and 0.5 < mid["hang"] < 1)
-
-    def test_male_plus_like_ratios_give_equal_weights_for_both_legs(self):
-        base, lm = avatar()
-        p, plm = pants(flare=0)
-        s = (1040 - 480) / (plm["hem"]["left_leg"]["y"] - plm["waist"]["y"])
-        mask = warp.figure_mask(base)
-        widths = []
-        for side, ratio in (("left", 1.12), ("right", 1.16)):
-            k = lm["knee"][f"{side}_leg"]
-            run = warp._leg_run(mask, lm["knee"]["y"], side, 300, (k["left_x"] + k["right_x"]) / 2)
-            widths.append(ratio * (run[1] - run[0]) / s)
-        plm["knee"]["left_leg"] = {"left_x": 128 - widths[0], "right_x": 128}
-        plm["knee"]["right_leg"] = {"left_x": 152, "right_x": 152 + widths[1]}
-        _, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm)])
-        legs = dbg["pants_fit"]["legs"]
-        self.assertAlmostEqual(legs["left"]["ratio"], 1.12, delta=0.01)
-        self.assertAlmostEqual(legs["right"]["ratio"], 1.16, delta=0.01)
-        self.assertEqual(legs["left"]["knee_pull"], legs["right"]["knee_pull"])
-        self.assertEqual(legs["left"]["hang"], legs["right"]["hang"])
 
 
 def interior_holes(layer):
@@ -540,6 +507,50 @@ class PantsTuckTests(SimpleTestCase):
         self.assertEqual(k, 1.0)
         self.assertIs(out, shirt)
 
+    def test_drape_body_margin_setting(self):
+        from django.core.exceptions import ImproperlyConfigured
+        from django.test import override_settings
+
+        from tryon_studio.settings.base import parse_drape_margin
+        self.assertEqual(parse_drape_margin(None), 6.0)
+        self.assertEqual(parse_drape_margin(" 4 "), 4.0)
+        self.assertIsNone(parse_drape_margin("off"))
+        for bad in ("-1", "abc", "nan"):
+            with self.assertRaises(ImproperlyConfigured):
+                parse_drape_margin(bad)
+        self.assertEqual(render_flags("avatar")["drape_body_margin"], 6.0)
+        with override_settings(TRYON_DRAPE_BODY_MARGIN=None):
+            self.assertIsNone(render_flags("avatar")["drape_body_margin"])
+
+    def test_drape_body_cap_stops_at_the_figure(self):
+        """docs/09 #119: a side reaches at most the figure edge + margin (pants 15 px wider per side: blocked)."""
+        shirt, pants, mask = self.layers()
+        out, k = warp.drape_over_pants(shirt, pants[:, :, 3], 150, mask, 6.0)
+        after = out[:, :, 3] >= 128
+        self.assertFalse(((shirt[:, :, 3] >= 128) & ~after).any())  # never narrower than the MLS output
+        for y in range(230, 295):
+            xs = np.where(after[y])[0]
+            self.assertGreaterEqual(xs[0], 105 - 6 - 1)
+            self.assertLessEqual(xs[-1], 194 + 6 + 1)
+        self.assertLess(k, warp.drape_over_pants(shirt, pants[:, :, 3], 150)[1])
+
+    def test_drape_body_cap_never_narrows_a_wide_shirt(self):
+        shirt, pants, mask = self.layers()
+        mask[:] = False
+        mask[40:400, 130:170] = True  # figure far inside the shirt: no stretch, shirt bytes kept
+        out, k = warp.drape_over_pants(shirt, pants[:, :, 3], 150, mask, 6.0)
+        self.assertEqual(k, 1.0)
+        self.assertTrue((out == shirt).all())
+
+    def test_drape_body_cap_off_is_the_old_output(self):
+        shirt, pants, mask = self.layers()
+        old, k0 = warp.drape_over_pants(shirt, pants[:, :, 3], 150)
+        off, k1 = warp.drape_over_pants(shirt, pants[:, :, 3], 150, mask, None)
+        wide, k2 = warp.drape_over_pants(shirt, pants[:, :, 3], 150, mask, 1000.0)
+        self.assertTrue((old == off).all() and (old == wide).all())
+        self.assertEqual(k0, k1)
+        self.assertEqual(k0, k2)
+
     def test_keep_shape_scale_fit(self):
         from apps.tryon_engine import mls
         self.assertEqual(render_flags("avatar")["mls_keep_scale"], "fit")
@@ -573,30 +584,6 @@ class PantsTuckTests(SimpleTestCase):
         legs = mask[y0:y1] & ~d1["arm_mask"][y0:y1]
         self.assertEqual(int((legs & c0[y0:y1] & ~c1[y0:y1]).sum()), 0)  # nothing the old engine covered is bare
         self.assertEqual(int((legs & ~c1[y0:y1]).sum()), 0)
-
-    def test_rows_pants_fit_x_covers_the_legs_and_is_on_by_default(self):
-        """docs/09 #118: rows + fit_x = one horizontal scale sx >= s for the whole garment; on by default;
-        nothing the per-row widths covered is bare; off = no fit_x info."""
-        from tryon_studio.settings.base import parse_mls_choice
-        self.assertEqual(parse_mls_choice("TRYON_PANTS_FIT_X", None), "1")
-        self.assertEqual(parse_mls_choice("TRYON_PANTS_HANG", None), "0")
-        self.assertTrue(render_flags("avatar")["pants_fit_x"])
-        self.assertFalse(render_flags("avatar")["pants_hang"])
-        base, lm = avatar()
-        p, plm = pants()
-        mask = warp.figure_mask(base)
-        _, _, d0 = warp.render_tryon(base, lm, [("pants", p, plm)])  # the keyword default: off
-        self.assertNotIn("pants_fit_x", d0)
-        _, _, d1 = warp.render_tryon(base, lm, [("pants", p, plm)], pants_fit_x=True)
-        fx = d1["pants_fit_x"]
-        self.assertGreaterEqual(fx["sx"], fx["s"])
-        self.assertLessEqual(fx["ratio"], warp.PANTS_FIT_MAX + 1e-9)
-        c0, c1 = d0["final_layers"]["pants"][:, :, 3] >= 128, d1["final_layers"]["pants"][:, :, 3] >= 128
-        y0, y1 = int(lm["waist"]["y"]) + 8, int(lm["ankle"]["left_leg"]["y"]) - 8
-        legs = mask[y0:y1] & ~d1["arm_mask"][y0:y1]
-        self.assertEqual(int((legs & c0[y0:y1] & ~c1[y0:y1]).sum()), 0)
-        _, _, d2 = warp.render_tryon(base, lm, [("pants", p, plm)], pants_engine="fit", pants_fit_x=True)
-        self.assertNotIn("pants_fit_x", d2)  # ignored with the fit engine
 
     def test_pants_leg_profile_is_smooth_and_above_the_need(self):
         need = [1.0] * 5 + [1.3] * 4 + [1.0] * 60
@@ -856,23 +843,27 @@ class PantsSilhouetteTests(SimpleTestCase):
                       "right_leg": {"y": 584, "left_x": 190, "right_x": 250}}}
         return img, lm
 
-    def test_balloon_and_cuff_are_kept(self):
+    def test_balloon_leg_keeps_its_width_with_a_monotonic_outline(self):
+        """Round 26 (docs/09 #120, replaces #70): the leg opens to the garment's own width x s and its edges are
+        monotonic from crotch to hem, so a balloon keeps its width but its cuff no longer tapers (both edges may
+        only run one way)."""
         base, lm = avatar()
         p, plm = self.balloon_pants()
         _, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm)])
-        s = (1040 - 480) / (584 - 10)  # uniform scale of this garment on this avatar
-        knee_y = 480 + (385 - 10) * s
+        s = (1040 - 480) / (584 - 10)  # uniform scale of this garment on this avatar (widths)
+        v = dbg["pants_scale"]["legs"]["left"]  # crotch -> hem: the leg's own vertical scale
+        knee_y = 670 + (385 - 180) * v
         for side in ("left", "right"):
-            rows = dbg["pants_leg_rows"][side]
+            rows = dbg["pants_rows"][side]
             w = {y: r - l for y, l, r in rows}
             knee_w = w[min(w, key=lambda y: abs(y - knee_y))]
-            bulge = max(v for y, v in w.items() if y >= knee_y)
+            bulge = max(v_ for y, v_ in w.items() if y >= knee_y)
             cuff = rows[-1][2] - rows[-1][1]
-            self.assertAlmostEqual(knee_w, 80 * s, delta=0.05 * 80 * s)  # knee: the garment's own width
-            self.assertAlmostEqual(bulge / knee_w, 100 / 80, delta=0.05 * 100 / 80)
-            self.assertAlmostEqual(cuff / bulge, 60 / 100, delta=0.05 * 60 / 100)
-            ys = [y for y, _, _ in rows]  # one uniform vertical scale below the knee: evenly spaced rows
-            self.assertLessEqual(max(np.diff(ys)), 6.01)
+            self.assertGreaterEqual(knee_w, 80 * s * 0.97)  # at least the garment's own width at the knee
+            self.assertAlmostEqual(bulge, 100 * s, delta=0.06 * 100 * s)  # the balloon keeps its width
+            self.assertGreater(cuff / bulge, 0.85)  # monotonic edges: no 60 % cuff taper any more
+            ys = [y for y, _, _ in rows]  # one dst row per px, no gaps
+            self.assertLessEqual(max(np.diff(ys)), 1.01)
 
 
 MARK = (0, 0, 255, 255)  # pure red (BGRA): appears nowhere else
@@ -1408,3 +1399,143 @@ class HemRuleTests(SimpleTestCase):
         both, _, dbg = warp.render_tryon(base, lm, [("pants", p, plm), ("tshirt", g, glm)], hem_rule=True)
         y = int(warp.body_hem_y(lm, 0.35, 10)) + 6  # below the T-shirt: the pants exactly as drawn alone
         np.testing.assert_array_equal(both[y:], on[y:])
+
+
+def torso_run(mask, y, axis=300):
+    """(left, right) pixel EDGES of the figure's run through the axis in row y."""
+    run = next(q for q in warp._runs(mask[y]) if q[0] <= axis <= q[1])
+    return run[0], run[1] + 1
+
+
+def solid_run(layer, y, axis=300):
+    run = next((q for q in warp._runs(layer[y, :, 3] >= 128) if q[0] <= axis <= q[1]), None)
+    return (run[0], run[1] + 1) if run else None
+
+
+class PantsFitModelTests(SimpleTestCase):
+    """Round 26 (docs/06 "Pants fit, round 26", docs/09 #120): the rows pants fit model."""
+
+    def render(self, p, plm, lm=None, **kw):
+        base, lm0 = avatar()
+        lm = lm or lm0
+        _, warns, dbg = warp.render_tryon(base, lm, [("pants", p, plm)], **kw)
+        return dbg["final_layers"]["pants"], dbg, lm, warp.figure_mask(base), warns
+
+    def test_a_block_is_the_body_plus_ease_whatever_the_garment_width(self):
+        for k in (0.8, 1.0, 2.0):  # narrow, as drawn, twice as wide: the garment's own width is not used
+            p, plm = pants(flare=0)
+            if k != 1.0:
+                p = cv2.resize(p, (int(p.shape[1] * k), p.shape[0]), interpolation=cv2.INTER_NEAREST)
+                plm = scale_x(plm, k)
+            layer, dbg, lm, mask, _ = self.render(p, plm)
+            top = int(np.ceil(lm["waist"]["y"] + dbg["pants_top_dip"])) + 1  # below the waistband dip
+            for y in range(top, int(lm["crotch"]["y"])):
+                bl, br = torso_run(mask, y)
+                got = solid_run(layer, y)
+                self.assertIsNotNone(got, (k, y))
+                w = float(layer[y, got[0] - 2:got[1] + 2, 3].sum()) / 255  # coverage-weighted: no px rounding
+                bw = br - bl
+                self.assertLessEqual(w, bw * (1 + warp.PANTS_BODY_EASE) + 1, (k, y, w, bw))
+                self.assertTrue(got[0] <= bl and got[1] >= br, (k, y, got, (bl, br)))  # body always covered
+            self.assertFalse((layer[:int(np.ceil(lm["waist"]["y"])), :, 3] > 0).any())  # nothing above the waist
+
+    def test_b_no_repeated_rows_at_the_hem(self):
+        """The warp itself (before the edge ring, which paints the outer 3 px plain on purpose): the last rows of
+        a leg are the garment's own last rows, none repeated."""
+        p, plm = pants(flare=20)
+        ys = np.arange(p.shape[0])
+        on = p[:, :, 3] > 0
+        p[:, :, 1] = np.where(on, (30 + ys % 200)[:, None], 0)  # every garment row a different colour
+        p[:, :, 2] = np.where(on, (40 + 60 * (ys // 200))[:, None], 0)
+        base, lm = avatar()
+        info = {}
+        layer, _ = warp.warp_pants(lm, plm, p, H, W, info=info, mask=warp.figure_mask(base))
+        for side in ("left", "right"):
+            rows = info["pants_rows"][side]
+            x0, x1 = int(min(r[1] for r in rows[-20:])) - 2, int(max(r[2] for r in rows[-20:])) + 3
+            ys = [y for y in range(int(rows[0][0]), H) if (layer[y, x0:x1, 3] >= 250).any()]
+            for y in ys[-10:]:
+                a, b = layer[y - 1, x0:x1].astype(int), layer[y, x0:x1].astype(int)
+                both = (a[:, 3] >= 250) & (b[:, 3] >= 250)
+                self.assertTrue(both.any())
+                self.assertGreater(np.abs(a[both, :3] - b[both, :3]).max(), 0, (side, y))
+
+    def test_c_edge_ring_takes_the_plain_fabric_colour(self):
+        p, plm = pants(flare=20)
+        sil = p[:, :, 3] > 0
+        ring = sil & ~(cv2.erode(sil.astype(np.uint8), np.ones((5, 5), np.uint8)) > 0)
+        p[ring] = (250, 250, 250, 255)  # the photo's white fringe, 2 px, opaque
+        for x in range(60, 230, 24):  # print dots that touch the left / right outline and the waist
+            cv2.circle(p, (x, 14), 4, (0, 200, 0, 255), -1)
+        for y in range(40, 560, 30):
+            cv2.circle(p, (int(np.nonzero(sil[y])[0].min()) + 3, y), 4, (0, 200, 0, 255), -1)
+        layer, *_ = self.render(p, plm)
+        a = layer[:, :, 3] >= 128
+        depth = cv2.distanceTransform(a.astype(np.uint8), cv2.DIST_L2, 3)
+        ring_px = a & (depth <= 3)
+        diff = np.abs(layer[:, :, :3][ring_px].astype(int) - np.array(PANTS[:3])).max(axis=1)
+        self.assertLessEqual(int(np.percentile(diff, 99)), 12)  # no white fringe, no green print in the ring
+        self.assertGreater(int((np.abs(layer[:, :, :3].astype(int) - (0, 200, 0)).max(axis=2) < 40).sum()), 50)
+
+    def test_d_no_step_at_the_crotch_axis(self):
+        p, plm = pants(flare=0)
+        xs = np.arange(p.shape[1])
+        p[:, :, 0] = np.where(p[:, :, 3] > 0, np.clip(xs * 255 // p.shape[1], 0, 255)[None, :], 0)  # x ramp
+        for cx in (140, 152):  # on the span's middle and off it (a fly that is not centred)
+            plm["crotch"]["center_x"] = cx
+            layer, dbg, lm, *_ = self.render(p, plm)
+            ax = int(round(warp._crotch_x(lm)))
+            for y in range(int(lm["waist"]["y"]) + 6, int(lm["crotch"]["y"]) - 1, 5):
+                row = layer[y, ax - 6:ax + 6, 0].astype(int)
+                jumps = np.abs(np.diff(row))
+                self.assertLessEqual(jumps[5], max(np.median(jumps), 1) * 2 + 1, (cx, y, row.tolist()))
+
+    def test_e_leg_edges_are_monotonic(self):
+        base, lm = avatar()
+        lm["knee"]["left_leg"] = {"left_x": 238, "right_x": 296}  # knee inward of the thigh (male_plus shape)
+        lm["knee"]["right_leg"] = {"left_x": 304, "right_x": 362}
+        for k, flare in ((1.0, 0), (1.0, 40), (1.6, 40)):
+            p, plm = pants(flare=flare)
+            if k != 1.0:
+                p = cv2.resize(p, (int(p.shape[1] * k), p.shape[0]), interpolation=cv2.INTER_NEAREST)
+                plm = scale_x(plm, k)
+            layer, dbg, *_ = self.render(p, plm, lm=lm)
+            for side in ("left", "right"):
+                rows = dbg["pants_rows"][side]
+                for c in (1, 2):
+                    e = np.array([r[c] for r in rows])
+                    d = np.diff(e)
+                    self.assertTrue((d >= -1e-6).all() or (d <= 1e-6).all(), (k, flare, side, c))
+                ys = range(int(rows[0][0]) + 2, int(rows[-1][0]) - 4)
+                for pick in (min, max):  # the drawn outline too (outer edge of the leg in the layer)
+                    xs = []
+                    for y in ys:
+                        cols = np.nonzero(layer[y, :, 3] >= 128)[0]
+                        cols = cols[cols < 300] if side == "left" else cols[cols >= 300]
+                        xs.append(pick(cols) if side == ("left" if pick is min else "right") else 0)
+                    if any(xs):
+                        d = np.diff(xs)
+                        rev = min(np.clip(d, 0, None).sum(), np.clip(-d, 0, None).sum())
+                        self.assertLessEqual(rev, 2, (k, flare, side))
+
+    def test_f_tshirt_render_does_not_change(self):
+        """The T-shirt alone does not touch the pants code; with pants only the pants layer is new."""
+        base, lm = avatar()
+        g, glm = tshirt()
+        a, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)])
+        b, _, _ = warp.render_tryon(base, lm, [("tshirt", g, glm)], pants_engine="fit")
+        np.testing.assert_array_equal(a, b)
+
+    def test_pants_edge_cuts_print_and_fringe_without_smearing(self):
+        layer = np.zeros((120, 120, 4), np.uint8)
+        layer[10:110, 10:110] = (40, 60, 200, 255)
+        layer[10:12, 10:110] = (250, 250, 250, 255)  # fringe along the top
+        layer[30:40, 10:20] = (0, 200, 0, 255)  # a print touching the left edge
+        layer[60:70, 60:70] = (0, 200, 0, 255)  # a print deep inside
+        out = warp.pants_edge(layer)
+        np.testing.assert_array_equal(out[:, :, 3], layer[:, :, 3])  # nothing eroded
+        a = out[:, :, 3] >= 128
+        ring = a & (cv2.distanceTransform(a.astype(np.uint8), cv2.DIST_L2, 3) <= 3)
+        np.testing.assert_allclose(out[:, :, :3][ring], np.broadcast_to((40, 60, 200), (int(ring.sum()), 3)), atol=2)
+        np.testing.assert_array_equal(out[60:70, 60:70], layer[60:70, 60:70])  # the deep print is untouched
+        self.assertTrue((out[30:40, 15:20, 1] == 200).all())  # print beyond the ring kept, not smeared outward
