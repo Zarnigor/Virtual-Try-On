@@ -304,6 +304,8 @@ export interface TshirtConfig {
   engine: 'parts' | 'mls'
   /** keep_shape on MLS only (docs/09 #112): present ("fit") when the fit scale was used. */
   keep_scale?: 'fit'
+  /** keep_shape on MLS only (docs/09 #121): px the whole garment was moved down to get the collar off the neck. */
+  keep_neck_dy?: number
   /** Tube sleeves (docs/09 #113): present ("arm") when the tube was clipped on the arm/torso boundary. */
   tube_clip?: 'arm'
   /** MLS sleeve variant; null for keep_shape. */

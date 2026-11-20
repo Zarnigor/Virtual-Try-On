@@ -277,6 +277,9 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       from the plain fabric, no erosion). #59 / #60 hang / #61 / #62 / #70 / #118 (`TRYON_PANTS_FIT_X`,
       `TRYON_PANTS_HANG`) and round 25 deleted. Block past the figure 30-52 k -> 7.6 k px per pants; new holes 20 px /
       54 (#47 corner pocket 18, leg gap 1). `run_pants26.py`, `pants_diag.py`. 229 tryon_engine tests.
+      **2026-11-20 keep_shape collar (docs/09 #121, docs/06 "keep_shape decision"):** keep_shape T-shirts move down
+      so the collar line sits at neck + 0.25 x (shoulder - neck), shoulders bound to the body's shoulder row
+      (`keep_neck_pairs`, no setting). #44 dy 24-34, neck covered 1377-2868 -> 13-293 px. `run_neck27.py`. 418 backend tests.
 - [ ] 9. Test suite (list in Conventions), demo mode, README commands verified.
       **2026-11-10:** demo mode done (docs/09 #58, README "Demo mode"; 18 results: 1 T-shirt + 1 pants x 6 avatars).
       README rewritten (run, demo, architecture, known limits). 123 backend tests, tsc, 35 vitest pass.

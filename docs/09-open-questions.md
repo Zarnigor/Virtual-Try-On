@@ -727,3 +727,12 @@ _(none blocking P0)_
        it? **owner 2026-11-20: decide later**); long pants no longer cover the shoe top; joggers / balloon cuffs no longer taper (monotonic legs); a
        1-3 px step can remain where a leg's outer edge leaves the block on avatar 5; the 18 px pocket under #47.
        #119 (drape body margin) is still to be written up (HANDOFF).
+121. **2026-11-20: keep_shape T-shirts: the collar off the neck, shoulders bound to the body, in production** (owner
+     task: #44 / #45 collar far above the neck base; owner answers: the neck-base row = where regular T-shirts put
+     it; anchor = the collar line, T = 0.25; then "variant 1, bind the shoulders to the body"). keep_shape only, no
+     setting: `mls.keep_neck_dy` + `keep_neck_pairs` (all MLS targets down by dy, shoulder targets' y = body
+     shoulder row), `tshirt_layer(keep_neck=True)` from render_tryon, `tshirt_config.keep_neck_dy` (API type
+     updated). Lifts for keep_shape: #112's "the collar stays where the shoulder scale puts it" and its "the seam
+     hangs" (shoulder k_y 0) - the shoulder y is bound again. adapt, pants, parts and the frozen fixtures unchanged.
+     #44: dy 24-34 px, neck px covered 1377-2868 -> 13-293, bare-shoulder px 0-15 -> 174-335 (regular crews 20-1411),
+     new holes 0. #45 (re-marked, adapt): dy 0-3. Details: docs/06 "keep_shape decision".

@@ -276,6 +276,30 @@ def _order_flips(pairs, a, b):
 KEEP_SCALES = ("shoulder", "fit")
 KEEP_SCALE_EASE = 1.04  # "fit": the garment's chest / waist / hem rows are at least this much wider than the body's
 KEEP_SCALE_MAX = 1.45  # "fit": at most this many times the shoulder scale (a cropped T-shirt is not blown up)
+KEEP_NECK_T = 0.25  # keep_shape (docs/09 #121): the collar line sits at least at neck.y + this x (shoulder.y - neck.y),
+# where regular (adapt) T-shirts put it (#28 0.11-0.19, #43 0.23-0.34, #40 0.10-0.28, #45 0.16-0.33 on 6 avatars)
+
+
+def keep_neck_dy(pairs, blm):
+    """keep_shape (docs/09 #121): whole px the aligned garment moves down so its collar line (the neck_l / neck_r
+    targets) reaches neck.y + KEEP_NECK_T x (shoulder.y - neck.y); only down (0 when it is already lower)."""
+    collar = (pairs["neck_l"][1][1] + pairs["neck_r"][1][1]) / 2
+    ny = _f(blm["neck"]["y"])
+    target = ny + KEEP_NECK_T * (_f(blm["shoulder"]["y"]) - ny)
+    return max(int(round(target - collar)), 0)
+
+
+def keep_neck_pairs(pairs, blm, dy):
+    """keep_shape (docs/09 #121), in place: every target moves down by dy, then the shoulder targets' y is bound to
+    the body's shoulder row (x as aligned), so the lowered garment's shoulder line is pulled back up onto the body's
+    shoulders by the MLS warp instead of leaving them bare."""
+    for k, (q, p, w) in list(pairs.items()):
+        pairs[k] = (q, (p[0], p[1] + dy), w)
+    a_sy = _f(blm["shoulder"]["y"])
+    for k in ("shoulder_l", "shoulder_r"):
+        if k in pairs:
+            q, p, w = pairs[k]
+            pairs[k] = (q, (p[0], a_sy), w)
 
 
 def keep_shape_scale(glm, blm, hem_y):
@@ -1973,9 +1997,13 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
                  shoulder_fractions=SHOULDER_LINE_FRACTIONS, shoulder_ease=SHOULDER_LINE_EASE,
                  shoulder_edge_alpha=128, sleeve_mode="mls", side_floor_mode="landmarks", hem_mode="off",
                  tube_arm="r11", hem_c_pair=False, armpit_mode="off", cuff_mode="chord", tube_fringe="keep",
-                 keep_scale="shoulder", tube_clip="armhole"):
+                 keep_scale="shoulder", tube_clip="armhole", keep_neck=False):
     """(BGRA layer HxW, info {engine, pairs, rejected, s, neck_opening?, sleeve_hems, runtime, map?}).
     keep_scale (keep_shape only, docs/09 #112): "shoulder" = the scale before #112 | "fit" = keep_shape_scale.
+    keep_neck (keep_shape only, docs/09 #121; render_tryon always passes True, the default here is the old output
+    the regression fixtures pin): every target moves down by keep_neck_dy (the collar line on the row regular
+    T-shirts use) and the shoulder targets are bound to the body's shoulder row (keep_neck_pairs), before the warp;
+    the back-collar opening moves with them; info["keep_neck_dy"]. A no-op for adapt.
     Raises MlsUnavailable (missing landmarks, failed core pairs, bad geometry): the caller uses the parts engine.
     sleeve_variant: benchmark only (module docstring); debug_map: info["map"] = (mx, my) for the fold metric."""
     if sleeve_variant not in SLEEVE_VARIANTS:  # a programming error, never a silent fallback to parts
@@ -2034,6 +2062,9 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
     sline = shoulder_line(pairs, glm, body_lm, mask, img[:, :, 3], shoulder_fractions, shoulder_ease,
                           shoulder_edge_alpha) if shoulder_variant == "line" else None
     raised = collar_floor(pairs, body_lm, mask) if collar_floor_on else None
+    neck_dy = keep_neck_dy(pairs, body_lm) if keep_neck and not fitted else None
+    if neck_dy:  # docs/09 #121
+        keep_neck_pairs(pairs, body_lm, neck_dy)
     mx, my = _inverse_maps(pairs, s, H, W)
     sfm_report = ap_report = ap_base = None
     if side_floor:  # second stage: pairs where the first solve left the garment edge, x floored; solve again
@@ -2154,6 +2185,7 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
         g_sy, a_sy = _f(glm["shoulder"]["y"]), _f(body_lm["shoulder"]["y"])
         if keep_scale == "fit" and not fitted:
             a_sy += keep_shape_drop(glm, body_lm, s)
+        a_sy += neck_dy or 0  # docs/09 #121: the opening moves down with the garment
         info["neck_opening"] = {"cx": a_cx + (geo["cx"] - g_cx) * s, "hw": geo["hw"] * s,
                                 "y0": a_sy + (geo["y0"] - g_sy) * s, "depth": geo["depth"] * s}
         layer = prod.clear_back_collar(layer, info["neck_opening"], body_lm)
@@ -2265,5 +2297,7 @@ def tshirt_layer(garment_img, glm, body_lm, mask, fit_mode="adapt", H=1200, W=60
                 lost &= ~z
         layer[lost] = ref[lost]
         sfm_report["patched_px"] = int(lost.sum())
+    if neck_dy is not None:
+        info["keep_neck_dy"] = neck_dy
     info["runtime"] = time.perf_counter() - t0
     return layer, info

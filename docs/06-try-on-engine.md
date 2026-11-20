@@ -464,7 +464,21 @@ With the old marking (shoulder inside the chest width) preset A leaves a bare-sh
 Evidence: `tools/warp-benchmark/out/sheet_shoulder_slope.png` (column A), round 5 table above: bare shoulders 0-3 px,
 fold 0-0.07 %, print distortion 0.021-0.029 (#44). Known cost: the garment's own sloped top sits above the body's
 shoulder line (excess 1000-3700 px, a natural dropped-shoulder look). Hem: benchmark assumption, still open (docs/09).
-
+- **Collar off the neck (2026-11-20, docs/09 #121, in production for keep_shape, no setting):** the shoulder-line
+  alignment put #44's collar line 12-22 px ABOVE the body's mid-neck row (t = -0.26 .. -0.57 on the neck ->
+  shoulder span), while regular adapt T-shirts put it at t 0.10-0.34 (#28, #43, #40, #45). `collar_bottom` is not
+  the problem (#44 0.62-0.82, crews 0.49-0.78). Now `keep_neck_pairs` (render_tryon always, `tshirt_layer(keep_neck=)`
+  default off for the frozen fixtures): every MLS target moves down by `keep_neck_dy` = round(neck.y + 0.25 x
+  (shoulder.y - neck.y) - collar line), only down; then the shoulder targets' y is bound to the body's shoulder row
+  (x as aligned) so the shoulders are not left bare; the back-collar opening moves with it. `tshirt_config.keep_neck_dy`.
+  A pure shift (tried first) left 585-2135 bare-shoulder px on #44 (avatar's skin and tank strap above the sloped
+  garment shoulders).
+  Numbers (`tools/warp-benchmark/run_neck27.py`, #44 / #45 x 6 avatars as keep_shape): #44 dy 24-34 px, collar line
+  on the target (<= 0.5 px), garment px over the neck 1377-2868 -> 13-293, bare-shoulder px 0-15 -> 174-335 (crew
+  adapt T-shirts on the same avatars: #43 185-1411, #28 20-457: the trapezius a regular T-shirt leaves open), new
+  holes 0. #45 (landmarks re-marked by the owner, adapt in the DB): dy 0-3, unchanged. Sheets
+  `out/neck27/sheet_<id>.png`, crops `out/neck27/crop_<id>_<avatar>.png`. Still visible: a small grey tank-strap
+  wedge beside the collar on avatar 3.
 ### MLS benchmark, round 6: fitted T-shirts, sleeves/hem/coverage and fit strength k (2026-11-11, NOT production)
 `tools/warp-benchmark/mls_fitted.py` (retarget hook on `mls_landmarks.warp`), runner `run_fitted.py`
 (`out/results6.json`). #28, #43, #40 re-exported from the DB (re-marked). 6 avatars. #28 chest above armpit: chest not

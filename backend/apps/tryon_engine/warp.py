@@ -2230,7 +2230,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
                  finish: str = "r60", finish_pants: bool = False, pants_tuck: bool = False,
                  mls_keep_scale: str = "shoulder", mls_tube_clip: str = "armhole", pants_engine: str = "rows",
-                 drape_body_margin: float | None = None):
+                 drape_body_margin: float | None = None, mls_keep_neck: bool = True):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -2297,6 +2297,9 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     debug["pants_drape"] = largest row stretch, debug["pants_tuck_px"] = pants px dropped.
     drape_body_margin (setting TRYON_DRAPE_BODY_MARGIN, docs/09 #119; the default here is the off value None): the
     drape stops at max(the MLS edge, the smoothed figure edge + this many px).
+    mls_keep_neck (docs/09 #121, no setting: the default True is production): keep_shape MLS T-shirts move down so the
+    collar line sits on the regular T-shirts' row, shoulders bound to the body (mls.keep_neck_pairs);
+    `tshirt_config.keep_neck_dy`. False = before #121 (only the frozen regression fixtures use it).
 
     Returns (BGR uint8 HxWx3 on white, warnings: [str], debug: dict).
     """
@@ -2334,6 +2337,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
         if fit == "keep_shape" and mls_keep_scale != "shoulder":  # docs/09 #112
             adapt_kw = {"keep_scale": mls_keep_scale}
             cfg["keep_scale"] = mls_keep_scale
+        if fit == "keep_shape" and mls_keep_neck:  # docs/09 #121: the collar on the regular T-shirts' row
+            adapt_kw = {**adapt_kw, "keep_neck": True}
         if fit != "keep_shape":  # docs/09 #105; keep_shape is called exactly as before
             cfg.update(sleeve=mls_sleeve, tube=bool(mls_tube), side_floor=mls_side_floor, hem=mls_hem,
                        armpit=mls_armpit if mls_tube and mls_side_floor == "mask" else "off",
@@ -2356,6 +2361,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                     *by_type["tshirt"], body_lm, mask, fit, H, W,
                     (hem_hip_fraction, hem_crotch_margin), sleeve_variant=mls_sleeve, **_mls_adapt_kwargs(cfg),
                     **hole_kw)
+            if "keep_neck_dy" in mls_info:
+                cfg["keep_neck_dy"] = mls_info["keep_neck_dy"]
             info["tshirt_config"] = cfg
             info["neck_hole"] = bool(hole_kw)
             info.update(engine="mls", mls=mls_info, sleeve_hems=mls_info["sleeve_hems"])

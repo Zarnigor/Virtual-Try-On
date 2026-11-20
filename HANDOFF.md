@@ -1,7 +1,7 @@
 # Handoff (2026-11-20)
 
 Yangi sessiyani shu fayldan boshlang. Bitta handoff fayl: eski `NEXT_STEPS.md` va `docs/11-session-handoff.md`
-oʻchirilgan (tarixi git da, raundlar tarixi `docs/06`, qarorlar `docs/09`, oxirgisi #120).
+oʻchirilgan (tarixi git da, raundlar tarixi `docs/06`, qarorlar `docs/09`, oxirgisi #121).
 Ish qoidalari: `CLAUDE.md` "How to work with me" (avval reja, egasining roziligini kutish, bitta qadam, raqamlar,
 yangi teshik 0, toza rasmlar).
 
@@ -9,7 +9,7 @@ yangi teshik 0, toza rasmlar).
 
 - Branch `tshirt-mls-default`, round 26 commit qilingan (shu fayl bilan birga). Git remote yoʻq.
 - `prompts/04-garment-cleaning.txt` (1-qatorda ortiqcha "is") va `smt.txt` atayin commit qilinmagan.
-- 415 backend test oʻtgan (2026-11-20). Engine oʻzgarganidan keyin `docker compose restart worker`.
+- 418 backend test oʻtgan (2026-11-20). Engine oʻzgarganidan keyin `docker compose restart worker`.
 
 ## 2. Oxirgi ishlar
 
@@ -21,6 +21,12 @@ yangi teshik 0, toza rasmlar).
   #61 / #62 / #70 / #118 (`TRYON_PANTS_FIT_X`, `TRYON_PANTS_HANG`) va round 25 oʻchirilgan; yangi sozlama yoʻq.
   Blok tanadan chiqishi 30–52k -> 7.6k px (bir shim, 6 avatar). Runner `tools/warp-benchmark/run_pants26.py`,
   diagnoz `tools/tryon_check/pants_diag.py`, sheet lar `tools/warp-benchmark/out/pants26/`.
+
+- **#121 keep_shape kollar** (docs/06 "keep_shape decision"): oversize keep_shape futbolka pastga suriladi, kollar
+  chizigʻi neck + 0.25 × (shoulder − neck) qatorida (oddiy futbolkalar qatori); yelka nishonlari tananing yelka
+  qatoriga bogʻlangan (`keep_neck_pairs`, sozlama yoʻq). #44: dy 24–34 px, boʻyindagi garment 1377–2868 -> 13–293
+  px, yalangʻoch yelka 174–335 px (oddiy crew lar 20–1411). Runner `tools/warp-benchmark/run_neck27.py`, natija
+  `tools/warp-benchmark/out/neck27/`. av3 da kollar yonida kichik kulrang mayka uchburchagi qoladi.
 
 ## 3. Keyingi qadam (egasi tanlaydi)
 
@@ -48,7 +54,7 @@ yangi teshik 0, toza rasmlar).
 ```
 export PATH=$PATH:~/.orbstack/bin
 docker compose up -d                                   # db, redis, backend :8000, worker, frontend :5173
-docker compose exec -T backend python manage.py test apps --noinput      # 415 test, ~10 min
+docker compose exec -T backend python manage.py test apps --noinput      # 418 test, ~10 min
 docker compose exec -T frontend npx tsc --noEmit
 docker compose exec -T frontend npm test -- --run
 docker compose exec -T backend python manage.py shell < tools/tryon_check/own_body_path.py   # ALL OK

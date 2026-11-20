@@ -41,8 +41,9 @@ def _fixture():
 def _render(base, blm, g, glm, mode="adapt", engine="mls", **over):
     # the fixture was exported with the r7 sleeves (before docs/09 #104 made C the default): pin them here, these
     # tests check the neck-hole wiring, not the sleeve variant
-    # (and the docs/09 #105 adapt options, the #107 finish and the #112 keep_shape scale off: the fixture predates them)
-    flags = {**render_flags("avatar"), "mls_keep_scale": "shoulder", "mls_tube_clip": "armhole", "pants_engine": "rows", "finish": "r60", "shading": False, "contact_shadows": False,
+    # (and the docs/09 #105 adapt options, the #107 finish, the #112 keep_shape scale and the #121 collar shift off:
+    # the fixture predates them)
+    flags = {**render_flags("avatar"), "mls_keep_neck": False, "mls_keep_scale": "shoulder", "mls_tube_clip": "armhole", "pants_engine": "rows", "finish": "r60", "shading": False, "contact_shadows": False,
              "edge_feather": False, "warp_engine": engine, "mls_sleeve": "r7", "mls_tube": False,
              "mls_side_floor": "off", "mls_armpit": "off", "mls_hem": "mls", "mls_cuff": "chord", "mls_fringe": "keep", **over}
     return render_tryon(base, blm, [("tshirt", g, engine_landmarks("tshirt", glm))], 1200, 600,

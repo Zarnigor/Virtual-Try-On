@@ -184,8 +184,10 @@ class TaskTests(MediaTestCase):
             if mode == "adapt":  # the settings defaults (docs/09 #105, #106)
                 want.update(sleeve="C", tube=True, side_floor="mask", armpit="r14", hem="garment", cuff="hem",
                             fringe="drop", tube_clip="arm")  # tube_clip: docs/09 #113
-            else:  # docs/09 #112
+            else:  # docs/09 #112, #121
                 want["keep_scale"] = "fit"
+                self.assertGreaterEqual(cfg[gid]["keep_neck_dy"], 0)
+                want["keep_neck_dy"] = cfg[gid]["keep_neck_dy"]
             self.assertEqual(cfg[gid], want)
             self.assertEqual(self._result_shape(outfit), (1200, 600))
 
@@ -1523,7 +1525,9 @@ class ProductionTshirtConfigTests(SimpleTestCase):
                     self.assertEqual(int((a != b).any(2).sum()), 0)
                     self.assertEqual(db["tshirt_config"], {"fit_mode": "keep_shape", "engine": "mls", "sleeve": None,
                                                            "tube": False, "side_floor": "off", "armpit": "off",
-                                                           "hem": "mls", "cuff": "chord", "fringe": "keep"})
+                                                           "hem": "mls", "cuff": "chord", "fringe": "keep",
+                                                           "keep_neck_dy": db["tshirt_config"]["keep_neck_dy"]})
+                    self.assertGreaterEqual(db["tshirt_config"]["keep_neck_dy"], 0)  # docs/09 #121
                     self.assertEqual(da["tshirt_config"], db["tshirt_config"])
 
     def test_all_flags_off_is_the_previous_production_call(self):
@@ -1606,3 +1610,63 @@ class ProductionTshirtConfigTests(SimpleTestCase):
         with override_settings(TRYON_MLS_TUBE=False, TRYON_MLS_HEM="mls"):
             flags = render_flags("body")
             self.assertEqual((flags["mls_tube"], flags["mls_hem"]), (False, "mls"))
+
+
+class KeepNeckTests(SimpleTestCase):
+    """docs/09 #121: keep_shape T-shirts move down so the collar line reaches the row regular T-shirts use."""
+
+    def setUp(self):
+        self.base, self.lm = body()
+        self.mask = warp.figure_mask(self.base)
+        self.g, self.glm = shirt()
+
+    def layers(self, **kw):
+        old, oi = mls.tshirt_layer(self.g, self.glm, self.lm, self.mask, "keep_shape", **kw)
+        new, ni = mls.tshirt_layer(self.g, self.glm, self.lm, self.mask, "keep_shape", keep_neck=True, **kw)
+        return old, oi, new, ni
+
+    def target(self):
+        ny = self.lm["neck"]["y"]
+        return ny + mls.KEEP_NECK_T * (self.lm["shoulder"]["y"] - ny)
+
+    def test_collar_line_lands_on_the_target_and_dy_is_never_negative(self):
+        for raise_px in (0, 30):  # as aligned, and a garment whose collar sits 30 px higher on itself
+            glm = {**self.glm, "collar": {**self.glm["collar"], "y": self.glm["collar"]["y"] - raise_px}}
+            new, ni = mls.tshirt_layer(self.g, glm, self.lm, self.mask, "keep_shape", keep_neck=True)
+            dy = ni["keep_neck_dy"]
+            self.assertGreaterEqual(dy, 0)
+            collar = (ni["pairs"]["neck_l"][1][1] + ni["pairs"]["neck_r"][1][1]) / 2
+            if dy > 0:
+                self.assertLessEqual(abs(collar - self.target()), 3)
+            else:
+                self.assertGreaterEqual(collar, self.target() - 0.5)  # already at or below: never moved up
+
+    def test_shoulders_are_bound_to_the_body_and_everything_else_moves_down(self):
+        glm = {**self.glm, "collar": {**self.glm["collar"], "y": self.glm["collar"]["y"] - 30}}  # collar rides high
+        _, oi = mls.tshirt_layer(self.g, glm, self.lm, self.mask, "keep_shape")
+        new, ni = mls.tshirt_layer(self.g, glm, self.lm, self.mask, "keep_shape", keep_neck=True)
+        dy = ni["keep_neck_dy"]
+        self.assertGreater(dy, 0)
+        for k in ("shoulder_l", "shoulder_r"):
+            self.assertAlmostEqual(ni["pairs"][k][1][1], self.lm["shoulder"]["y"])
+            self.assertAlmostEqual(ni["pairs"][k][1][0], oi["pairs"][k][1][0])
+        for k in ("neck_l", "neck_r", "neck_c", "chest_l", "waist_r", "hem_l"):
+            self.assertAlmostEqual(ni["pairs"][k][1][1], oi["pairs"][k][1][1] + dy)
+        if "neck_opening" in oi:
+            self.assertAlmostEqual(ni["neck_opening"]["y0"], oi["neck_opening"]["y0"] + dy)
+        # the shoulders stay covered: the garment's top near the shoulder points is on the body's shoulder row, up to
+        # the outer-contour halo erosion (HALO_ERODE) and the 1-2 px slope of the line from the collar
+        a = new[:, :, 3] >= 128
+        for x in (int(self.lm["shoulder"]["left_x"]) + 8, int(self.lm["shoulder"]["right_x"]) - 8):
+            self.assertLessEqual(int(np.argmax(a[:, x])), self.lm["shoulder"]["y"] + warp.HALO_ERODE + 2)
+
+    def test_adapt_is_untouched_and_render_tryon_uses_it_for_keep_shape_only(self):
+        a0, _ = mls.tshirt_layer(self.g, self.glm, self.lm, self.mask, "adapt")
+        a1, ai = mls.tshirt_layer(self.g, self.glm, self.lm, self.mask, "adapt", keep_neck=True)
+        np.testing.assert_array_equal(a0, a1)
+        self.assertNotIn("keep_neck_dy", ai)
+        _, _, d = warp.render_tryon(self.base, self.lm, [("tshirt", self.g, self.glm)], warp_engine="mls",
+                                    fit_modes={"tshirt": "keep_shape"})
+        self.assertIn("keep_neck_dy", d["tshirt_config"])
+        _, _, d = warp.render_tryon(self.base, self.lm, [("tshirt", self.g, self.glm)], warp_engine="mls")
+        self.assertNotIn("keep_neck_dy", d["tshirt_config"])
