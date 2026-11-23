@@ -215,17 +215,6 @@ export interface StaffLandmarksRequest {
   measurements?: Measurements
 }
 
-/** GET avatars/nearest/ query. Model path: all measurements required (rule 20). */
-export interface NearestAvatarQuery {
-  sex: Sex
-  /** Not used by the matching yet. */
-  height?: number
-  shoulder: number
-  chest: number
-  waist: number
-  hip: number
-}
-
 // ---------- garments ----------
 
 export type GarmentType = 'tshirt' | 'pants'
