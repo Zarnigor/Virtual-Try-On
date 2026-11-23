@@ -30,7 +30,9 @@ but the frontend must fully work too (React is required). The owner works and re
   body + 3 %, legs open to their own width, monotonic edges, `pants_edge`; #118 `fit_x` and round 25 removed).
   **The hem rule is NOT decided.**
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
-- **Model (avatar) path: numeric measurements are required.** Own-body path: measurements optional.
+- **Model (avatar) path: gender only (docs/09 #124, 2026-11-23, owner).** The user picks Erkak/Ayol; the frontend selects that sex's
+  `average` avatar (any avatar of that sex if none, else an inline error). No measurements are sent; `avatars/nearest/` stays in the
+  backend, unused (may return later). Own-body path: measurements optional.
 - Garment AI cleaning (hanger/background removal, prompt 04) is in P0 but **off for now** (`AI_CLEANING_ENABLED=0`, no prepaid
   image credits, docs/09 #55): garments are cleaned by rembg only.
 - Realistic render is saved with the outfit. Originals are deleted after processing.
@@ -164,7 +166,7 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       clearly). `AI_DEV_BYPASS` defaults to 0 in `.env.example` and docker-compose: set `AI_DEV_BYPASS=1` in `.env` for
       local testing without a key (body uploads fail closed with `AI_UNAVAILABLE` otherwise, prompt 02 is not wired).
       100 backend tests, tsc, 35 vitest pass. Still to do: prompt 04 (needs credits), quality check, Save/Cancel, delete original.
-- [ ] 7. Avatar path: all measurements required in `avatars/nearest/`, adjust landmarks to measurements, screens 3 + 6.
+- [ ] 7. Avatar path: gender only in the frontend (docs/09 #124); `avatars/nearest/` kept in the backend, unused. Adjust landmarks to measurements: dropped for now. Screens 3 + 6.
       **2026-11-16 (docs/09 #110):** `avatars/nearest/` requires sex + 4 measurements; the try-on page has the form.
       Not done: landmarks adjusted to measurements, screens 3 + 6 as designed.
 - [ ] 8. Try-on: hands/forearms above the garment, `quality_warnings[]`, explicit `POST outfits/` save, screens 10-12 per design.

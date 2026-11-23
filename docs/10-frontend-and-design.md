@@ -60,7 +60,7 @@ with a `deleted` flag.
   then delete it. (Assumption, see docs/09.)
 - Screen 5/9: the editor snaps ticks to the silhouette edge, supports dragging, arrow-key nudges (1 px, Shift 10 px), zoom.
   Landmark names are fixed (docs/03). Run the sanity checks on the client AND the server.
-- Screen 6: all five measurements are required. Units are cm. (Circumference vs front width: open question 13.)
+- Screen 6: gender only (docs/09 #124); the measurement inputs are removed from the frontend for now. Choosing Erkak/Ayol selects that sex's average avatar.
 - Screen 10: toggling Oddiy/Realistik switches which backend image is shown. The AI button creates a job.
 - Screen 10: lists only garments matching the body/avatar sex; "Barcha kiyimlarni koʻrsatish" shows the rest marked
   "Boshqa jins uchun" with the try-on button disabled and explained (docs/09 #97). An own body without `sex` (created

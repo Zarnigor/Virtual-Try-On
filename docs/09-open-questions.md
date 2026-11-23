@@ -749,3 +749,11 @@ _(none blocking P0)_
      `u2net`; one cached session per process), `GARMENT_MASK_DEBUG_DIR` (DEBUG only: raw + final mask PNGs, off by default).
      T-shirt cutout unchanged. 422 backend tests (new: `apps/jobs/tests_leg_gap.py`). Open: `birefnet-general` not measured
      (about 1 GB download); garments cut out before this change keep their black wedge until re-uploaded.
+124. **2026-11-23: model (avatar) picker is gender-only in the frontend** (owner; may bring measurements back much later).
+     The 4 measurement inputs, their validation and the "Mos modelni topish" button are removed from `pages/TryOn.tsx`;
+     choosing Erkak/Ayol selects that sex's `average` avatar from the loaded `GET /api/avatars/` (any avatar of that sex if
+     none, else the inline error "Bu jins uchun model topilmadi."). Nothing is selected until the click. Removed on the
+     frontend only: `nearestAvatar`, `NearestAvatarQuery`. Backend `avatars/nearest/`, `Avatar.measurements` and the
+     serializers are unchanged (supersedes the "required" part of rule 20 / #110). Added a minimal `frontend/.eslintrc.cjs`
+     (`npm run lint` now runs and passes; `no-explicit-any` off in `*.test.ts`). Checks: tsc clean, 78 vitest, lint clean,
+     `POST /api/tryon/` with avatar 2 (male) and 5 (female) -> job done, result image saved.

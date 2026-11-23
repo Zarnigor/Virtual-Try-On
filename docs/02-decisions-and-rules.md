@@ -38,7 +38,7 @@ These come from the product owner. Do not change them without asking. Log: `09-o
 
 ## Measurements and fit
 19. Own body: marked landmarks on the photo are the required input; numeric measurements and height are optional.
-20. **Model path (avatar): numeric measurements are required.**
+20. **Model path (avatar): gender only (changed 2026-11-23, docs/09 #124; before: numeric measurements required).** The backend `avatars/nearest/` and the measurement fields stay, unused by the frontend.
 21. **Garment real size is NOT entered.** Fit is set per garment (`fit_mode`, docs/09 #93, decided 2026-11-11):
     `adapt` (default) = the garment is fully deformed to the body's landmarks; `keep_shape` = the garment keeps its own
     proportions (oversized, wide-leg) and only its anchors fit the body. There is no tight/fits/loose label.
