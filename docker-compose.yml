@@ -65,7 +65,11 @@ services:
       - TRYON_MLS_TUBE_CLIP=${TRYON_MLS_TUBE_CLIP:-arm}  # tube sleeve clip (docs/09 #113): arm | armhole
       - TRYON_PANTS_ENGINE=${TRYON_PANTS_ENGINE:-rows}  # pants engine (docs/09 #114, #116): rows | fit
       - TRYON_DRAPE_BODY_MARGIN=${TRYON_DRAPE_BODY_MARGIN:-6}  # T-shirt drape over pants stops at figure edge + px (docs/09 #119): 6 | off
+      - TRYON_PANTS_LEG=${TRYON_PANTS_LEG:-smooth}  # rows pants legs (docs/09 #122): smooth | r26
+      - TRYON_PANTS_DEBUG_DIR=${TRYON_PANTS_DEBUG_DIR:-}  # DEBUG only: pants debug images folder (docs/09 #122)
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
+      - REMBG_MODEL=${REMBG_MODEL:-isnet-general-use}  # garment background removal model
+      - GARMENT_MASK_DEBUG_DIR=${GARMENT_MASK_DEBUG_DIR:-}  # DEBUG only: raw + final garment masks folder
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:
@@ -118,7 +122,11 @@ services:
       - TRYON_MLS_TUBE_CLIP=${TRYON_MLS_TUBE_CLIP:-arm}  # tube sleeve clip (docs/09 #113): arm | armhole
       - TRYON_PANTS_ENGINE=${TRYON_PANTS_ENGINE:-rows}  # pants engine (docs/09 #114, #116): rows | fit
       - TRYON_DRAPE_BODY_MARGIN=${TRYON_DRAPE_BODY_MARGIN:-6}  # T-shirt drape over pants stops at figure edge + px (docs/09 #119): 6 | off
+      - TRYON_PANTS_LEG=${TRYON_PANTS_LEG:-smooth}  # rows pants legs (docs/09 #122): smooth | r26
+      - TRYON_PANTS_DEBUG_DIR=${TRYON_PANTS_DEBUG_DIR:-}  # DEBUG only: pants debug images folder (docs/09 #122)
       - GARMENT_FLATTEN_LIGHTING=${GARMENT_FLATTEN_LIGHTING:-1}  # flatten lighting of near-solid garments
+      - REMBG_MODEL=${REMBG_MODEL:-isnet-general-use}  # garment background removal model
+      - GARMENT_MASK_DEBUG_DIR=${GARMENT_MASK_DEBUG_DIR:-}  # DEBUG only: raw + final garment masks folder
       - AI_DAILY_LIMIT=${AI_DAILY_LIMIT:-5}
       - AI_GARMENT_DAILY_LIMIT=${AI_GARMENT_DAILY_LIMIT:-5}
     depends_on:

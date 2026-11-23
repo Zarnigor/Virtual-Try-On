@@ -236,6 +236,101 @@ def _ai_clean_not_built():
     )
 
 
+_REMBG_SESSIONS: dict = {}
+
+
+def _rembg_session():
+    """One rembg session per process for settings.REMBG_MODEL (loading a model takes seconds)."""
+    from rembg import new_session
+    name = settings.REMBG_MODEL
+    if name not in _REMBG_SESSIONS:
+        _REMBG_SESSIONS[name] = new_session(name)
+    return _REMBG_SESSIONS[name]
+
+
+def _dump_masks(garment, raw_mask, final_mask):
+    """Debug only (GARMENT_MASK_DEBUG_DIR, DEBUG): the raw model mask and the final mask as PNGs."""
+    folder = settings.GARMENT_MASK_DEBUG_DIR
+    if not folder:
+        return
+    import os
+    os.makedirs(folder, exist_ok=True)
+    raw_mask.save(os.path.join(folder, f"garment_{garment.pk}_1_raw_mask.png"))
+    final_mask.save(os.path.join(folder, f"garment_{garment.pk}_2_final_mask.png"))
+
+
+LEG_GAP_MIN_CONTRAST = 90.0  # RGB distance fabric <-> photo background below which the clean-up does nothing
+LEG_GAP_BAND = 0.15  # the clean-up band reaches this share of a leg's width beyond the gap
+LEG_GAP_FEATHER_PX = 3  # px (kernel <= 5): the soft edge kept next to the cleared gap
+
+
+def clear_background_between_legs(rgb, mask):
+    """Pants: alpha 0 for the photo background the model kept as fabric between the legs.
+
+    rgb: HxWx3 uint8 original photo; mask: HxW uint8 model alpha. Returns the new alpha (same shape). Nothing is
+    filled: the alpha only goes down. Applies only when the fabric is clearly unlike the background (white pants on
+    black), only inside the columns of the gap (measured on the lowest rows, where the legs are apart) and only for
+    pixels that are nearer the background colour than the fabric and connected to the outside background.
+    A pixel's alpha is capped by the share of fabric colour in it (a soft edge, no black fringe)."""
+    import cv2
+    import numpy as np
+
+    solid = mask >= 128
+    outside = ~solid
+    # background colour: the median of the outside pixels on the image border
+    border = np.zeros(mask.shape, bool)
+    border[[0, -1], :] = True
+    border[:, [0, -1]] = True
+    ob = outside & border
+    if ob.sum() < 20 or solid.sum() < 500:
+        return mask
+    bg = np.median(rgb[ob].astype(np.float32), axis=0)
+    inner = cv2.erode(solid.astype(np.uint8), np.ones((9, 9), np.uint8)) > 0
+    if inner.sum() < 200:
+        return mask
+    fabric = np.median(rgb[inner].astype(np.float32), axis=0)
+    axis = fabric - bg
+    span = float(np.linalg.norm(axis))
+    if span < LEG_GAP_MIN_CONTRAST:
+        return mask
+    # t = share of fabric colour in a pixel (0 = background, 1 = fabric): projection on the bg -> fabric axis
+    t = ((rgb.astype(np.float32) - bg) @ axis) / (span * span)
+    # the gap columns: the legs are apart on the lowest rows. Found by colour, because the model may keep the gap
+    # as foreground all the way to the hem
+    legs = solid & (t >= 0.5)
+    ys = np.where(legs.any(axis=1))[0]
+    top, bot = int(ys[0]), int(ys[-1])
+    gap = None
+    for y in range(bot - max(int(0.03 * (bot - top)), 2), top + int(0.5 * (bot - top)), -1):
+        d = np.diff(np.concatenate([[0], legs[y].astype(np.int8), [0]]))
+        starts, ends = np.where(d == 1)[0], np.where(d == -1)[0]
+        if len(starts) >= 2:
+            k = int(np.argmax(starts[1:] - ends[:-1]))  # the widest hole between runs
+            gap = (int(ends[k]), int(starts[k + 1]), int(ends[k] - starts[k]), int(ends[k + 1] - starts[k + 1]))
+            break
+    if gap is None:
+        return mask
+    left_end, right_start, wl, wr = gap
+    x0 = max(left_end - int(LEG_GAP_BAND * wl), 0)
+    x1 = min(right_start + int(LEG_GAP_BAND * wr), mask.shape[1])
+    band = np.zeros(mask.shape, bool)
+    band[top:, x0:x1] = True  # to the image edge: the gap is open to the background below the hem
+    cand = (t < 0.5) & band & (mask > 0)
+    # keep only the candidates connected to the outside background
+    n, lab = cv2.connectedComponents((cand | (outside & band)).astype(np.uint8), connectivity=4)
+    touching = np.unique(lab[outside & band & (mask < 128)])
+    reach = np.isin(lab, touching[touching > 0]) & cand
+    if not reach.any():
+        return mask
+    k = 2 * LEG_GAP_FEATHER_PX + 1
+    zone = cv2.dilate(reach.astype(np.uint8), np.ones((k, k), np.uint8)) > 0
+    cap = np.clip((t - 0.3) / 0.4, 0.0, 1.0) * 255.0
+    out = mask.astype(np.float32)
+    out[zone] = np.minimum(out[zone], cap[zone])
+    out[reach] = 0
+    return np.rint(out).astype(np.uint8)
+
+
 def _rembg_clean(garment):
     """Remove the background with rembg, crop to the alpha bounding box, save as the garment image.
 
@@ -246,6 +341,7 @@ def _rembg_clean(garment):
     lossless PNG. Raises on any failure (never keeps the uncleaned photo silently).
     """
     from pathlib import Path
+    import numpy as np
     from PIL import Image, ImageChops, ImageOps
     from django.core.files.base import ContentFile
     from rembg import remove
@@ -255,17 +351,20 @@ def _rembg_clean(garment):
         src = ImageOps.exif_transpose(Image.open(f))
         src.load()
     rgb = src.convert("RGB")
-    mask = remove(rgb, only_mask=True).convert("L")
+    mask = remove(rgb, session=_rembg_session(), only_mask=True).convert("L")
+    raw_mask = mask
+    if garment.type == "pants":  # the model keeps the photo background between the legs as fabric (docs/09 #123)
+        mask = Image.fromarray(clear_background_between_legs(np.array(rgb), np.array(mask)), "L")
     if "A" in src.getbands() or "transparency" in src.info:  # a PNG that already has transparency keeps it
         mask = ImageChops.darker(mask, src.convert("RGBA").getchannel("A"))
-    img = rgb.convert("RGBA")
+    img = rgb.convert("RGBA")  # original RGB + the final alpha, never the rembg cutout colours
     img.putalpha(mask)
+    _dump_masks(garment, raw_mask, mask)
     bbox = mask.getbbox()
     if not bbox:
         raise JobRejected("NO_GARMENT", "rembg left nothing")
     img = img.crop(bbox)
     # Opaque inside the silhouette: rembg holes are filled, background-coloured openings stay (docs/09 #63).
-    import numpy as np
     from apps.tryon_engine.warp import background_color, fill_alpha_holes, opening_mask
     arr = np.array(img)
     arr = fill_alpha_holes(arr, opening_mask(arr, background_color(arr)))

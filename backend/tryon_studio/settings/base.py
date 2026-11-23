@@ -208,7 +208,8 @@ TRYON_MLS_CHOICES = {"TRYON_MLS_TUBE": ("1", "0"), "TRYON_MLS_SIDE_FLOOR": ("mas
                      "TRYON_MLS_CUFF": ("hem", "chord"), "TRYON_MLS_FRINGE": ("drop", "keep"),
                      "TRYON_FINISH": ("r17", "off"), "TRYON_FINISH_PANTS": ("1", "0"),
                      "TRYON_PANTS_TUCK": ("1", "0"), "TRYON_MLS_KEEP_SCALE": ("fit", "shoulder"),
-                     "TRYON_MLS_TUBE_CLIP": ("arm", "armhole"), "TRYON_PANTS_ENGINE": ("rows", "fit")}
+                     "TRYON_MLS_TUBE_CLIP": ("arm", "armhole"), "TRYON_PANTS_ENGINE": ("rows", "fit"),
+                     "TRYON_PANTS_LEG": ("smooth", "r26")}
 
 
 def parse_mls_choice(name, value):
@@ -249,6 +250,12 @@ TRYON_MLS_TUBE_CLIP = parse_mls_choice("TRYON_MLS_TUBE_CLIP", os.environ.get("TR
 #   TRYON_PANTS_ENGINE  rows (default, docs/09 #116) = warp.warp_pants | fit = warp.warp_pants_fit (the garment's own
 #                       outline x a smooth width factor, legs hang from the hip; rounds 21-22)
 TRYON_PANTS_ENGINE = parse_mls_choice("TRYON_PANTS_ENGINE", os.environ.get("TRYON_PANTS_ENGINE"))
+# docs/09 #122 (round 28): rows pants legs.
+#   TRYON_PANTS_LEG  smooth (default) = one horizontal factor per leg + one smooth centre line (no knee bend)
+#                    | r26 = the round 26 legs (per-row cap, centre on the body leg per row)
+TRYON_PANTS_LEG = parse_mls_choice("TRYON_PANTS_LEG", os.environ.get("TRYON_PANTS_LEG"))
+# docs/09 #122: a folder for pants debug images (width profile, warped mask, overlay); read only with DEBUG.
+TRYON_PANTS_DEBUG_DIR = os.environ.get("TRYON_PANTS_DEBUG_DIR", "").strip() or None
 # docs/09 #119: with TRYON_PANTS_TUCK the drape may widen a T-shirt row only up to max(its MLS edge, figure edge +
 # this many px), the limit smoothed along y. Every body is on the 600 x 1200 canvas, so the margin is in px.
 #   TRYON_DRAPE_BODY_MARGIN  6 (default) | off = no body limit, the behaviour before #119
@@ -271,6 +278,11 @@ def parse_drape_margin(value):
 TRYON_DRAPE_BODY_MARGIN = parse_drape_margin(os.environ.get("TRYON_DRAPE_BODY_MARGIN"))
 # Flatten the photo lighting of near-solid garments when they are cleaned (apps/garments/lighting.py).
 GARMENT_FLATTEN_LIGHTING = os.environ.get("GARMENT_FLATTEN_LIGHTING", "1") == "1"
+# Garment background removal (rembg, tasks._rembg_clean). REMBG_MODEL: isnet-general-use (default) | birefnet-general |
+# u2net. GARMENT_MASK_DEBUG_DIR: DEBUG only, a folder; the raw model mask and the final mask of every garment are saved there
+# as PNGs (off when empty).
+REMBG_MODEL = os.environ.get("REMBG_MODEL", "isnet-general-use").strip() or "isnet-general-use"
+GARMENT_MASK_DEBUG_DIR = (os.environ.get("GARMENT_MASK_DEBUG_DIR", "").strip() or None) if DEBUG else None
 AI_CACHE_TTL_S = 30 * 24 * 3600  # cached validation verdicts, keyed by image hash (apps/jobs/ai_cache.py)
 PROMPTS_DIR = Path(os.environ.get("PROMPTS_DIR", BASE_DIR.parent / "prompts"))  # docker: ./prompts -> /prompts
 

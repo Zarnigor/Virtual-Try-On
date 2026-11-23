@@ -736,3 +736,16 @@ _(none blocking P0)_
      hangs" (shoulder k_y 0) - the shoulder y is bound again. adapt, pants, parts and the frozen fixtures unchanged.
      #44: dy 24-34 px, neck px covered 1377-2868 -> 13-293, bare-shoulder px 0-15 -> 174-335 (regular crews 20-1411),
      new holes 0. #45 (re-marked, adapt): dy 0-3. Details: docs/06 "keep_shape decision".
+123. **2026-11-23: pants cutout kept the photo background between the legs (black wedge), fixed in the cutout step**
+     (garment 76, white wide-leg pants on a black photo). Root cause: the rembg model mask itself, not our post-processing:
+     `u2net` kept 51 277 and `isnet-general-use` 133 317 opaque black px (wedge below the crotch, open to the outside, so
+     `fill_alpha_holes` / the external-contour fill never touched it). The stored RGB was already the original photo.
+     Fix (`apps/jobs/tasks.py`, pants only): `clear_background_between_legs(rgb, mask)` lowers alpha for px nearer the
+     background colour than the fabric, only in the gap columns, only when connected to the outside background and only when
+     the fabric/background contrast is clear (a black print on the fabric is kept; near-black pants on black: untouched);
+     soft edge of 3 px (kernel 7 x 7 dilate = within 3 px each side), nothing is filled. Result on the real image: opaque
+     black px 133 317 -> 14 (`isnet-general-use`), 51 277 -> 6 251 (`u2net`, the rest is the thin outer edge outline, left
+     to `remove_halo`); white fabric lost 0 px. Settings: `REMBG_MODEL` (default `isnet-general-use`, `birefnet-general` |
+     `u2net`; one cached session per process), `GARMENT_MASK_DEBUG_DIR` (DEBUG only: raw + final mask PNGs, off by default).
+     T-shirt cutout unchanged. 422 backend tests (new: `apps/jobs/tests_leg_gap.py`). Open: `birefnet-general` not measured
+     (about 1 GB download); garments cut out before this change keep their black wedge until re-uploaded.
