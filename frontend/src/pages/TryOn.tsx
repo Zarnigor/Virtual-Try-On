@@ -192,6 +192,39 @@ export default function TryOn() {
                 </p>
                 <Segmented<Sex> title="Jins" value={avSex} options={SEX_LABELS} onChange={chooseAvatarSex} />
                 {avError && <p className="error-text" role="alert" style={{ marginTop: 8 }}>{avError}</p>}
+                {avSex && !avError && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto', marginTop: 12 }}>
+                    {avatars.filter((av) => av.sex === avSex).map((av) => (
+                      <label
+                        key={av.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          padding: '8px 12px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: `1px solid ${selectedAvatar === av.id ? 'var(--accent)' : 'var(--border)'}`,
+                          background: selectedAvatar === av.id ? 'var(--accent-soft)' : 'var(--inset)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name="avatar"
+                          checked={selectedAvatar === av.id}
+                          onChange={() => setSelectedAvatar(av.id)}
+                          style={{ display: 'none' }}
+                        />
+                        {av.image_url && (
+                          <img src={av.image_url} alt="Model" style={{ width: 36, height: 72, objectFit: 'contain', borderRadius: 4 }} />
+                        )}
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>
+                          {av.sex === 'male' ? 'Erkak' : 'Ayol'} — {av.build}
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
