@@ -1105,6 +1105,16 @@ PANTS_RING = 3  # px: the outer ring of the warped pants that takes its colour f
 PANTS_PLAIN_SHARE = 0.15  # colour clusters holding at least this share of the fabric are plain fabric (not print)
 PANTS_PLAIN_DIST = 40.0  # a px is plain fabric when its colour lies this close to a plain cluster centre
 PANTS_PLAIN_SIGMA = 4.0  # px: blur of the plain-fabric colour field the ring is filled from
+PANTS_SRC_SIGMA = 3.0  # rows (leg_mode smooth): blur of a leg's src span along y
+PANTS_BODY_SIGMA = 8.0  # rows (leg_mode smooth): blur of the body leg width along y
+
+
+def _blur_rows(v: np.ndarray, sigma: float) -> np.ndarray:
+    """1-D Gaussian blur of a per-row sequence (ends replicated)."""
+    v = np.asarray(v, np.float64)
+    if len(v) < 3:
+        return v.copy()
+    return cv2.GaussianBlur(v.reshape(-1, 1), (1, 0), sigma, borderType=cv2.BORDER_REPLICATE)[:, 0]
 
 
 def _clamped_run(run, lo: float, hi: float, width: float, k: float):
@@ -1190,8 +1200,13 @@ def _leg_bottom(alpha: np.ndarray, side: str, axis: float, below: float) -> floa
 
 def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int, W: int,
                arms: dict | None = None, info: dict | None = None,
-               mask: np.ndarray | None = None, engine: str = "rows") -> tuple[np.ndarray, list]:
-    """engine "fit" = warp_pants_fit (round 21, docs/09 #114, setting TRYON_PANTS_ENGINE); "rows" (the default) =
+               mask: np.ndarray | None = None, engine: str = "rows",
+               leg_mode: str = "r26") -> tuple[np.ndarray, list]:
+    """leg_mode (round 28, docs/09 #122, setting TRYON_PANTS_LEG; the default here is the off value): "smooth" =
+    each leg gets one horizontal factor (the garment's own outline, at most PANTS_MAX_BODY x the body leg: no
+    bend where a per-row cap switches from the thigh to the knee width), one smooth centre line (a degree-2 curve
+    through the body leg's centres, no knee kink), src spans and body widths blurred along y; "r26" = round 26.
+    engine "fit" = warp_pants_fit (round 21, docs/09 #114, setting TRYON_PANTS_ENGINE); "rows" (the default) =
     the round 26 fit model (docs/06 "Pants fit, round 26", docs/09 #120):
     - length: the garment's waist..crotch lands on the body's waist..crotch; its crotch..own bottom edge on the
       body's crotch..ankle (full length, pants_scale) or, shorter pants, at the uniform scale s;
@@ -1287,18 +1302,47 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
     for side in ("left", "right"):
         L = legs[side]
         open_h = max(PANTS_LEG_OPEN * (a_kn - a_cr), 1.0)
-        rows = []
+        raw = []
         for y in range(y_cr + 1, int(np.floor(L["hem"])) + 1):
             sy = g_cr + (y - a_cr) * L["v"]
             sl, sr = _leg_span(g_alpha, sy, _interp_span(L["src"], sy), side, g_cx)
-            rl, rr = leg_body(side, y)
-            bw = rr - rl
+            raw.append([y, sy, sl, sr, *leg_body(side, y)])
+        raw = np.array(raw, np.float64).reshape(-1, 6)
+        ys_ = raw[:, 0]
+        bw_ = raw[:, 5] - raw[:, 4]
+        ref_ = np.where(ys_ > a_kn, np.maximum(bw_, knee_w[side]), bw_)
+        cen_ = (raw[:, 4] + raw[:, 5]) / 2
+        own_ = (raw[:, 3] - raw[:, 2]) * s
+        if leg_mode == "smooth" and len(raw) >= 5:  # round 28 (docs/09 #122): no knee bend, no row jitter
+            # src spans blurred along y, never past the garment's own run (no transparent src px sampled)
+            raw[:, 2] = np.maximum(_blur_rows(raw[:, 2], PANTS_SRC_SIGMA), raw[:, 2])
+            raw[:, 3] = np.minimum(_blur_rows(raw[:, 3], PANTS_SRC_SIGMA), raw[:, 3])
+            own_ = (raw[:, 3] - raw[:, 2]) * s
+            bw_ = _blur_rows(bw_, PANTS_BODY_SIGMA)
+            # one horizontal factor for the whole leg instead of a per-row cap: the garment's own outline (no
+            # bend where the cap switches from the thigh to the knee width)
+            below = ys_ > a_cr + open_h
+            cap = np.maximum(ref_ * PANTS_MAX_BODY, bw_ * (1 + PANTS_BODY_EASE))
+            ratio = cap / np.maximum(own_, 1e-6)
+            f = float(min(1.0, ratio[below].min())) if below.any() else 1.0
+            if info is not None:
+                j = int(np.argmin(np.where(below, ratio, np.inf))) if below.any() else 0
+                info.setdefault("pants_leg_cap_at", {})[side] = (float((ys_[j] - a_cr) / max(L["hem"] - a_cr, 1)),
+                                                                   float(ys_[j] > a_kn))
+            own_ = own_ * f
+            ref_ = np.full_like(ref_, np.inf)  # the factor is the cap
+            # the leg's centre line: one smooth curve through the body leg's centres (degree 2, no knee kink)
+            cen_ = np.polyval(np.polyfit(ys_, cen_, 2), ys_)
+            if info is not None:
+                info.setdefault("pants_leg_factor", {})[side] = f
+        rows = []
+        for i, (y, sy, sl, sr, rl, rr) in enumerate(raw):
+            bw = bw_[i]
             base = bw * (1 + PANTS_BODY_EASE)
-            ref = max(bw, knee_w[side]) if y > a_kn else bw
-            target = min(max((sr - sl) * s, base), max(ref * PANTS_MAX_BODY, base))
+            target = min(max(own_[i], base), max(ref_[i] * PANTS_MAX_BODY, base))
             k_open = _smooth((y - a_cr) / open_h)
             w = base + k_open * (target - base)
-            c = (rl + rr) / 2
+            c = cen_[i]
             l, r = c - w / 2, c + w / 2
             if side == "left":  # the inner edge stays out of the garment's own gap between the legs
                 lim = max(a_cx - max(g_cx - sr, 0.0) * s, rr)  # never inside the body leg
@@ -1318,8 +1362,13 @@ def warp_pants(body_lm: dict, garment_lm: dict, garment_img: np.ndarray, H: int,
         if not rows:
             continue
         lr = np.array(rows, np.float64)
+        if info is not None:
+            info.setdefault("pants_profile", {})[side] = {"y": lr[:, 0].copy(), "raw_l": lr[:, 1].copy(),
+                                                          "raw_r": lr[:, 2].copy()}
         lr[:, 1] = _leg_edges(lr[:, 1], -1)
         lr[:, 2] = _leg_edges(lr[:, 2], 1)
+        if info is not None:
+            info["pants_profile"][side].update(l=lr[:, 1].copy(), r=lr[:, 2].copy())
         leg_rows[side] = [tuple(r_[:3]) for r_ in lr]
         k = 0 if side == "left" else 1
         for y, l, r, sl, sr, sy in lr:
@@ -2230,7 +2279,7 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
                  mls_armpit: str = "off", mls_hem: str = "mls", mls_cuff: str = "chord", mls_fringe: str = "keep",
                  finish: str = "r60", finish_pants: bool = False, pants_tuck: bool = False,
                  mls_keep_scale: str = "shoulder", mls_tube_clip: str = "armhole", pants_engine: str = "rows",
-                 drape_body_margin: float | None = None, mls_keep_neck: bool = True):
+                 drape_body_margin: float | None = None, mls_keep_neck: bool = True, pants_leg: str = "r26"):
     """base: BGR/BGRA image; garments: [(type, BGRA image, landmarks)]. Layers, bottom to top (LAYER_ORDER):
     avatar -> pants (from their own waist row down) -> the T-shirt: torso + rigid sleeves (each pixel from exactly
     one piece, sleeves clipped below the torso's shoulder slope line), halo removed once on the outer contour of
@@ -2295,6 +2344,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     adapt T-shirt hangs over the pants: its sides are stretched to cover them (drape_over_pants) and what is still
     beside it above the hem is dropped unless it lies on the figure (tuck_pants). keep_shape is not touched.
     debug["pants_drape"] = largest row stretch, debug["pants_tuck_px"] = pants px dropped.
+    pants_leg (setting TRYON_PANTS_LEG, docs/09 #122; the default here is the off value "r26"): "smooth" = rows
+    pants legs without the knee bend (warp_pants leg_mode).
     drape_body_margin (setting TRYON_DRAPE_BODY_MARGIN, docs/09 #119; the default here is the off value None): the
     drape stops at max(the MLS edge, the smoothed figure edge + this many px).
     mls_keep_neck (docs/09 #121, no setting: the default True is production): keep_shape MLS T-shirts move down so the
@@ -2321,7 +2372,8 @@ def render_tryon(base: np.ndarray, body_lm: dict, garments: list, H: int = 1200,
     layers = []
     if "pants" in by_type:
         warped, warns = garment_layer("pants", *by_type["pants"], body_lm, H, W, arms, info, mask,
-                                      halo_removal=halo_removal, **({"engine": "fit"} if pants_engine == "fit" else {}))
+                                      halo_removal=halo_removal,
+                                      **({"engine": "fit"} if pants_engine == "fit" else {"leg_mode": pants_leg}))
         warnings += [f"pants: {w}" for w in warns]
         layers.append(("pants", warped))
     opening = None
