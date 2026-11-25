@@ -11,7 +11,7 @@ export const getConfig = (): Promise<AppConfig> => {
       .then(({ data }) => data)
       .catch(() => {
         cached = null
-        return { demo_mode: false }
+        return { demo_mode: false, fit_check_enabled: false }
       })
   }
   return cached

@@ -26,9 +26,9 @@ def garment_fits_sex(garment_gender: str, sex: str) -> bool:
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def app_config(request):
-    """GET /api/config/: public flags the frontend needs before login (demo label)."""
+    """GET /api/config/: public flags the frontend needs before login (demo label, fit check gate)."""
     from django.conf import settings
-    return Response({"demo_mode": settings.DEMO_MODE})
+    return Response({"demo_mode": settings.DEMO_MODE, "fit_check_enabled": settings.FIT_CHECK_ENABLED})
 
 
 def _serve_demo(request, avatar_obj, garments):

@@ -101,11 +101,11 @@ class DemoTests(MediaTestCase):
         self.assertEqual(r.status_code, 202)
         delay.assert_called_once()
         self.assertEqual(Job.objects.get(pk=r.data["job_id"]).status, "queued")
-        self.assertEqual(self.client.get("/api/config/").data, {"demo_mode": False})
+        self.assertIs(self.client.get("/api/config/").data["demo_mode"], False)
 
     @override_settings(DEMO_MODE=True)
     def test_config_is_public(self):
-        self.assertEqual(self.client.get("/api/config/").data, {"demo_mode": True})
+        self.assertIs(self.client.get("/api/config/").data["demo_mode"], True)
 
     def settings_media(self):
         from django.conf import settings

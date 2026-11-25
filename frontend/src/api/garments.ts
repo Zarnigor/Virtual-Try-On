@@ -7,12 +7,12 @@ import type {
 
 export type { Garment } from './types'
 
-/** `sizes` is required by the backend (400 SIZES_INVALID without it); the upload form that collects it is docs/11 step 4. */
-export const uploadGarment = (photo: File, type: GarmentType, sizes?: GarmentSizes, stretch = false, name = '') => {
+/** `sizes` is required (400 SIZES_INVALID otherwise, docs/11). */
+export const uploadGarment = (photo: File, type: GarmentType, sizes: GarmentSizes, stretch = false, name = '') => {
   const form = new FormData()
   form.append('photo', photo)
   form.append('type', type)
-  if (sizes) form.append('sizes', JSON.stringify(sizes))
+  form.append('sizes', JSON.stringify(sizes))
   form.append('stretch', String(stretch))
   if (name) form.append('name', name)
   return client.post<GarmentUploadResponse>('/api/garments/', form, {

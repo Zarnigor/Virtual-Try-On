@@ -5,6 +5,7 @@ import Spinner from '../components/Spinner'
 import DevAiWarning from '../components/DevAiWarning'
 import { GenderBadge } from '../components/GarmentSettingsPanel'
 import StatusChip from '../components/StatusChip'
+import { FIT_TEXT } from '../locale/uz'
 
 export default function Wardrobe() {
   const [garments, setGarments] = useState<Garment[]>([])
@@ -118,6 +119,7 @@ export default function Wardrobe() {
                   <StatusChip status="unmarked" />
                 )}
                 {g.image_url && g.neck_complete === false && <StatusChip status="neck_unmarked" />}
+                {g.owned_by_me && !g.sizes_complete && <StatusChip status="sizes_missing" />}
               </div>
 
               <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
@@ -133,6 +135,11 @@ export default function Wardrobe() {
                   <button className="btn btn-secondary btn-sm" style={{ flex: 1, fontSize: 12 }} disabled>
                     Tayyorlanmoqda…
                   </button>
+                )}
+                {g.owned_by_me && (
+                  <Link to={`/garments/${g.id}/sizes`} className="btn btn-secondary btn-sm" style={{ fontSize: 12 }}>
+                    {FIT_TEXT.sizesLink}
+                  </Link>
                 )}
                 <button
                   className="btn btn-danger btn-sm"

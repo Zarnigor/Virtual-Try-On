@@ -248,3 +248,11 @@ class FitCheckUnconfirmedBodyTests(FitBase):
             post = self.post([g], base="body")
         self.assertEqual((r.status_code, r.data), (post.status_code, post.data))
         self.assertEqual(r.status_code, 400)
+
+
+class ConfigFlagTests(MediaTestCase):
+    def test_config_exposes_the_fit_check_flag(self):
+        for flag in (True, False):
+            with override_settings(FIT_CHECK_ENABLED=flag):
+                r = self.client.get("/api/config/")  # public, no login
+            self.assertEqual((r.status_code, r.data["fit_check_enabled"]), (200, flag))

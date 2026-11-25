@@ -180,10 +180,10 @@ export interface BodyConfirmRequest {
   measurements?: Measurements | null
 }
 
-/** PATCH body/measurements/ (once per 365 days). */
+/** PATCH body/measurements/ (once per 365 days). MERGE: send only the changed keys; null is rejected (docs/09 #127). */
 export interface MeasurementsUpdateRequest {
-  height_cm?: number | null
-  measurements?: Measurements | null
+  height_cm?: number
+  measurements?: Measurements
 }
 
 // ---------- avatars ----------
@@ -346,6 +346,8 @@ export interface FitCheckResponse { results: FitCheckResult[] }
 export interface AppConfig {
   /** Backend runs with DEMO_MODE=1: some try-on results are precomputed (job.result.demo = true). */
   demo_mode: boolean
+  /** FIT_CHECK_ENABLED=1: POST tryon/ refuses a garment that does not fit (docs/11); the UI then disables the button. */
+  fit_check_enabled: boolean
 }
 
 export interface TryOnResponse {

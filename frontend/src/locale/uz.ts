@@ -194,3 +194,100 @@ export const HOME = {
   outfitAlt: 'Obraz',
   preparing: 'Tayyorlanmoqda…',
 }
+
+// ---------- fit check (docs/11) ----------
+
+/** Garment real-size fields (flat-lay cm). */
+export const GARMENT_SIZE_LABELS = {
+  chest_width: 'Koʻkrak kengligi',
+  length: 'Uzunlik',
+  shoulder_width: 'Yelka kengligi',
+  waist_width: 'Bel kengligi',
+  sleeve_length: 'Yeng uzunligi',
+  hip_width: 'Son kengligi',
+  inseam: 'Ichki uzunlik',
+  thigh_width: 'Son yuqori kengligi',
+  leg_opening: 'Pocha kengligi',
+} as const
+
+/** The person's sizes (cm). */
+export const BODY_SIZE_LABELS = {
+  height_cm: 'Boʻy',
+  shoulder: 'Yelka aylanasi',
+  chest: 'Koʻkrak aylanasi',
+  waist: 'Bel aylanasi',
+  hip: 'Son aylanasi',
+  shoulder_width: 'Yelka kengligi',
+  inseam: 'Ichki uzunlik',
+} as const
+
+/** Same zone names as backend apps/sizing/messages.py. */
+export const FIT_ZONE_NAMES = {
+  chest: 'koʻkrak', shoulder: 'yelka', waist: 'bel', hip: 'son', inseam: 'uzunlik',
+} as const
+
+export const FIT_TEXT = {
+  required: (label: string) => `${label}: kiriting.`,
+  notNumber: (label: string) => `${label}: son kiriting.`,
+  range: (label: string, min: number, max: number) => `${label}: ${min} dan ${max} sm gacha boʻlishi kerak.`,
+  cm: 'sm',
+  requiredMark: 'majburiy',
+  optional: 'ixtiyoriy',
+  sizesTitle: 'Kiyim oʻlchamlari',
+  sizesHelp: 'Kiyimni tekis joyga yoyib, bir tomonidan santimetrda oʻlchang.',
+  stretch: 'Choʻziluvchan mato',
+  stretchHelp: 'Mato choʻziladi (masalan, elastan qoʻshilgan).',
+  whereToMeasure: 'Qayerdan oʻlchash kerak',
+  diagramChest: 'yarim kenglik: qoʻltiqdan qoʻltiqqacha',
+  diagramLength: 'yelka tepasidan pastki chetigacha',
+  diagramShoulder: 'yelka chokidan yelka chokigacha',
+  diagramWaist: 'yarim kenglik: bel chizigʻida',
+  diagramSleeve: 'yelka chokidan yeng uchigacha',
+  diagramPantsWaist: 'yarim kenglik: bel chetida',
+  diagramHip: 'yarim kenglik: eng keng joyida',
+  diagramInseam: 'qadamdan pocha chetigacha',
+  diagramThigh: 'yarim kenglik: qadam ostida',
+  diagramLeg: 'yarim kenglik: pocha chetida',
+  sizesMissingBadge: 'Oʻlchamlar kiritilmagan',
+  sizesLink: 'Oʻlchamlar',
+  sizesPageTitle: 'Kiyim oʻlchamlari',
+  edit: 'Tahrirlash',
+  save: 'Saqlash',
+  saving: 'Saqlanmoqda…',
+  saved: 'Saqlandi',
+  cancel: 'Bekor qilish',
+  back: 'Orqaga',
+  notFound: 'Kiyim topilmadi.',
+  saveError: 'Saqlab boʻlmadi',
+  stretchYes: 'Ha',
+  stretchNo: 'Yoʻq',
+  yourSizesTitle: 'Sizning oʻlchamlaringiz',
+  yourSizesHelp: 'Kiyim sizga mos kelishini tekshirish uchun. Model tanloviga taʼsir qilmaydi. Barchasi santimetrda.',
+  notFits: 'Sizga mos emas',
+  garmentSizeMissing: 'Bu kiyimning oʻlchamlari kiritilmagan.',
+  bodySizeMissing: 'Kiyimni tekshirish uchun oʻlchamlaringizni kiriting.',
+  diagramAlt: 'Oʻlchash sxemasi',
+  enterGarmentSizes: 'Oʻlchamlarni kiritish',
+  enterYourSizes: 'Oʻlchamlaringizni kiritish',
+  checking: 'Oʻlcham tekshirilmoqda…',
+  fitInfoOnly: 'Oʻlcham tekshiruvi hozircha faqat maʼlumot uchun.',
+  bodyNotChangeable: 'Boʻsh qoldirilgan maydon oʻzgarmaydi (oʻlchamni oʻchirib boʻlmaydi).',
+} as const
+
+/** Body measurements page (PATCH merges: only changed values are sent, docs/09 #127). */
+export const MEASUREMENTS_TEXT = {
+  title: 'Tana oʻlchovlari',
+  locked: 'Oʻlchovlarni yiliga bir marta oʻzgartirish mumkin.',
+  nextChange: (date: string) => ` Keyingi oʻzgartirish: ${date}.`,
+  help: 'Barcha oʻlchovlar santimetrda. Aylana: lenta tana atrofida; kenglik: bir yelka uchidan ikkinchisigacha.',
+  fitHelp: 'Kiyim mos kelishini tekshirish uchun boʻy, koʻkrak, bel, son aylanasi va yelka kengligi kerak.',
+  lockWarning: 'Saqlangandan keyin oʻlchovlarni bir yil oʻzgartirib boʻlmaydi.',
+  noChange: 'Hech narsa oʻzgarmadi.',
+  saved: 'Saqlandi',
+  save: 'Saqlash',
+  saving: 'Saqlanmoqda…',
+  back: 'Orqaga',
+  saveError: 'Saqlashda xato',
+  positive: (label: string) => `${label}: musbat son kiriting.`,
+  placeholder: (example: number) => `masalan: ${example}`,
+} as const

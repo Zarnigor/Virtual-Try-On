@@ -1,17 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { listAvatars, type Avatar } from '../api/avatars'
 import { garmentFitsSex, listGarments, type Garment } from '../api/garments'
 import { getBody, setBodySex, type Body } from '../api/bodies'
 import { getConfig } from '../api/config'
-import { startTryon } from '../api/tryon'
+import { fitCheck, startTryon } from '../api/tryon'
 import { getOutfit } from '../api/outfits'
 import { usePoll } from '../components/usePoll'
 import Spinner from '../components/Spinner'
 import DevAiWarning from '../components/DevAiWarning'
 import StatusChip from '../components/StatusChip'
 import { GenderBadge, Segmented } from '../components/GarmentSettingsPanel'
-import type { Sex } from '../api/types'
-import { SEX_LABELS, TRYON_GENDER, TRYON_QUALITY } from '../locale/uz'
+import FitNotice, { type FitAnswer } from '../components/FitNotice'
+import type { FitZoneCheck, Sex } from '../api/types'
+import {
+  FIT_MEASUREMENT_FIELDS, loadSessionSizes, saveSessionSizes, validateFitMeasurements, type MeasurementValues,
+} from '../fit/measurementFields'
+import { BODY_SIZE_LABELS, FIT_TEXT, SEX_LABELS, TRYON_GENDER, TRYON_QUALITY } from '../locale/uz'
+
+const FIT_CODES = ['GARMENT_SIZE_MISSING', 'BODY_SIZE_MISSING', 'SIZE_MISMATCH']
+const FIT_DEBOUNCE_MS = 400
 
 const TRYON_ERRORS: Record<string, string> = {
   GENDER_MISMATCH: TRYON_GENDER.mismatch,
@@ -36,13 +43,22 @@ export default function TryOn() {
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [starting, setStarting] = useState(false)
+  // Fit check (docs/11). The flag only decides whether a non-fitting garment blocks the button; results always show.
+  const [fitEnabled, setFitEnabled] = useState(false)
+  const [sizes, setSizes] = useState<MeasurementValues>(() => loadSessionSizes())
+  const [fitAnswers, setFitAnswers] = useState<Record<number, FitAnswer>>({})
+  const [fitError, setFitError] = useState('')
+  const [checking, setChecking] = useState(false)
+  const fitSeq = useRef(0)
 
   const { job } = usePoll(jobId)
 
   useEffect(() => {
     listAvatars().then(({ data }) => setAvatars(data)).catch(() => {})
     // Demo mode also lists the catalog (the demo garments); otherwise only the user's own garments, as before.
-    getConfig().then((c) => setScope(c.demo_mode ? 'all' : 'mine')).catch(() => setScope('mine'))
+    getConfig()
+      .then((c) => { setScope(c.demo_mode ? 'all' : 'mine'); setFitEnabled(c.fit_check_enabled) })
+      .catch(() => setScope('mine'))
   }, [])
 
   useEffect(() => {
@@ -63,6 +79,51 @@ export default function TryOn() {
       })
       .catch(() => {})
   }, [scope, baseSex, showAll])
+
+  // The user's own sizes (avatar path): kept for the session; only valid values are sent.
+  const sizeCheck = useMemo(() => validateFitMeasurements(sizes, false), [sizes])
+  const measurementsKey = JSON.stringify(sizeCheck.measurements)
+  const updateSizes = (next: MeasurementValues) => {
+    setSizes(next)
+    saveSessionSizes(next)
+  }
+
+  // GET tryon/fit-check/ whenever the base or the selection changes (debounced; stale answers dropped).
+  const garmentKey = selectedGarments.join(',')
+  const bodyReady = body !== null && body.confirmed_at !== null
+  useEffect(() => {
+    const seq = ++fitSeq.current
+    const ready = selectedGarments.length > 0 && (base === 'avatar' ? selectedAvatar !== null : bodyReady)
+    if (!ready) {
+      setFitAnswers({})
+      setFitError('')
+      setChecking(false)
+      return
+    }
+    setChecking(true)
+    const timer = setTimeout(() => {
+      fitCheck(base, selectedGarments, selectedAvatar ?? undefined, JSON.parse(measurementsKey))
+        .then(({ data }) => {
+          if (seq !== fitSeq.current) return
+          setFitAnswers(Object.fromEntries(data.results.map((r) => [r.garment_id, {
+            garmentId: r.garment_id, fits: r.fits, checks: r.checks, code: r.code,
+          }])))
+          setFitError('')
+        })
+        .catch((err: unknown) => {
+          if (seq !== fitSeq.current) return
+          const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+          setFitAnswers({})
+          setFitError(detail ?? '')
+        })
+        .finally(() => { if (seq === fitSeq.current) setChecking(false) })
+    }, FIT_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [base, selectedAvatar, garmentKey, measurementsKey, bodyReady])
+
+  const notFitting = selectedGarments.filter((id) => fitAnswers[id] && !fitAnswers[id].fits)
+  const fitBlocked = fitEnabled && notFitting.length > 0
 
   const chooseAvatarSex = (sex: Sex) => {
     setAvSex(sex)
@@ -113,6 +174,7 @@ export default function TryOn() {
       setError(TRYON_GENDER.mismatch)  // the backend refuses it too (400 GENDER_MISMATCH)
       return
     }
+    if (fitBlocked) return  // the button is disabled too; the backend refuses it as well (flag on)
     setError('')
     setStarting(true)
     setJobId(null)
@@ -122,11 +184,23 @@ export default function TryOn() {
         base,
         avatar_id: base === 'avatar' ? (selectedAvatar ?? undefined) : undefined,
         garment_ids: selectedGarments,
+        measurements: base === 'avatar' ? sizeCheck.measurements : undefined,
       })
       setJobId(data.job_id)
       setOutfitId(data.outfit_id)
     } catch (err: unknown) {
-      const data = (err as { response?: { data?: { code?: string; detail?: string } } })?.response?.data
+      const data = (err as { response?: { data?: {
+        code?: string; detail?: string; garment_id?: number; checks?: FitZoneCheck[]
+      } } })?.response?.data
+      if (data?.code && FIT_CODES.includes(data.code)) {
+        // Race (sizes changed after the last fit-check) with the flag on: show it like a fit-check result.
+        const code = data.code === 'SIZE_MISMATCH' ? undefined : data.code as FitAnswer['code']
+        const ids = data.code === 'BODY_SIZE_MISSING' ? selectedGarments : [data.garment_id ?? -1]
+        setFitAnswers((prev) => ({
+          ...prev,
+          ...Object.fromEntries(ids.map((id) => [id, { garmentId: id, fits: false, checks: data.checks ?? [], code }])),
+        }))
+      }
       setError((data?.code && TRYON_ERRORS[data.code]) || data?.detail || 'Xato yuz berdi')
     } finally {
       setStarting(false)
@@ -192,6 +266,29 @@ export default function TryOn() {
                 </p>
                 <Segmented<Sex> title="Jins" value={avSex} options={SEX_LABELS} onChange={chooseAvatarSex} />
                 {avError && <p className="error-text" role="alert" style={{ marginTop: 8 }}>{avError}</p>}
+                {avSex && !avError && (
+                  <div id="fit-sizes" style={{ marginTop: 16 }}>
+                    <h3 style={{ fontSize: 14, marginBottom: 4 }}>{FIT_TEXT.yourSizesTitle}</h3>
+                    <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{FIT_TEXT.yourSizesHelp}</p>
+                    {FIT_MEASUREMENT_FIELDS.map((f) => (
+                      <div className="field" key={f.key} style={{ marginBottom: 8 }}>
+                        <label className="label" htmlFor={`fit-${f.key}`}>
+                          {BODY_SIZE_LABELS[f.key]} ({FIT_TEXT.cm})
+                          {f.required
+                            ? <span style={{ color: 'var(--danger)' }} title={FIT_TEXT.requiredMark}> *</span>
+                            : <span style={{ color: 'var(--muted)', fontWeight: 400 }}> ({FIT_TEXT.optional})</span>}
+                        </label>
+                        <input id={`fit-${f.key}`} className="input" type="number" inputMode="decimal" step="0.1"
+                          min={f.min} max={f.max} placeholder={`${f.min}–${f.max}`} value={sizes[f.key] ?? ''}
+                          aria-invalid={sizeCheck.errors[f.key] ? true : undefined}
+                          onChange={(e) => updateSizes({ ...sizes, [f.key]: e.target.value })} />
+                        {sizeCheck.errors[f.key] && (
+                          <p className="error-text" style={{ marginTop: 4 }}>{sizeCheck.errors[f.key]}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {avSex && !avError && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto', marginTop: 12 }}>
                     {avatars.filter((av) => av.sex === avSex).map((av) => (
@@ -297,6 +394,14 @@ export default function TryOn() {
                             Belgilar kerak
                           </span>
                         )}
+                        {g.owned_by_me && !g.sizes_complete && (
+                          <span style={{ fontSize: 11, color: 'var(--warning)', marginLeft: 6 }}>
+                            {FIT_TEXT.sizesMissingBadge}
+                          </span>
+                        )}
+                        {isSelected && fitAnswers[g.id] && (
+                          <FitNotice answer={fitAnswers[g.id]} base={base} ownGarment={g.owned_by_me} />
+                        )}
                       </div>
                     </label>
                   )
@@ -305,12 +410,17 @@ export default function TryOn() {
             )}
           </div>
 
-          {error && <p className="error-text">{error}</p>}
+          {checking && <p style={{ fontSize: 12, color: 'var(--muted)' }}>{FIT_TEXT.checking}</p>}
+          {fitError && <p className="error-text" role="alert">{fitError}</p>}
+          {!fitEnabled && notFitting.length > 0 && (
+            <p style={{ fontSize: 12, color: 'var(--muted)' }}>{FIT_TEXT.fitInfoOnly}</p>
+          )}
+          {error && <p className="error-text" role="alert">{error}</p>}
 
           <button
             className="btn btn-primary"
             onClick={handleStart}
-            disabled={starting || isPolling}
+            disabled={starting || isPolling || fitBlocked}
             style={{ width: '100%' }}
           >
             {starting || isPolling ? 'Qayta ishlanmoqda…' : 'Kiyib koʻrish'}

@@ -53,6 +53,14 @@ with a `deleted` flag.
   main set is incomplete shows "Avval 1-qadamdagi asosiy nuqtalarni belgilang" with a link to step 1; wardrobe chip
   "Boʻyin belgilanmagan" while `neck_complete` is false; try-on result banner for `quality_warnings`
   (`neck_hole_invalid`, `mls_fallback`, locale `TRYON_QUALITY`).
+- Fit check (docs/11 step 4, not in the design): garment upload has a sizes form with a "where to measure" inline SVG
+  (`components/SizesForm`, `SizeDiagram`) + stretch checkbox; `/garments/:id/sizes` (view + edit, owner only; the
+  wardrobe card shows "Oʻlchamlar kiritilmagan" and an "Oʻlchamlar" link); the avatar path asks "Sizning
+  oʻlchamlaringiz" after the gender pick (sessionStorage, only for the fit check, not for the avatar choice, #124);
+  the try-on page calls `GET tryon/fit-check/` (debounced 400 ms) and shows per selected garment "Sizga mos emas" +
+  zone lines or a missing-size message with a link to the right form; the button is disabled by them only when
+  `GET config/` says `fit_check_enabled`. The body measurements page has shoulder_width + inseam and sends only the
+  changed keys (PATCH merges, docs/09 #127). Pure helpers: `src/fit/`.
 
 ## Behaviour notes
 - Screen 4: the uploaded original is only a temporary preview and is deleted after processing (docs/02 rule 6).

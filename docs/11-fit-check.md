@@ -122,6 +122,8 @@ values, the rest stay; `null` is rejected (no key removal); an identical PATCH d
 2. `apps/sizing.check_fit` + unit tests: every zone, boundaries, stretch, keep_shape, missing sizes (0.5-1 day).
 3. Wire into `POST tryon/` + `GET tryon/fit-check/` + messages + flag + permission tests (0.5 day).
 4. Frontend: size form with a "where to measure" image, required body/avatar sizes, "mos emas" with reasons (1 day).
+   **Done 2026-11-25** (docs/10 "States"): `GET config/` exposes `fit_check_enabled`; the try-on button is disabled
+   by a non-fitting garment only when it is true; with the flag 0 the results are still shown ("faqat maʼlumot uchun").
 5. Real cm for existing garments, 6 avatars x garments table, tune `FIT_RULES`, `build_demo` again (0.5 day).
 Risk: real measurements. Garments photographed from the internet have no real cm (take them from the seller's size
 chart, never invent).

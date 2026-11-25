@@ -4,6 +4,8 @@ import { uploadGarment } from '../api/garments'
 import { usePoll } from '../components/usePoll'
 import Dropzone from '../components/Dropzone'
 import Spinner from '../components/Spinner'
+import SizesForm from '../components/SizesForm'
+import { validateSizes, type GarmentSizeKey, type SizeValues } from '../fit/sizeFields'
 
 // Same limits as the backend settings (MAX_UPLOAD_MB, GARMENT_MIN_SIDE_PX).
 const MAX_UPLOAD_MB = 20
@@ -18,6 +20,10 @@ export default function GarmentUpload() {
   const [error, setError] = useState('')
   const [jobId, setJobId] = useState<number | null>(null)
   const [garmentId, setGarmentId] = useState<number | null>(null)
+  // Real size (docs/11): required on upload. Client checks are UX only; the backend's SIZES_INVALID message wins.
+  const [sizes, setSizes] = useState<SizeValues>({})
+  const [stretch, setStretch] = useState(false)
+  const [sizeErrors, setSizeErrors] = useState<Partial<Record<GarmentSizeKey, string>>>({})
 
   const { job } = usePoll(jobId)
 
@@ -58,10 +64,13 @@ export default function GarmentUpload() {
 
   const handleUpload = async () => {
     if (!file) return
+    const checked = validateSizes(type, sizes)
+    setSizeErrors(checked.errors)
+    if (!checked.ok) return
     setLoading(true)
     setError('')
     try {
-      const { data } = await uploadGarment(file, type)
+      const { data } = await uploadGarment(file, type, checked.sizes, stretch)
       setJobId(data.job_id)
       setGarmentId(data.garment.id)
     } catch (err: unknown) {
@@ -109,7 +118,7 @@ export default function GarmentUpload() {
   }
 
   return (
-    <div className="page" style={{ maxWidth: 560 }}>
+    <div className="page" style={{ maxWidth: 760 }}>
       <h1 className="page-title">Kiyim yuklash</h1>
 
       <div className="card">
@@ -141,7 +150,7 @@ export default function GarmentUpload() {
                   name="garment_type"
                   value={t}
                   checked={type === t}
-                  onChange={() => setType(t)}
+                  onChange={() => { setType(t); setSizes({}); setSizeErrors({}) }}
                   style={{ display: 'none' }}
                 />
                 {t === 'tshirt' ? 'Futbolka' : 'Shim'}
@@ -177,7 +186,12 @@ export default function GarmentUpload() {
           />
         )}
 
-        {error && <p className="error-text" style={{ marginTop: 10 }}>{error}</p>}
+        <div style={{ marginTop: 20 }}>
+          <SizesForm type={type} values={sizes} onChange={setSizes} stretch={stretch} onStretch={setStretch}
+            errors={sizeErrors} disabled={loading} />
+        </div>
+
+        {error && <p className="error-text" role="alert" style={{ marginTop: 10 }}>{error}</p>}
 
         <button
           className="btn btn-primary"
