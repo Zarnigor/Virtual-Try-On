@@ -47,10 +47,15 @@ Validation ranges (400 `SIZES_INVALID` outside, Uzbek message naming the field):
 `hip_width` 30-90, `inseam` 40-100, `thigh_width` 15-50, `leg_opening` 8-40.
 
 ### Body sizes (cm)
-`height_cm` 140-210; circumferences `chest` 70-150, `waist` 55-150, `hip` 75-160; `shoulder` (width) 30-60;
+`height_cm` 140-210; circumferences `chest` 70-150, `waist` 55-150, `hip` 75-160; `shoulder_width` (width) 30-60;
 `inseam` optional 55-100, else estimated as 0.45 x height (proposed, calibrate).
-Required for the check: height, chest, waist, hip, shoulder (tshirt needs chest + shoulder; pants waist + hip + inseam).
-Missing -> 400 `BODY_SIZE_MISSING`.
+Required for the check: tshirt `chest` + `shoulder_width`; pants `waist` + `hip` + `inseam` (or `height_cm` for the
+estimate). Missing -> 400 `BODY_SIZE_MISSING`.
+
+**Interpretation (step 2, 2026-11-25):** the existing `measurements.shoulder` (Body, Avatar, docs/09 #13) is a
+**circumference** (seeded avatars: 96-126 cm). The fit check never converts it: it reads a separate body key
+`shoulder_width` (cm, a width). Missing `shoulder_width` -> `SizesMissing(side="body", keys=["shoulder_width"])`.
+Step 3 / the frontend collect it (where it is stored is decided in step 3).
 
 ## Rules (proposed thresholds, calibrate in step 5)
 `garment_circ = 2 x flat_width`, `ease = garment_circ - body_circ`. Widths (shoulder) are compared directly.
@@ -58,12 +63,21 @@ Missing -> 400 `BODY_SIZE_MISSING`.
 | zone | too_small if | too_large if (adapt only) |
 |---|---|---|
 | tshirt chest | ease < 0 (stretch: < -4) | ease > +20 |
-| tshirt shoulder | garment < body - 2 | garment > body + 6 (keep_shape: not checked) |
+| tshirt shoulder | garment `shoulder_width` < body `shoulder_width` - 2 | garment > body + 6 |
 | pants waist | garment_circ < body - 4 (stretch: < -8) | garment_circ > body + 6 |
 | pants hip | ease < 0 (stretch: < -4) | ease > +20 |
 | pants inseam | garment < body - 5 | garment > body + 8 |
 
-- Thresholds live in one settings dict (`FIT_RULES`), not in code branches.
+- **keep_shape: no too_large check on any zone** (too_small still applies), per decision 1.
+- Thresholds live in one settings dict (`FIT_RULES` in `tryon_studio/settings/base.py`: per type, per zone
+  `min_ease`, `min_ease_stretch` (chest, waist, hip only; else `min_ease` is used), `max_ease`; plus
+  `BODY_INSEAM_HEIGHT_RATIO`), not in code branches. Code: `apps/sizing/fit.py` `check_fit(..., rules=None)`.
+- Output: `FitResult(fits, checks)`, `ZoneCheck(zone, garment_cm, body_cm, ease_cm, verdict, limit_cm)`. For
+  chest / waist / hip `garment_cm` is the circumference (2 x flat width); `limit_cm` = body + the broken ease limit
+  (same unit as `garment_cm`), else null. Values rounded to 1 decimal after comparing. Zone order: tshirt chest,
+  shoulder; pants waist, hip, inseam.
+- Missing or non-numeric required keys raise `SizesMissing(side, keys)` (garment checked first); unknown type or
+  fit_mode raise `ValueError`.
 - A value exactly on a threshold passes (boundary tests).
 - Optional garment fields are checked only when present (none have rules yet).
 - `fits = all zones ok`.

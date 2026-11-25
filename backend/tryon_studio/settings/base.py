@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "apps.tryon_engine",
     "apps.outfits",
     "apps.jobs",
+    "apps.sizing",
 ]
 
 MIDDLEWARE = [
@@ -313,3 +314,20 @@ AI_DEV_BYPASS = DEBUG and os.environ.get("AI_DEV_BYPASS", "0") == "1"
 # {"ai_skipped": true}; honoured only with DEBUG (adults-only is a hard rule), so production always runs it.
 # Staff avatar uploads never call the AI (apps/bodies/pipeline.py).
 BODY_AI_CHECK_ENABLED = os.environ.get("BODY_AI_CHECK_ENABLED", "1") == "1" or not DEBUG
+
+# Fit check thresholds (docs/11 "Rules", docs/09 #125; PROPOSED, calibrated in step 5). cm. Per zone:
+# ease = garment - body (garment circumference = 2 x flat width for chest / waist / hip; shoulder width and inseam
+# compared directly). too_small if ease < min_ease (min_ease_stretch for a stretch garment, when the zone has one);
+# too_large if ease > max_ease (adapt only). A value exactly on a limit passes. Read by apps/sizing/fit.py.
+FIT_RULES = {
+    "BODY_INSEAM_HEIGHT_RATIO": 0.45,  # body inseam estimate when not given (proposed, calibrate)
+    "tshirt": {
+        "chest": {"min_ease": 0, "min_ease_stretch": -4, "max_ease": 20},
+        "shoulder": {"min_ease": -2, "max_ease": 6},
+    },
+    "pants": {
+        "waist": {"min_ease": -4, "min_ease_stretch": -8, "max_ease": 6},
+        "hip": {"min_ease": 0, "min_ease_stretch": -4, "max_ease": 20},
+        "inseam": {"min_ease": -5, "max_ease": 8},
+    },
+}
