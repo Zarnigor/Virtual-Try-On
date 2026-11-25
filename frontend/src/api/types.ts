@@ -247,6 +247,11 @@ export interface Garment {
   fit_mode: FitMode
   gender: GarmentGender
   status: GarmentStatus
+  /** Real flat-lay size in cm (docs/11); null for garments made before the fit check. */
+  sizes: GarmentSizes | null
+  stretch: boolean
+  /** Every required size key is present (false when sizes is null). */
+  sizes_complete: boolean
   owned_by_me: boolean
   /** True = the AI check was skipped (AI_DEV_BYPASS, local dev only): NOT validated. Show a dev warning. */
   ai_skipped: boolean
@@ -259,7 +264,24 @@ export interface LandmarkWarning { code: 'collar_far' | 'outside_garment'; group
 /** PATCH garments/{id}/landmarks/ response. */
 export type GarmentLandmarksResponse = Garment & { landmark_warnings: LandmarkWarning[] }
 
-/** POST garments/ is multipart: photo (File) + type + name?. */
+/** Garment real size, flat-lay cm (docs/11). Required: tshirt chest_width, length, shoulder_width; pants waist_width,
+ *  hip_width, inseam. Optional: tshirt waist_width, sleeve_length; pants thigh_width, leg_opening. */
+export interface GarmentSizes {
+  chest_width?: number
+  length?: number
+  shoulder_width?: number
+  waist_width?: number
+  sleeve_length?: number
+  hip_width?: number
+  inseam?: number
+  thigh_width?: number
+  leg_opening?: number
+}
+
+/** PATCH garments/{id}/sizes/ body: sizes is a FULL replace. 400 SIZES_INVALID {code, detail}. */
+export interface GarmentSizesUpdate { sizes: GarmentSizes; stretch?: boolean }
+
+/** POST garments/ is multipart: photo (File) + type + sizes (JSON string, required) + stretch? + name?. */
 export interface GarmentUploadResponse {
   garment: Garment
   job_id: number

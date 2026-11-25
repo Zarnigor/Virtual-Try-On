@@ -1,11 +1,16 @@
+import json
+
 from django.conf import settings
 from django.db.models import Q
+from rest_framework.exceptions import ValidationError as DRFValidationError
+from rest_framework.fields import BooleanField
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .landmark_checks import LandmarksInvalid, alpha_stats, for_storage, validate_garment_landmarks
 from .models import Garment
+from .size_checks import SizesInvalid, validate_sizes
 from .serializers import GarmentSerializer, GarmentUploadSerializer
 from apps.images import ImageRejected, validate_image_upload
 from apps.jobs.models import Job
@@ -73,6 +78,11 @@ def _upload_garment(request):
     s = GarmentUploadSerializer(data=request.data)
     s.is_valid(raise_exception=True)
 
+    try:  # sizes first: a bad request creates no garment and no job
+        sizes = validate_sizes(s.validated_data["type"], _parse_sizes(s.validated_data.get("sizes")))
+    except SizesInvalid as e:
+        return Response({"code": "SIZES_INVALID", "detail": e.detail}, status=400)
+
     photo = s.validated_data["photo"]
     try:
         validate_image_upload(photo, min_side=settings.GARMENT_MIN_SIDE_PX)
@@ -86,6 +96,8 @@ def _upload_garment(request):
         # `image` is the cleaned PNG only (contract: image_url = cleaned). It stays empty, so image_url,
         # width and height are null, until the cleaning job has written it from original_image.
         original_image=photo,
+        sizes=sizes,
+        stretch=s.validated_data["stretch"],
     )
 
     job = Job.objects.create(user=request.user, kind="garment_clean", target_id=garment.pk)
@@ -95,6 +107,43 @@ def _upload_garment(request):
         "garment": GarmentSerializer(garment, context={"request": request}).data,
         "job_id": job.pk,
     }, status=201)
+
+
+def _parse_sizes(raw):
+    """Multipart sends `sizes` as a JSON string; JSON bodies send an object. Malformed -> SizesInvalid."""
+    if raw is None or raw == "":
+        raise SizesInvalid("Kiyim oʻlchamlarini kiriting.")
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except ValueError:
+            raise SizesInvalid("Oʻlchamlar notoʻgʻri formatda.") from None
+    return raw
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def update_sizes(request, pk):
+    """PATCH /api/garments/{id}/sizes/ {sizes, stretch?}: FULL replace of `sizes` (no merge), owner only."""
+    try:
+        g = Garment.objects.get(pk=pk, owner=request.user)
+    except Garment.DoesNotExist:
+        return Response(status=404)
+    stretch = g.stretch
+    if "stretch" in request.data:
+        field = BooleanField()
+        try:
+            stretch = field.run_validation(request.data["stretch"])
+        except DRFValidationError:
+            return Response({"code": "SIZES_INVALID", "detail": "stretch: true yoki false."}, status=400)
+    try:
+        sizes = validate_sizes(g.type, _parse_sizes(request.data.get("sizes")))
+    except SizesInvalid as e:
+        return Response({"code": "SIZES_INVALID", "detail": e.detail}, status=400)
+    g.sizes = sizes
+    g.stretch = stretch
+    g.save(update_fields=["sizes", "stretch"])
+    return Response(GarmentSerializer(g, context={"request": request}).data)
 
 
 # Fields PATCH garments/{id}/ may change (owner only). Nothing else is editable here: the image never is.

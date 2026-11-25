@@ -29,6 +29,9 @@ class Garment(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
     fit_mode = models.CharField(max_length=12, choices=FIT_CHOICES, default="adapt")
     gender = models.CharField(max_length=8, choices=GENDER_CHOICES, default="unisex")
+    # Real flat-lay size in cm (docs/11, docs/09 #125); null for rows made before the fit check.
+    sizes = models.JSONField(null=True, blank=True)
+    stretch = models.BooleanField(default=False)
     # True = the AI check was skipped (AI_DEV_BYPASS, local dev only): this garment was NOT validated.
     ai_skipped = models.BooleanField(default=False)
     # The stored PNG had its photo lighting flattened (apps/garments/lighting.py); never flatten twice.

@@ -6,6 +6,7 @@ from apps.avatars.models import Avatar
 from apps.garments.models import Garment
 from apps.testing import MediaTestCase, png_bytes
 
+VALID_TSHIRT_SIZES_JSON = '{"chest_width": 52, "length": 70, "shoulder_width": 46}'
 TSHIRT_LM = {"shoulder": {"y": 5, "left_x": 5, "right_x": 55}}
 
 
@@ -105,7 +106,7 @@ class GarmentUploadValidationTests(MediaTestCase):
     def _post(self, data, name="g.jpg", content_type="image/jpeg"):
         from django.core.files.uploadedfile import SimpleUploadedFile
         photo = SimpleUploadedFile(name, data, content_type=content_type)
-        return self.client.post("/api/garments/", {"photo": photo, "type": "tshirt"}, format="multipart")
+        return self.client.post("/api/garments/", {"photo": photo, "type": "tshirt", "sizes": VALID_TSHIRT_SIZES_JSON}, format="multipart")
 
     def _assert_rejected(self, r, code):
         self.assertEqual(r.status_code, 400, r.data)
@@ -158,7 +159,7 @@ class GarmentCleaningStateTests(MediaTestCase):
     def _upload(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
         photo = SimpleUploadedFile("g.jpg", _image_bytes("JPEG"), content_type="image/jpeg")
-        return self.client.post("/api/garments/", {"photo": photo, "type": "tshirt"}, format="multipart")
+        return self.client.post("/api/garments/", {"photo": photo, "type": "tshirt", "sizes": VALID_TSHIRT_SIZES_JSON}, format="multipart")
 
     def test_upload_does_not_expose_the_uncleaned_photo_as_image(self, delay):
         r = self._upload()

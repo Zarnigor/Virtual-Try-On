@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .landmark_checks import landmarks_complete, neck_complete
 from .models import Garment
+from .size_checks import sizes_complete
 from apps.users.media_views import make_signed_url
 
 
@@ -15,10 +16,15 @@ class GarmentSerializer(serializers.ModelSerializer):
         fields = (
             "id", "name", "type", "image_url", "thumb_url", "original_preview_url",
             "width", "height", "landmarks", "landmarks_complete", "neck_complete", "visibility", "fit_mode", "gender", "status",
-            "owned_by_me", "ai_skipped",
+            "owned_by_me", "ai_skipped", "sizes", "stretch", "sizes_complete",
             "created_at",
         )
         read_only_fields = fields
+
+    sizes_complete = serializers.SerializerMethodField()
+
+    def get_sizes_complete(self, obj):
+        return sizes_complete(obj.type, obj.sizes)
 
     width = serializers.SerializerMethodField()
     landmarks_complete = serializers.SerializerMethodField()
@@ -74,3 +80,6 @@ class GarmentUploadSerializer(serializers.Serializer):
     photo = serializers.FileField()
     type = serializers.ChoiceField(choices=["tshirt", "pants"])
     name = serializers.CharField(max_length=100, required=False, default="")
+    # JSON string in multipart (parsed in the view: malformed -> 400 SIZES_INVALID, never a 500).
+    sizes = serializers.CharField(required=False, allow_blank=True)
+    stretch = serializers.BooleanField(required=False, default=False)

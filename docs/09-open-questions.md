@@ -1,8 +1,9 @@
 # 09. Decisions log and remaining open questions
 
 ## Decided by the owner (do not ask again)
-1. **Garment real size: NOT entered.** The garment always adapts (is deformed) to the body. No size-mismatch display.
-   (Changed 2026-11-11, #93: fit is per garment, `adapt` | `keep_shape`.)
+1. **SUPERSEDED 2026-11-25 by #125 (`docs/11-fit-check.md`): garment real size (cm) is now entered and a fit check
+   runs before try-on.** Former text: Garment real size: NOT entered. The garment always adapts (is deformed) to the
+   body. No size-mismatch display. (Changed 2026-11-11, #93: fit is per garment, `adapt` | `keep_shape`.)
 2. **Realistic result is saved** with the outfit (plain result is kept too; UI shows the realistic one first).
 3. **MVP garments = T-shirt + pants.** Body photo: short-sleeved/sleeveless top and shorts or tight leggings.
 4. **Model path (avatar): measurements are REQUIRED** if the user wants to use an avatar.
@@ -29,6 +30,7 @@ _(none blocking P0)_
   body's waist half-width (at least the hip half-width). Used only to compare methods; the warp method (production
   row warp + rigid sleeves vs MLS) stays the owner's choice. The production hem rule itself is #91 (proposed).
   Round 2 (marked landmarks + fit strength k, docs/06) uses the same hem assumption; still not a decision.
+- **Fit check thresholds (`FIT_RULES`, docs/11) are proposed**, to be calibrated on the 6 avatars with real garment cm.
 
 ## Rejected
 - **shoulder_slope pair (V1), alignment tweak (V2), both (V3)** for `keep_shape` (rejected by the owner 2026-11-11,
@@ -757,3 +759,13 @@ _(none blocking P0)_
      serializers are unchanged (supersedes the "required" part of rule 20 / #110). Added a minimal `frontend/.eslintrc.cjs`
      (`npm run lint` now runs and passes; `no-explicit-any` off in `*.test.ts`). Checks: tsc clean, 78 vitest, lint clean,
      `POST /api/tryon/` with avatar 2 (male) and 5 (female) -> job done, result image saved.
+
+## Decided 2026-11-25: fit check (owner decision)
+125. **2026-11-25: garment real size (cm) is entered and a fit check runs before try-on.** Full spec:
+    `docs/11-fit-check.md`. Supersedes #1 and docs/02 rule 21's "real size is NOT entered"; the render
+    (MLS, parts, fit_mode rules) is unchanged. Separate app `apps/sizing` (pure `check_fit`), the only coupling is
+    `POST tryon/`; flag `FIT_CHECK_ENABLED`. Owner choices: too small -> always "mos emas", too large -> only for
+    `adapt` (no upper limit for `keep_shape`); garments without sizes are blocked (`GARMENT_SIZE_MISSING`) until filled
+    once; `Garment.stretch` bool added; both body sources supported in code (own-body measurements become required for
+    try-on). Thresholds (`FIT_RULES`) are proposed, calibrated in step 5. Step 1 (data model + API) built 2026-11-25:
+    `Garment.sizes` / `stretch`, `apps/garments/size_checks.py`, `PATCH garments/{id}/sizes/` (full replace).

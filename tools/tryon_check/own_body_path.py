@@ -26,6 +26,10 @@ API = "http://localhost:8000/api"
 PHOTO = os.environ.get("PHOTO", "/avatars/male_average.jpg")
 SEX = os.environ.get("SEX", "male")
 GARMENTS = [int(v) for v in os.environ.get("GARMENTS", "28,51").split(",")]
+SIZES = {  # valid placeholder sizes for the upload check only (docs/11)
+    "tshirt": '{"chest_width": 52, "length": 70, "shoulder_width": 46}',
+    "pants": '{"waist_width": 40, "hip_width": 50, "inseam": 78}',
+}
 OUT = "/tmp/own_body"
 os.makedirs(OUT, exist_ok=True)
 fails = []
@@ -109,7 +113,7 @@ try:
                       headers={"Authorization": f"Bearer {RefreshToken.for_user(other).access_token}"})
     check("outfits listed", len(c.get("/outfits/").json()) == 2)
     src = Garment.objects.get(pk=GARMENTS[0])  # garment upload: clean job, original deleted, landmarks saved
-    r = c.post("/garments/", files={"photo": ("g.png", src.image.read(), "image/png")}, data={"type": src.type})
+    r = c.post("/garments/", files={"photo": ("g.png", src.image.read(), "image/png")}, data={"type": src.type, "sizes": SIZES[src.type]})
     check("garment upload 201", r.status_code == 201, r.text[:200])
     if r.status_code == 201:
         gid = r.json()["garment"]["id"] if "garment" in r.json() else r.json()["id"]

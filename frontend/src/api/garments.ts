@@ -1,15 +1,19 @@
 import client from './client'
 import type {
-  ForSex, Garment, GarmentGender, GarmentLandmarks, GarmentLandmarksResponse, GarmentScope, GarmentSettings, GarmentType,
+  ForSex, Garment, GarmentGender, GarmentLandmarks, GarmentLandmarksResponse, GarmentScope, GarmentSettings, GarmentSizes,
+  GarmentType,
   GarmentUploadResponse, Visibility,
 } from './types'
 
 export type { Garment } from './types'
 
-export const uploadGarment = (photo: File, type: GarmentType, name = '') => {
+/** `sizes` is required by the backend (400 SIZES_INVALID without it); the upload form that collects it is docs/11 step 4. */
+export const uploadGarment = (photo: File, type: GarmentType, sizes?: GarmentSizes, stretch = false, name = '') => {
   const form = new FormData()
   form.append('photo', photo)
   form.append('type', type)
+  if (sizes) form.append('sizes', JSON.stringify(sizes))
+  form.append('stretch', String(stretch))
   if (name) form.append('name', name)
   return client.post<GarmentUploadResponse>('/api/garments/', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -35,5 +39,9 @@ export const updateVisibility = (id: number, visibility: Visibility) =>
 /** fit_mode / gender, same style as visibility. */
 export const updateGarmentSettings = (id: number, settings: GarmentSettings) =>
   client.patch<Garment>(`/api/garments/${id}/`, settings)
+
+/** FULL replace of sizes (docs/11). */
+export const updateGarmentSizes = (id: number, sizes: GarmentSizes, stretch?: boolean) =>
+  client.patch<Garment>(`/api/garments/${id}/sizes/`, { sizes, stretch })
 
 export const deleteGarment = (id: number) => client.delete(`/api/garments/${id}/`)
