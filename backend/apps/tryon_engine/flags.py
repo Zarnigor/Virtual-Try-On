@@ -16,7 +16,8 @@ TRYON_MLS_KEEP_SCALE (docs/09 #112, default fit): keep_shape MLS T-shirts are sc
 TRYON_MLS_TUBE_CLIP (docs/09 #113, default arm): tube sleeves end on the arm/torso boundary | armhole = before.
 TRYON_PANTS_ENGINE (docs/09 #114, #116, default rows): rows = warp_pants (round 26 fit model, docs/09 #120) |
 fit = warp_pants_fit (rounds 21-22).
-TRYON_DRAPE_BODY_MARGIN (docs/09 #119, default 6 px | off = before): the drape over pants stops at the figure edge."""
+TRYON_DRAPE_BODY_MARGIN (docs/09 #119, default 6 px | off = before): the drape over pants stops at the figure edge.
+TRYON_PANTS_LEG (docs/09 #122, default smooth | r26 = before): rows pants legs without the knee bend."""
 from django.conf import settings
 
 
@@ -28,7 +29,7 @@ def render_flags(source: str = "body") -> dict:
     r17 = settings.TRYON_FINISH == "r17"
     return {"source": source, "finish": "r17" if r17 else "r60",
             "finish_pants": r17 and settings.TRYON_FINISH_PANTS, "pants_tuck": settings.TRYON_PANTS_TUCK, "mls_keep_scale": settings.TRYON_MLS_KEEP_SCALE, "mls_tube_clip": settings.TRYON_MLS_TUBE_CLIP, "pants_engine": settings.TRYON_PANTS_ENGINE,
-            "drape_body_margin": settings.TRYON_DRAPE_BODY_MARGIN,
+            "drape_body_margin": settings.TRYON_DRAPE_BODY_MARGIN, "pants_leg": settings.TRYON_PANTS_LEG,
             "shading": r17 or settings.TRYON_SHADING, "contact_shadows": r17 or settings.TRYON_CONTACT_SHADOW,
             "edge_feather": r17 or settings.TRYON_EDGE_FEATHER, "shoulder_cap": settings.TRYON_SHOULDER_CAP,
             "hem_snap": settings.TRYON_HEM_SNAP, "halo_removal": settings.TRYON_HALO_REMOVAL,

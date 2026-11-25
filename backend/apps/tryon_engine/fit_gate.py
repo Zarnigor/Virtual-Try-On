@@ -79,3 +79,22 @@ def run_gate(garments, body_sizes: dict) -> list:
 
 def first_failure(results):
     return next((r for r in results if not r.fits), None)
+
+
+# Calibration (docs/11 "Calibration"): zones that depend on the height alone (a model photo gives only the height).
+HEIGHT_ZONES = ("inseam",)
+
+
+def height_only_checks(garment, height_cm: float) -> list:
+    """The height-dependent zone checks of `garment` for a body known only by its height (inseam estimated), with the
+    same check_fit rules as the gate. The other required body keys are filled with the garment's own size (ease 0)
+    and their zones are dropped. Empty for a garment type without a height zone (T-shirt) or without sizes."""
+    gs = garment.sizes or {}
+    filler = {"chest": 2 * gs.get("chest_width", 0), "waist": 2 * gs.get("waist_width", 0),
+              "hip": 2 * gs.get("hip_width", 0), "shoulder_width": gs.get("shoulder_width", 0)}
+    try:
+        r = check_fit(garment.type, garment.sizes, garment.stretch, garment.fit_mode,
+                      {**filler, "height_cm": height_cm})
+    except SizesMissing:
+        return []
+    return [c for c in r.checks if c.zone in HEIGHT_ZONES]

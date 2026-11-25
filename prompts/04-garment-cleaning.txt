@@ -1,4 +1,4 @@
-Edit this product photo of ONE clothing item ({GARMENT_TYPE}).
+Edit this product photo of ONE clothing item ({GARMENT_TYPE}).is
 
 OUTPUT
 The same garment as a clean flat-lay product image: perfectly front-facing,

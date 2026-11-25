@@ -115,6 +115,24 @@ and recomputed when staff save the avatar landmarks (unless the request sets it)
   bad params; a garment the user cannot see -> 404. base=body needs a confirmed body (same 400 as `POST tryon/`).
 - Contract rule (docs/04): views, serializers and `frontend/src/api/types.ts` change in the same commit.
 
+## Calibration (step 5 tooling; no rule changes, the flag stays 0)
+- **Enter real sizes:** `manage.py set_garment_sizes --file <json> [--dry-run]`. File
+  `{"<garment id>": {<size keys>, "stretch"?: bool}}`; validated with `apps/garments/size_checks.py` (the API rules);
+  `sizes` fully replace the stored ones, `stretch` omitted = unchanged; any garment incl. catalog / demo ones (owner
+  null). One invalid entry -> nothing is written and every error is listed. Prints before / after per garment. The
+  file must be inside the container: `docker compose cp sizes.json backend:/tmp/sizes.json`.
+- **Matrix report:** `tools/fit_check/run.sh [cases.json]` (runs `tools/fit_check/matrix.py` in the backend
+  container, read-only; logic in `apps/tryon_engine/fit_report.py`, which uses only `fit_gate`). Rows = garments with
+  complete sizes, columns = the avatars, a cell only for a matching gender (docs/09 #97); body sizes = the avatar's
+  stored sizes through `fit_gate.sizes_from` (the same path as `POST tryon/`). Cell: every zone `ease_cm` + verdict
+  (e.g. "chest +12.0 ok | shoulder -1.5 ok") and the overall answer `fits` / `katta` (warning) / `mos emas`
+  (rejected) / a missing-size code. Output `tools/fit_check/out/fit_matrix.md` + `.json` (gitignored); skipped
+  garments (no / incomplete sizes) and avatars (missing size keys) are printed with the reason.
+- **Model-photo cases:** `cases.json` = `[{garment, model_height_cm, worn_size, expected: "fits"}]` (e.g. from a
+  seller page). The body is only the height (inseam = 0.45 x height), so only height-dependent zones are checked
+  (`fit_gate.height_only_checks`: inseam); the T-shirt `length` is printed for information (not a rule). Cases
+  expected to fit that fail are listed with the zone.
+
 ## User messages (Uzbek, backend-produced, docs/02 rule 18)
 - too_small zone: "Bu kiyim sizga mos emas: {zone} {n} sm tor." (inseam: "qisqa"); too_large zone (warning,
   #128): "Bu kiyim sizga katta: {zone} {n} sm keng." (inseam: "uzun"). One line per zone; n = |garment_cm -
