@@ -19,22 +19,30 @@ class MessageTests(SimpleTestCase):
         r = check_fit("tshirt", {"chest_width": 47, "length": 70, "shoulder_width": 46}, False, "adapt", TBODY)
         self.assertEqual(messages.size_mismatch_detail(r), "Bu kiyim sizga mos emas: koʻkrak 6 sm tor.")
         r = check_fit("tshirt", {"chest_width": 61.25, "length": 70, "shoulder_width": 46}, False, "adapt", TBODY)
-        self.assertEqual(messages.size_mismatch_detail(r), "Bu kiyim sizga mos emas: koʻkrak 2.5 sm keng.")
+        self.assertEqual(messages.size_mismatch_detail(r), "Bu kiyim sizga katta: koʻkrak 2.5 sm keng.")
+        self.assertEqual(messages.warning_detail(r), "Bu kiyim sizga katta: koʻkrak 2.5 sm keng.")
+        self.assertTrue(r.fits)  # too_large only is a warning (docs/09 #128)
 
     def test_inseam_qisqa_and_uzun(self):
         pants = {"waist_width": 41, "hip_width": 55}
         r = check_fit("pants", {**pants, "inseam": 70}, False, "adapt", PBODY)  # limit 75
         self.assertEqual(messages.size_mismatch_detail(r), "Bu kiyim sizga mos emas: uzunlik 5 sm qisqa.")
         r = check_fit("pants", {**pants, "inseam": 90}, False, "adapt", PBODY)  # limit 88
-        self.assertEqual(messages.size_mismatch_detail(r), "Bu kiyim sizga mos emas: uzunlik 2 sm uzun.")
+        self.assertEqual(messages.size_mismatch_detail(r), "Bu kiyim sizga katta: uzunlik 2 sm uzun.")
 
     def test_several_zones_one_line_each_in_zone_order(self):
         r = check_fit("pants", {"waist_width": 30, "hip_width": 70, "inseam": 60}, False, "adapt", PBODY)
         self.assertEqual(messages.size_mismatch_detail(r).split("\n"), [
             "Bu kiyim sizga mos emas: bel 16 sm tor.",  # 60 vs limit 76
-            "Bu kiyim sizga mos emas: son 20 sm keng.",  # 140 vs limit 120
+            "Bu kiyim sizga katta: son 20 sm keng.",  # 140 vs limit 120
             "Bu kiyim sizga mos emas: uzunlik 15 sm qisqa.",  # 60 vs limit 75
         ])
+
+    def test_warning_detail_only_lists_too_large(self):
+        r = check_fit("pants", {"waist_width": 30, "hip_width": 70, "inseam": 60}, False, "adapt", PBODY)
+        self.assertEqual(messages.warning_detail(r), "Bu kiyim sizga katta: son 20 sm keng.")
+        ok = check_fit("pants", {"waist_width": 41, "hip_width": 55, "inseam": 81}, False, "adapt", PBODY)
+        self.assertEqual(messages.warning_detail(ok), "")
 
     def test_fixed_texts(self):
         self.assertEqual(messages.GARMENT_SIZE_MISSING, "Bu kiyimning oʻlchamlari kiritilmagan.")

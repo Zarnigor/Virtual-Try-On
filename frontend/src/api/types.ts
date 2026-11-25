@@ -297,7 +297,7 @@ export interface TryOnRequest {
   avatar_id?: number
   /** At most one garment per type (max 2). */
   garment_ids: number[]
-  /** base=avatar only: the user's own sizes for the fit check (docs/11); ignored for base=body. */
+  /** Accepted and IGNORED since docs/09 #129: the fit check uses the rendered Body's / Avatar's own sizes. */
   measurements?: FitMeasurements
 }
 
@@ -325,7 +325,17 @@ export interface FitZoneCheck {
   limit_cm: number | null
 }
 
-/** POST tryon/ 400 from the fit gate (only with FIT_CHECK_ENABLED=1); nothing is created. */
+/** Job result `fit_warnings` item (FIT_CHECK_ENABLED=1, docs/09 #128): rendered, but too large in these zones. */
+export interface FitWarning {
+  garment_id: number
+  /** The too_large zone checks. */
+  checks: FitZoneCheck[]
+  /** "Bu kiyim sizga katta: ..." lines. */
+  detail: string
+}
+
+/** POST tryon/ 400 from the fit gate (only with FIT_CHECK_ENABLED=1); nothing is created.
+ *  SIZE_MISMATCH = at least one too_small zone; checks / detail list too_large zones too. */
 export type FitError =
   | { code: 'GARMENT_SIZE_MISSING'; garment_id: number; keys: string[]; detail: string }
   | { code: 'BODY_SIZE_MISSING'; keys: string[]; detail: string }
@@ -334,8 +344,13 @@ export type FitError =
 /** GET tryon/fit-check/ item; a garment that does not fit is a result (fits false), not an error. */
 export interface FitCheckResult {
   garment_id: number
+  /** No too_small zone (docs/09 #128). A fitting garment may still have warnings. */
   fits: boolean
   checks: FitZoneCheck[]
+  /** too_large zones: the garment is rendered, the user is told it is big. */
+  warnings: FitZoneCheck[]
+  /** Uzbek "Bu kiyim sizga katta: ..." lines; "" when none. */
+  warning_detail: string
   code?: 'GARMENT_SIZE_MISSING' | 'BODY_SIZE_MISSING'
   keys?: string[]
 }

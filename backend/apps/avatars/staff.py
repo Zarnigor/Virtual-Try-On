@@ -14,9 +14,11 @@ from rest_framework.response import Response
 from apps.bodies.landmark_checks import BodyLandmarksInvalid, complete_body_landmarks, validate_body_landmarks
 
 from .models import Avatar
+from .sizes import shoulder_width_cm
 from .serializers import AvatarSerializer
 
-MEASUREMENT_KEYS = ("shoulder", "chest", "waist", "hip")
+# shoulder, chest, waist, hip = circumferences; shoulder_width = a WIDTH for the fit check (docs/09 #129).
+MEASUREMENT_KEYS = ("shoulder", "chest", "waist", "hip", "shoulder_width")
 
 
 class IsStaffOr404(BasePermission):
@@ -121,8 +123,14 @@ def staff_avatar_landmarks(request, pk):
     if "height_cm" in s.validated_data:
         avatar.height_cm = s.validated_data["height_cm"]
         fields.append("height_cm")
-    if "measurements" in s.validated_data:
-        avatar.measurements = {**(avatar.measurements or {}), **s.validated_data["measurements"]}
+    sent = s.validated_data.get("measurements", {})
+    measurements = {**(avatar.measurements or {}), **sent}
+    if "shoulder_width" not in sent:  # docs/09 #129: recomputed from the saved landmarks unless sent explicitly
+        width = shoulder_width_cm(avatar.landmarks, avatar.height_cm)
+        if width is not None:
+            measurements["shoulder_width"] = width
+    if measurements != (avatar.measurements or {}):
+        avatar.measurements = measurements
         fields.append("measurements")
     avatar.save(update_fields=fields)
     return Response(_data(avatar, request))

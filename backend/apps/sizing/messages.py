@@ -22,17 +22,26 @@ def format_cm(value: float) -> str:
     return text[:-2] if text.endswith(".0") else text
 
 
+def zone_line(c) -> str:
+    """too_small: "Bu kiyim sizga mos emas: {zone} {n} sm tor|qisqa."; too_large (a warning, docs/09 #128):
+    "Bu kiyim sizga katta: {zone} {n} sm keng|uzun."; "" for an ok zone."""
+    if c.verdict == "ok":
+        return ""
+    small, large = _WORDS.get(c.zone, ("tor", "keng"))
+    n = format_cm(abs(c.garment_cm - c.limit_cm))
+    if c.verdict == "too_small":
+        return f"Bu kiyim sizga mos emas: {ZONE_NAMES[c.zone]} {n} sm {small}."
+    return f"Bu kiyim sizga katta: {ZONE_NAMES[c.zone]} {n} sm {large}."
+
+
 def size_mismatch_detail(result: FitResult) -> str:
-    """One line per failing zone: "Bu kiyim sizga mos emas: {zone} {n} sm {tor|keng}."."""
-    lines = []
-    for c in result.checks:
-        if c.verdict == "ok":
-            continue
-        small, large = _WORDS.get(c.zone, ("tor", "keng"))
-        word = small if c.verdict == "too_small" else large
-        n = abs(c.garment_cm - c.limit_cm)
-        lines.append(f"Bu kiyim sizga mos emas: {ZONE_NAMES[c.zone]} {format_cm(n)} sm {word}.")
-    return "\n".join(lines)
+    """400 SIZE_MISMATCH detail: one line per failing zone (too_small and too_large), in zone order."""
+    return "\n".join(line for line in map(zone_line, result.checks) if line)
+
+
+def warning_detail(result: FitResult) -> str:
+    """The too_large lines only ("" when there is no warning)."""
+    return "\n".join(zone_line(c) for c in result.warnings)
 
 
 def measurement_invalid_detail(key: str, lo=None, hi=None) -> str:

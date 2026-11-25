@@ -94,9 +94,12 @@ class KeepShapeTests(SimpleTestCase):
         self.assertTrue(r.fits)
         r = check_fit("pants", {"waist_width": 90, "hip_width": 90, "inseam": 100}, False, "keep_shape", PBODY)
         self.assertTrue(r.fits)
-        # the same garments fail on adapt
+        self.assertEqual(r.warnings, [])  # keep_shape: no too_large check, no warning
+        # the same garments get warnings on adapt but still fit (docs/09 #128)
         r = check_fit("tshirt", {"chest_width": 90, "length": 100, "shoulder_width": 70}, False, "adapt", TBODY)
         self.assertEqual([c.verdict for c in r.checks], ["too_large", "too_large"])
+        self.assertTrue(r.fits)
+        self.assertEqual([c.zone for c in r.warnings], ["chest", "shoulder"])
 
     def test_too_small_still_fails(self):
         r = check_fit("tshirt", {**TSHIRT, "chest_width": 45}, False, "keep_shape", TBODY)
@@ -119,6 +122,17 @@ class InseamTests(SimpleTestCase):
     def test_tshirt_needs_no_height(self):
         body = {k: v for k, v in TBODY.items() if k != "height_cm"}
         self.assertTrue(check_fit("tshirt", TSHIRT, False, "adapt", body).fits)
+
+
+class WarningTests(SimpleTestCase):
+    def test_fits_means_no_too_small(self):
+        r = check_fit("tshirt", {**TSHIRT, "chest_width": 61}, False, "adapt", TBODY)  # +22: too_large
+        self.assertTrue(r.fits)
+        self.assertEqual([(c.zone, c.verdict) for c in r.warnings], [("chest", "too_large")])
+        r = check_fit("tshirt", {**TSHIRT, "chest_width": 40, "shoulder_width": 60}, False, "adapt", TBODY)
+        self.assertFalse(r.fits)
+        self.assertEqual([c.zone for c in r.warnings], ["shoulder"])
+        self.assertEqual(check_fit("tshirt", TSHIRT, False, "adapt", TBODY).warnings, [])
 
 
 class ReportTests(SimpleTestCase):

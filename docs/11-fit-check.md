@@ -25,8 +25,9 @@ body/avatar. Before rendering, the backend checks whether the garment really fit
   either way.
 
 ## Decisions (owner, 2026-11-25)
-1. **Too small -> always "mos emas". Too large -> "mos emas" only for `adapt`.** `keep_shape` (oversized, wide-leg)
-   has no upper limit: it is big on purpose.
+1. **Too small -> always "mos emas" (rejected). Too large -> a WARNING, not a rejection (changed 2026-11-25,
+   docs/09 #128):** the garment is rendered and the user is told "Bu kiyim sizga katta"; only for `adapt`.
+   `keep_shape` (oversized, wide-leg) has no upper limit and no warning: it is big on purpose.
 2. **Garments without sizes are blocked from try-on** until sizes are entered: `GARMENT_SIZE_MISSING`. Sizes are
    required on new uploads; existing garments (#28, #40, #43, #44, #45, demo catalog) get them once via
    `PATCH garments/{id}/sizes/`.
@@ -62,8 +63,11 @@ estimate). Missing -> 400 `BODY_SIZE_MISSING`.
 Stored (step 3, docs/09 #126) as `Body.measurements.shoulder_width` (and optional `inseam`), validated with the other
 keys by `apps/sizing/measurements.py` (docs/11 ranges, all optional; `MEASUREMENTS_INVALID`) at `body/confirm/` and
 `PATCH body/measurements/` (yearly lock unchanged). The PATCH **merges** (docs/09 #127): sent keys replace the stored
-values, the rest stay; `null` is rejected (no key removal); an identical PATCH does not start the lock. Avatar: no change, the avatar path sends the user's sizes in
-`POST tryon/` `measurements`.
+values, the rest stay; `null` is rejected (no key removal); an identical PATCH does not start the lock.
+**Avatar (docs/09 #129): `Avatar.measurements.shoulder_width`** (cm, width) = shoulder px width x height_cm /
+(foot_bottom.y - head_top.y) (#76), filled by `manage.py fill_avatar_shoulder_width [--dry-run]` (never overwrites)
+and recomputed when staff save the avatar landmarks (unless the request sets it). Seeded values: 38.5, 41.9, 46.7
+(male slim / average / plus), 35.8, 41.6, 39.9 (female slim / average / plus).
 
 ## Rules (proposed thresholds, calibrate in step 5)
 `garment_circ = 2 x flat_width`, `ease = garment_circ - body_circ`. Widths (shoulder) are compared directly.
@@ -88,7 +92,7 @@ values, the rest stay; `null` is rejected (no key removal); an identical PATCH d
   fit_mode raise `ValueError`.
 - A value exactly on a threshold passes (boundary tests).
 - Optional garment fields are checked only when present (none have rules yet).
-- `fits = all zones ok`.
+- `fits` = no too_small zone; `FitResult.warnings` = the too_large zones (docs/09 #128).
 
 ## API
 - `POST garments/` multipart: adds `sizes` (JSON string) and `stretch`; `sizes` required. 400 `SIZES_INVALID`.
@@ -98,19 +102,24 @@ values, the rest stay; `null` is rejected (no key removal); an identical PATCH d
   fit gate -> demo short-circuit -> job. Every garment is checked; the first failing one in `garment_ids` order is
   reported: 400 `GARMENT_SIZE_MISSING` `{garment_id, keys, detail}` / `BODY_SIZE_MISSING` `{keys, detail}` /
   `SIZE_MISMATCH` `{garment_id, checks: [{zone, garment_cm, body_cm, ease_cm, verdict, limit_cm}], detail}`.
-  No job and no outfit is created on failure. Base=body uses `Body.height_cm` + `Body.measurements`; base=avatar
-  uses the request `measurements` (400 `MEASUREMENTS_INVALID` outside the ranges).
-- `GET tryon/fit-check/?base=avatar|body&avatar_id=&garment_ids=1,2` (+ the measurement keys as query params for
-  avatar) -> 200 `{results: [{garment_id, fits, checks, code?, keys?}]}` (UI: disable the try-on button early). Same
+  `SIZE_MISMATCH` = at least one too_small zone; its `checks` and `detail` list every failing zone (too_small and
+  too_large). No job and no outfit is created on failure. A garment whose only failing zones are too_large is rendered
+  (202) and the job result gets `fit_warnings: [{garment_id, checks, detail}]` (flag 1 only; `[]` when none).
+  **The check always uses the sizes of the body that is rendered (docs/09 #129):** base=body `Body.height_cm` +
+  `Body.measurements`; base=avatar `Avatar.height_cm` + `Avatar.measurements` (chest, waist, hip, shoulder_width;
+  inseam estimated). A request `measurements` is accepted and ignored (the frontend stops sending it later).
+- `GET tryon/fit-check/?base=avatar|body&avatar_id=&garment_ids=1,2` (measurement query params are accepted and
+  ignored, #129) -> 200 `{results: [{garment_id, fits, checks, warnings, warning_detail, code?, keys?}]}` (UI:
+  disable the try-on button early; `fits: true` with `warnings` = rendered, but big). Same
   gate as `POST tryon/`. Not fitting = a result; missing sizes = `fits: false, checks: []` + code + keys. 400 only for
   bad params; a garment the user cannot see -> 404. base=body needs a confirmed body (same 400 as `POST tryon/`).
-- Avatar path: the check uses the measurements the user entered (the ones the avatar was chosen by), not the avatar's
-  nominal measurements. Proposed: pass them in `POST tryon/` as `measurements` (same shape as body).
 - Contract rule (docs/04): views, serializers and `frontend/src/api/types.ts` change in the same commit.
 
 ## User messages (Uzbek, backend-produced, docs/02 rule 18)
-- `SIZE_MISMATCH`: "Bu kiyim sizga mos emas: {zone} {n} sm {tor|keng}." (one line per failing zone; inseam uses
-  `qisqa|uzun`; n = |garment_cm - limit_cm|, 1 decimal, trailing .0 dropped). Code: `apps/sizing/messages.py`.
+- too_small zone: "Bu kiyim sizga mos emas: {zone} {n} sm tor." (inseam: "qisqa"); too_large zone (warning,
+  #128): "Bu kiyim sizga katta: {zone} {n} sm keng." (inseam: "uzun"). One line per zone; n = |garment_cm -
+  limit_cm|, 1 decimal, trailing .0 dropped. `SIZE_MISMATCH.detail` = all lines, `fit_warnings[].detail` /
+  `warning_detail` = the "katta" lines. Code: `apps/sizing/messages.py`.
 - `MEASUREMENTS_INVALID`: "{field}: {min} dan {max} sm gacha boʻlishi kerak." (or "{field}: son kiriting.")
 - `GARMENT_SIZE_MISSING`: "Bu kiyimning oʻlchamlari kiritilmagan."
 - `BODY_SIZE_MISSING`: "Kiyimni tekshirish uchun oʻlchamlaringizni kiriting."

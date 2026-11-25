@@ -782,3 +782,16 @@ _(none blocking P0)_
     `MEASUREMENTS_INVALID` (no key removal: a removal plus the yearly lock would lose a value for a year); the lock
     starts only when at least one value actually changes. `GET tryon/fit-check/` base=body requires a confirmed body,
     same 400 as `POST tryon/`.
+128. **2026-11-25: too_large is a warning, not a rejection** (owner). Only a too_small zone rejects (400
+    `SIZE_MISMATCH`, its detail lists every failing zone). A garment whose only failing zones are too_large is
+    rendered: 202 and the job result `fit_warnings: [{garment_id, checks, detail}]`, detail per zone "Bu kiyim sizga
+    katta: {zone} {n} sm keng." (inseam "uzun"). keep_shape: still no too_large check, so no warning.
+    `FitResult.fits` = no too_small zone, `FitResult.warnings` = the too_large zones; fit-check results add
+    `warnings` + `warning_detail`. Supersedes the "too large -> mos emas" half of docs/11 decision 1.
+129. **2026-11-25: the fit check uses the sizes of the body that is rendered** (owner). base=body: Body sizes
+    (unchanged); base=avatar: the AVATAR's `height_cm` + `measurements` (chest, waist, hip, shoulder_width; inseam
+    estimated). Request `measurements` (POST tryon/) and the avatar measurement params (GET tryon/fit-check/) are
+    accepted and ignored; the frontend stops sending them in a later step (supersedes the avatar part of #126).
+    `Avatar.measurements.shoulder_width` (cm, width) = shoulder px x height_cm / (foot_bottom.y - head_top.y) (#76):
+    `manage.py fill_avatar_shoulder_width [--dry-run]` (never overwrites), recomputed on the staff landmark save
+    unless sent. Seeded: 38.5 / 41.9 / 46.7 (male slim / average / plus), 35.8 / 41.6 / 39.9 (female).

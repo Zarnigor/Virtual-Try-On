@@ -18,7 +18,7 @@ def run_tryon(job_pk: int):
         outfit = Outfit.objects.get(pk=job.target_id)
         report = _do_warp(outfit)
         job.status = "done"
-        job.result = {"outfit_id": outfit.pk, **report}
+        job.result = {**(job.result or {}), "outfit_id": outfit.pk, **report}  # keeps fit_warnings (docs/09 #128)
         job.save(update_fields=["status", "result"])
 
     except Exception as e:

@@ -9,7 +9,6 @@ from apps.avatars.models import Avatar
 from apps.garments.models import Garment
 from .tasks import run_tryon
 from . import fit_gate
-from apps.sizing.measurements import MeasurementsInvalid, RANGES as MEASUREMENT_RANGES, validate_measurements
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,7 +30,7 @@ def app_config(request):
     return Response({"demo_mode": settings.DEMO_MODE, "fit_check_enabled": settings.FIT_CHECK_ENABLED})
 
 
-def _serve_demo(request, avatar_obj, garments):
+def _serve_demo(request, avatar_obj, garments, extra_result=None):
     """DEMO_MODE: a precomputed result for this exact (avatar, garments) pair, as a finished job. None if absent."""
     from pathlib import Path
     from django.conf import settings
@@ -47,7 +46,7 @@ def _serve_demo(request, avatar_obj, garments):
     data = (Path(settings.MEDIA_ROOT) / rel).read_bytes()
     outfit.result_image.save(f"result_{outfit.pk}.png", ContentFile(data), save=True)
     job = Job.objects.create(user=request.user, kind="tryon", target_id=outfit.pk, status="done",
-                             result={"outfit_id": outfit.pk, "demo": True})
+                             result={"outfit_id": outfit.pk, "demo": True, **(extra_result or {})})
     return Response({"job_id": job.pk, "outfit_id": outfit.pk}, status=202)
 
 
@@ -57,9 +56,10 @@ def start_tryon(request):
     """
     POST /api/tryon/
     body: { base: "body" | "avatar", avatar_id?: int, garment_ids: [int, ...], measurements?: {...} }
-    Returns the job id for polling. measurements (base=avatar only, the user's own sizes, docs/11) are always
-    validated (400 MEASUREMENTS_INVALID); with FIT_CHECK_ENABLED the fit gate runs after the existing checks and
-    before the demo short-circuit (400 GARMENT_SIZE_MISSING | BODY_SIZE_MISSING | SIZE_MISMATCH, nothing created).
+    Returns the job id for polling. With FIT_CHECK_ENABLED the fit gate runs after the existing checks and before
+    the demo short-circuit, on the sizes of the body that is rendered (Body or Avatar, docs/09 #129; a request
+    `measurements` is accepted and ignored): 400 GARMENT_SIZE_MISSING | BODY_SIZE_MISSING | SIZE_MISMATCH (a too_small
+    zone), nothing created; too_large zones only are rendered and listed in the job result `fit_warnings` (#128).
     """
     data = request.data
     base_type = data.get("base", "body")
@@ -71,7 +71,6 @@ def start_tryon(request):
         return Response({"detail": "max 2 garments per try-on"}, status=400)
 
     body_obj = None
-    request_sizes = {}
     avatar_obj = None
 
     if base_type == "body":
@@ -91,10 +90,6 @@ def start_tryon(request):
             avatar_obj = Avatar.objects.get(pk=avatar_id)
         except Avatar.DoesNotExist:
             return Response(status=404)
-        try:  # the user's own sizes, not the avatar's; base=body ignores the field
-            request_sizes = validate_measurements(data.get("measurements"))
-        except MeasurementsInvalid as e:
-            return Response({"code": "MEASUREMENTS_INVALID", "detail": e.detail, "field": e.key}, status=400)
 
     # validate garments
     garments = []
@@ -120,14 +115,16 @@ def start_tryon(request):
         return Response({"detail": "Duplicate garment types"}, status=400)
 
     from django.conf import settings
+    fit_result = {}
     if settings.FIT_CHECK_ENABLED:
-        sizes = fit_gate.body_sizes_from_body(body_obj) if body_obj is not None else request_sizes
-        failed = fit_gate.first_failure(fit_gate.run_gate(garments, sizes))
+        results = fit_gate.run_gate(garments, fit_gate.sizes_from(body_obj or avatar_obj))
+        failed = fit_gate.first_failure(results)
         if failed is not None:
             return Response(failed.as_error(), status=400)
+        fit_result = {"fit_warnings": [r.as_warning() for r in results if r.warnings]}
 
     if settings.DEMO_MODE and avatar_obj is not None:
-        served = _serve_demo(request, avatar_obj, garments)
+        served = _serve_demo(request, avatar_obj, garments, fit_result)
         if served is not None:
             return served
 
@@ -142,6 +139,7 @@ def start_tryon(request):
         user=request.user,
         kind="tryon",
         target_id=outfit.pk,
+        result=fit_result or None,  # run_tryon merges its report into it (fit_warnings kept)
     )
     run_tryon.delay(job.pk)
 
@@ -159,26 +157,12 @@ def _query_ids(raw):
     return [int(p) for p in parts]
 
 
-def _query_measurements(params):
-    """Measurement query params -> numbers (MeasurementsInvalid for a non-number); other params are ignored."""
-    out = {}
-    for key in MEASUREMENT_RANGES:
-        raw = params.get(key)
-        if raw is None or raw == "":
-            continue
-        try:
-            out[key] = float(raw)
-        except ValueError:
-            out[key] = raw  # the validator rejects it with the field's message
-    return validate_measurements(out)
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def fit_check(request):
-    """GET /api/tryon/fit-check/?base=avatar|body&avatar_id=&garment_ids=1,2 (+ height_cm, chest, waist, hip,
-    shoulder_width, inseam for base=avatar) -> {results: [{garment_id, fits, checks, code?, keys?}]}.
-    Same gate as POST tryon/, regardless of FIT_CHECK_ENABLED. A garment that does not fit is a result, not an error."""
+    """GET /api/tryon/fit-check/?base=avatar|body&avatar_id=&garment_ids=1,2 -> {results: [{garment_id, fits, checks,
+    warnings, warning_detail, code?, keys?}]}. Same gate as POST tryon/ (the rendered body's sizes; measurement query
+    params are accepted and ignored, docs/09 #129), regardless of FIT_CHECK_ENABLED. Not fitting = a result."""
     params = request.query_params
     base = params.get("base")
     if base not in ("avatar", "body"):
@@ -193,17 +177,15 @@ def fit_check(request):
             return Response(status=404)
         if not body_obj.is_confirmed:  # same answer as POST tryon/
             return Response({"detail": "Body not confirmed yet"}, status=400)
-        sizes = fit_gate.body_sizes_from_body(body_obj)
+        sizes = fit_gate.sizes_from(body_obj)
     else:
         avatar_id = params.get("avatar_id")
         if not avatar_id or not avatar_id.isdigit():
             return Response({"code": "BAD_AVATAR_ID", "detail": "avatar_id kerak."}, status=400)
-        if not Avatar.objects.filter(pk=int(avatar_id)).exists():
+        avatar_obj = Avatar.objects.filter(pk=int(avatar_id)).first()
+        if avatar_obj is None:
             return Response(status=404)
-        try:
-            sizes = _query_measurements(params)
-        except MeasurementsInvalid as e:
-            return Response({"code": "MEASUREMENTS_INVALID", "detail": e.detail, "field": e.key}, status=400)
+        sizes = fit_gate.sizes_from(avatar_obj)
 
     garments = []
     for gid in ids:  # same visibility rule as POST tryon/: owner, or public AND approved

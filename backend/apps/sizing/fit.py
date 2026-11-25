@@ -8,7 +8,7 @@ Garment sizes are flat-lay cm (apps/garments/size_checks.py keys). Body sizes (c
   Body/Avatar.measurements, which is never converted); inseam optional, else height_cm x BODY_INSEAM_HEIGHT_RATIO.
 """
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 EPS = 1e-9  # "exactly on a limit passes" must survive float noise (e.g. 2 x 45.1)
 
@@ -40,8 +40,11 @@ class ZoneCheck:
 
 @dataclass(frozen=True)
 class FitResult:
+    """fits = no too_small zone (docs/09 #128: only too_small rejects). warnings = the too_large zones (adapt only):
+    the garment is rendered and the user is told it is big."""
     fits: bool
     checks: list
+    warnings: list = field(default_factory=list)
 
 
 def _num(v):
@@ -88,4 +91,5 @@ def check_fit(garment_type, garment_sizes, stretch, fit_mode, body_sizes, rules=
             verdict, limit = "too_large", b + rule["max_ease"]
         checks.append(ZoneCheck(zone, round(g, 1), round(b, 1), round(ease, 1), verdict,
                                 None if limit is None else round(limit, 1)))
-    return FitResult(all(c.verdict == "ok" for c in checks), checks)
+    return FitResult(all(c.verdict != "too_small" for c in checks), checks,
+                     [c for c in checks if c.verdict == "too_large"])

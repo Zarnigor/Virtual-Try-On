@@ -1,4 +1,5 @@
-"""Fit gate in try-on (docs/11 step 3, docs/09 #126): POST tryon/ and GET tryon/fit-check/."""
+"""Fit gate in try-on (docs/11, docs/09 #126, #128, #129): POST tryon/ and GET tryon/fit-check/.
+The gate uses the rendered body's sizes (Body or Avatar); only too_small rejects, too_large is a warning."""
 from unittest import mock
 
 from django.core.files.base import ContentFile
@@ -10,13 +11,13 @@ from apps.bodies.models import Body
 from apps.garments.models import Garment
 from apps.jobs.models import Job
 from apps.outfits.models import Outfit
-from apps.sizing.measurements import RANGES
 from apps.testing import MediaTestCase, png_bytes
 
 LM = {"shoulder": {"y": 5, "left_x": 5, "right_x": 55}}
-SIZES = {"height_cm": 175, "chest": 100, "waist": 80, "hip": 100, "shoulder_width": 44, "inseam": 80}
-TSHIRT = {"chest_width": 55, "length": 70, "shoulder_width": 46}  # fits SIZES
-PANTS = {"waist_width": 41, "hip_width": 55, "inseam": 81}  # fits SIZES
+# Avatar sizes: inseam estimated from height (178 x 0.45 = 80.1)
+AVATAR_M = {"shoulder": 116, "chest": 100, "waist": 80, "hip": 100, "shoulder_width": 44}
+TSHIRT = {"chest_width": 55, "length": 70, "shoulder_width": 46}  # fits: chest +10, shoulder +2
+PANTS = {"waist_width": 41, "hip_width": 55, "inseam": 81}  # fits: waist +2, hip +10, inseam +0.9
 
 
 class FitBase(MediaTestCase):
@@ -25,8 +26,7 @@ class FitBase(MediaTestCase):
         self.user = self.make_user()
         self.other = self.make_user("b@test.uz")
         self.login(self.user)
-        self.avatar = Avatar.objects.create(sex="male", build="average",
-                                            measurements={"shoulder": 116, "chest": 98, "waist": 86, "hip": 98})
+        self.avatar = Avatar.objects.create(sex="male", build="average", height_cm=178, measurements=dict(AVATAR_M))
 
     def garment(self, gtype="tshirt", sizes="default", owner="me", **kw):
         if sizes == "default":
@@ -43,12 +43,10 @@ class FitBase(MediaTestCase):
         b.save()
         return b
 
-    def post(self, garments, measurements=SIZES, base="avatar", **extra):
+    def post(self, garments, base="avatar", **extra):
         data = {"base": base, "garment_ids": [g.id for g in garments], **extra}
         if base == "avatar":
             data["avatar_id"] = self.avatar.id
-        if measurements is not None:
-            data["measurements"] = measurements
         return self.client.post("/api/tryon/", data, format="json")
 
     def assert_nothing_created(self):
@@ -59,10 +57,49 @@ class FitBase(MediaTestCase):
 @override_settings(FIT_CHECK_ENABLED=True)
 @mock.patch("apps.tryon_engine.views.run_tryon.delay")
 class PostTryonFitTests(FitBase):
-    def test_fitting_garments_start_the_job(self, delay):
+    def test_fitting_garments_start_the_job_without_warnings(self, delay):
         r = self.post([self.garment(), self.garment("pants")])
         self.assertEqual(r.status_code, 202, r.data)
         delay.assert_called_once()
+        self.assertEqual(Job.objects.get(pk=r.data["job_id"]).result, {"fit_warnings": []})
+
+    def test_too_large_only_is_rendered_with_fit_warnings(self, delay):
+        g = self.garment(sizes={**TSHIRT, "chest_width": 62})  # 124 vs limit 120: 4 cm big
+        r = self.post([g])
+        self.assertEqual(r.status_code, 202, r.data)
+        delay.assert_called_once()
+        warnings = Job.objects.get(pk=r.data["job_id"]).result["fit_warnings"]
+        self.assertEqual(warnings, [{"garment_id": g.id, "detail": "Bu kiyim sizga katta: koʻkrak 4 sm keng.",
+                                     "checks": [{"zone": "chest", "garment_cm": 124, "body_cm": 100, "ease_cm": 24,
+                                                 "verdict": "too_large", "limit_cm": 120}]}])
+
+    def test_fit_warnings_survive_the_task(self, delay):
+        from apps.tryon_engine import tasks
+        r = self.post([self.garment(sizes={**TSHIRT, "chest_width": 62})])
+        job = Job.objects.get(pk=r.data["job_id"])
+        with mock.patch.object(tasks, "_do_warp", return_value={"engine": "mls"}):
+            tasks.run_tryon(job.pk)
+        job.refresh_from_db()
+        self.assertEqual(job.status, "done")
+        self.assertEqual((job.result["engine"], len(job.result["fit_warnings"])), ("mls", 1))
+        self.assertEqual(job.result["outfit_id"], r.data["outfit_id"])
+
+    def test_too_small_plus_too_large_is_400_listing_both(self, delay):
+        g = self.garment(sizes={**TSHIRT, "chest_width": 47, "shoulder_width": 52})  # chest -6, shoulder +8
+        r = self.post([g])
+        self.assertEqual((r.status_code, r.data["code"], r.data["garment_id"]), (400, "SIZE_MISMATCH", g.id))
+        self.assertEqual([(c["zone"], c["verdict"]) for c in r.data["checks"]],
+                         [("chest", "too_small"), ("shoulder", "too_large")])
+        self.assertEqual(r.data["detail"].split("\n"), ["Bu kiyim sizga mos emas: koʻkrak 6 sm tor.",
+                                                        "Bu kiyim sizga katta: yelka 2 sm keng."])
+        self.assert_nothing_created()
+        delay.assert_not_called()
+
+    def test_keep_shape_huge_garment_no_warning(self, delay):
+        g = self.garment(sizes={"chest_width": 90, "length": 100, "shoulder_width": 70}, fit_mode="keep_shape")
+        r = self.post([g])
+        self.assertEqual(r.status_code, 202, r.data)
+        self.assertEqual(Job.objects.get(pk=r.data["job_id"]).result, {"fit_warnings": []})
 
     def test_garment_size_missing(self, delay):
         g = self.garment(sizes=None)
@@ -72,27 +109,23 @@ class PostTryonFitTests(FitBase):
                                   "keys": ["chest_width", "shoulder_width"],
                                   "detail": "Bu kiyimning oʻlchamlari kiritilmagan."})
         self.assert_nothing_created()
-        delay.assert_not_called()
 
-    def test_body_size_missing(self, delay):
-        r = self.post([self.garment()], measurements={"chest": 100})
+    def test_avatar_missing_shoulder_width_is_body_size_missing(self, delay):
+        self.avatar.measurements = {k: v for k, v in AVATAR_M.items() if k != "shoulder_width"}
+        self.avatar.save()
+        r = self.post([self.garment()], measurements={"shoulder_width": 44})  # request sizes do not help
         self.assertEqual(r.status_code, 400)
         self.assertEqual(r.data, {"code": "BODY_SIZE_MISSING", "keys": ["shoulder_width"],
                                   "detail": "Kiyimni tekshirish uchun oʻlchamlaringizni kiriting."})
-        r = self.post([self.garment()], measurements=None)  # no measurements at all
-        self.assertEqual((r.data["code"], r.data["keys"]), ("BODY_SIZE_MISSING", ["chest", "shoulder_width"]))
         self.assert_nothing_created()
 
-    def test_size_mismatch(self, delay):
-        g = self.garment(sizes={**TSHIRT, "chest_width": 47})  # 94 vs chest 100: 6 cm tight
-        r = self.post([g])
-        self.assertEqual((r.status_code, r.data["code"], r.data["garment_id"]), (400, "SIZE_MISMATCH", g.id))
-        self.assertEqual(r.data["checks"][0], {"zone": "chest", "garment_cm": 94, "body_cm": 100, "ease_cm": -6,
-                                               "verdict": "too_small", "limit_cm": 100})
-        self.assertEqual(r.data["checks"][1]["verdict"], "ok")
-        self.assertEqual(r.data["detail"], "Bu kiyim sizga mos emas: koʻkrak 6 sm tor.")
-        self.assert_nothing_created()
-        delay.assert_not_called()
+    def test_avatar_base_uses_the_avatar_sizes_request_ignored(self, delay):
+        g = self.garment(sizes={**TSHIRT, "chest_width": 47})  # too small for the avatar's chest 100
+        r = self.post([g], measurements={"chest": 90, "shoulder_width": 44, "height_cm": 175})
+        self.assertEqual((r.status_code, r.data["code"]), (400, "SIZE_MISMATCH"))
+        ok = self.garment()
+        r = self.post([ok], measurements={"chest": 1000, "waist": "x"})  # ignored, not even validated
+        self.assertEqual(r.status_code, 202, r.data)
 
     def test_first_failing_garment_in_garment_ids_order(self, delay):
         small_tshirt = self.garment(sizes={**TSHIRT, "chest_width": 40})
@@ -101,14 +134,13 @@ class PostTryonFitTests(FitBase):
         self.assertEqual((r.data["code"], r.data["garment_id"]), ("GARMENT_SIZE_MISSING", no_size_pants.id))
         r = self.post([small_tshirt, no_size_pants])
         self.assertEqual((r.data["code"], r.data["garment_id"]), ("SIZE_MISMATCH", small_tshirt.id))
-        ok_tshirt = self.garment()
-        r = self.post([ok_tshirt, no_size_pants])  # a fitting first garment does not hide the second
+        big_tshirt = self.garment(sizes={**TSHIRT, "chest_width": 62})  # a warning does not stop the check
+        r = self.post([big_tshirt, no_size_pants])
         self.assertEqual((r.data["code"], r.data["garment_id"]), ("GARMENT_SIZE_MISSING", no_size_pants.id))
         self.assert_nothing_created()
 
     def test_gender_mismatch_comes_before_the_fit_gate(self, delay):
-        g = self.garment(sizes=None, gender="female")
-        r = self.post([g])
+        r = self.post([self.garment(sizes=None, gender="female")])
         self.assertEqual(r.data["code"], "GENDER_MISMATCH")
 
     @override_settings(DEMO_MODE=True)
@@ -120,36 +152,17 @@ class PostTryonFitTests(FitBase):
             self.assertEqual(self.post([self.garment()]).status_code, 202)
             lookup.assert_called_once()
 
-    def test_avatar_base_uses_the_request_sizes_not_the_avatar(self, delay):
-        g = self.garment(sizes={**TSHIRT, "chest_width": 52})  # 104: fits chest 100, too large for chest 80
-        self.assertEqual(self.post([g]).status_code, 202)
-        r = self.post([g], measurements={**SIZES, "chest": 80})
-        self.assertEqual((r.data["code"], r.data["checks"][0]["verdict"]), ("SIZE_MISMATCH", "too_large"))
-
-    def test_body_base_uses_body_sizes_and_ignores_the_request(self, delay):
+    def test_body_base_uses_body_sizes(self, delay):
         self.body(measurements={"shoulder": 116, "chest": 100, "shoulder_width": 44})
         g = self.garment()
-        r = self.post([g], base="body", measurements={"chest": 1000})  # ignored, not even validated
-        self.assertEqual(r.status_code, 202, r.data)
+        self.assertEqual(self.post([g], base="body", measurements={"chest": 1000}).status_code, 202)
         Body.objects.filter(user=self.user).update(measurements={"chest": 100, "shoulder": 116})
-        r = self.post([g], base="body", measurements=SIZES)  # request has shoulder_width: still ignored
+        r = self.post([g], base="body")
         self.assertEqual((r.data["code"], r.data["keys"]), ("BODY_SIZE_MISSING", ["shoulder_width"]))
 
     def test_body_base_pants_use_height_for_inseam(self, delay):
         self.body(measurements={"waist": 80, "hip": 100}, height_cm=180)  # 81 vs 81: ok
         self.assertEqual(self.post([self.garment("pants")], base="body").status_code, 202)
-
-    def test_request_measurements_validated(self, delay):
-        for key, (lo, hi) in RANGES.items():
-            for value, ok in ((lo, True), (hi, True), (lo - 0.5, False), (hi + 0.5, False)):
-                with self.subTest(key=key, value=value):
-                    with override_settings(FIT_CHECK_ENABLED=False):
-                        r = self.post([self.garment()], measurements={key: value})
-                    if ok:
-                        self.assertEqual(r.status_code, 202, r.data)
-                    else:
-                        self.assertEqual((r.status_code, r.data["code"], r.data["field"]),
-                                         (400, "MEASUREMENTS_INVALID", key))
 
 
 @override_settings(FIT_CHECK_ENABLED=False)
@@ -158,43 +171,51 @@ class FlagOffTests(FitBase):
     def test_flag_off_is_the_old_behaviour(self, delay):
         for g in (self.garment(sizes=None), self.garment(sizes={**TSHIRT, "chest_width": 30})):
             with self.subTest(garment=g.id):
-                self.assertEqual(self.post([g], measurements=None).status_code, 202)
-                self.assertEqual(self.post([g]).status_code, 202)  # measurements accepted, not used
-
-    def test_flag_off_still_validates_measurements(self, delay):
-        r = self.post([self.garment()], measurements={"chest": 10})
-        self.assertEqual(r.data["code"], "MEASUREMENTS_INVALID")
-        self.assert_nothing_created()
+                r = self.post([g], measurements={"chest": 10})  # accepted and ignored
+                self.assertEqual(r.status_code, 202)
+                self.assertIsNone(Job.objects.get(pk=r.data["job_id"]).result)  # no fit_warnings
 
 
 class FitCheckEndpointTests(FitBase):
     URL = "/api/tryon/fit-check/"
 
-    def get(self, garments, base="avatar", sizes=SIZES, **extra):
+    def get(self, garments, base="avatar", **extra):
         params = {"base": base, "garment_ids": ",".join(str(g.id) for g in garments), **extra}
         if base == "avatar":
             params.setdefault("avatar_id", self.avatar.id)
-            params.update(sizes or {})
         return self.client.get(self.URL, params)
 
     @override_settings(FIT_CHECK_ENABLED=False)
-    def test_results_regardless_of_flag_and_non_fitting_is_200(self):
-        ok, small, missing = (self.garment(), self.garment("pants", sizes={**PANTS, "waist_width": 30}),
-                              self.garment(sizes=None))
-        r = self.get([ok, small, missing])
+    def test_results_regardless_of_flag(self):
+        ok = self.garment()
+        small = self.garment("pants", sizes={**PANTS, "waist_width": 30})
+        big = self.garment(sizes={**TSHIRT, "chest_width": 62})
+        missing = self.garment(sizes=None)
+        r = self.get([ok, small, big, missing])
         self.assertEqual(r.status_code, 200, r.data)
         res = r.data["results"]
-        self.assertEqual([x["garment_id"] for x in res], [ok.id, small.id, missing.id])
-        self.assertEqual((res[0]["fits"], [c["zone"] for c in res[0]["checks"]]), (True, ["chest", "shoulder"]))
+        self.assertEqual([x["garment_id"] for x in res], [ok.id, small.id, big.id, missing.id])
+        self.assertEqual((res[0]["fits"], res[0]["warnings"], res[0]["warning_detail"]), (True, [], ""))
         self.assertNotIn("code", res[0])
         self.assertEqual((res[1]["fits"], res[1]["checks"][0]["verdict"]), (False, "too_small"))
-        self.assertEqual(res[2], {"garment_id": missing.id, "fits": False, "checks": [],
-                                  "code": "GARMENT_SIZE_MISSING", "keys": ["chest_width", "shoulder_width"]})
+        self.assertTrue(res[2]["fits"])  # too_large only: fits, with a warning
+        self.assertEqual([c["zone"] for c in res[2]["warnings"]], ["chest"])
+        self.assertEqual(res[2]["warning_detail"], "Bu kiyim sizga katta: koʻkrak 4 sm keng.")
+        self.assertEqual(res[3], {"garment_id": missing.id, "fits": False, "checks": [], "warnings": [],
+                                  "warning_detail": "", "code": "GARMENT_SIZE_MISSING",
+                                  "keys": ["chest_width", "shoulder_width"]})
 
-    def test_body_size_missing_result(self):
-        r = self.get([self.garment("pants")], sizes={"waist": 80})
-        self.assertEqual(r.data["results"][0]["code"], "BODY_SIZE_MISSING")
-        self.assertEqual(r.data["results"][0]["keys"], ["hip", "inseam"])
+    def test_avatar_sizes_used_query_sizes_ignored(self):
+        g = self.garment(sizes={**TSHIRT, "chest_width": 47})
+        r = self.get([g], chest="80", shoulder_width="abc")  # neither used nor validated
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(r.data["results"][0]["fits"])
+
+    def test_avatar_missing_key_result(self):
+        self.avatar.measurements = {"chest": 100}
+        self.avatar.save()
+        res = self.get([self.garment("pants")]).data["results"][0]
+        self.assertEqual((res["code"], res["keys"]), ("BODY_SIZE_MISSING", ["waist", "hip"]))
 
     def test_same_answer_as_post(self):
         g = self.garment(sizes={**TSHIRT, "chest_width": 47})
@@ -205,7 +226,7 @@ class FitCheckEndpointTests(FitBase):
 
     def test_body_base(self):
         self.body(measurements={"chest": 100, "shoulder_width": 44})
-        r = self.get([self.garment()], base="body", chest="10")  # query sizes ignored for base=body
+        r = self.get([self.garment()], base="body", chest="10")
         self.assertTrue(r.data["results"][0]["fits"])
 
     def test_bad_params_are_400(self):
@@ -215,10 +236,6 @@ class FitCheckEndpointTests(FitBase):
             ({"base": "avatar", "avatar_id": self.avatar.id}, "BAD_GARMENT_IDS"),
             ({"base": "avatar", "avatar_id": self.avatar.id, "garment_ids": "1,a"}, "BAD_GARMENT_IDS"),
             ({"base": "avatar", "garment_ids": str(g.id)}, "BAD_AVATAR_ID"),
-            ({"base": "avatar", "avatar_id": self.avatar.id, "garment_ids": str(g.id), "chest": "10"},
-             "MEASUREMENTS_INVALID"),
-            ({"base": "avatar", "avatar_id": self.avatar.id, "garment_ids": str(g.id), "chest": "abc"},
-             "MEASUREMENTS_INVALID"),
         ):
             with self.subTest(params=params):
                 r = self.client.get(self.URL, params)
@@ -254,5 +271,5 @@ class ConfigFlagTests(MediaTestCase):
     def test_config_exposes_the_fit_check_flag(self):
         for flag in (True, False):
             with override_settings(FIT_CHECK_ENABLED=flag):
-                r = self.client.get("/api/config/")  # public, no login
+                r = self.client.get("/api/config/")
             self.assertEqual((r.status_code, r.data["fit_check_enabled"]), (200, flag))
