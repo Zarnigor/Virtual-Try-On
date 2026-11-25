@@ -1,6 +1,7 @@
 """POST /api/staff/avatars/ (staff only): new avatar photo through the shared body pipeline, then the editor.
 
-Multipart: sex, build, photo, height_cm, shoulder, chest, waist, hip (nominal circumferences, cm). One avatar per
+Multipart: sex, build, photo, height_cm, shoulder, chest, waist, hip (nominal circumferences, cm), shoulder_width?
+(cm, a width; default: computed from the new landmarks, docs/09 #129). One avatar per
 (sex, build): uploading an existing pair replaces its photo and landmarks and resets landmarks_confirmed_at (200);
 a new pair returns 201. Runs synchronously (rembg, a few seconds); no AI call.
 """
@@ -12,6 +13,7 @@ from apps.bodies.pipeline import BodyPhotoRejected, process_body_photo
 from apps.images import ImageRejected, validate_image_upload
 
 from .models import Avatar
+from .sizes import with_shoulder_width
 
 MIN_SIDE_PX = 600
 
@@ -25,6 +27,7 @@ class AvatarUploadSerializer(serializers.Serializer):
     chest = serializers.FloatField(min_value=20, max_value=300)
     waist = serializers.FloatField(min_value=20, max_value=300)
     hip = serializers.FloatField(min_value=20, max_value=300)
+    shoulder_width = serializers.FloatField(min_value=20, max_value=300, required=False)
 
 
 def save_processed(avatar: Avatar, processed, name: str) -> None:
@@ -55,6 +58,7 @@ def create_avatar(request):
     avatar, created = Avatar.objects.get_or_create(sex=d["sex"], build=d["build"])
     save_processed(avatar, processed, f"avatar_{d['sex']}_{d['build']}.png")
     avatar.height_cm = d["height_cm"]
-    avatar.measurements = {k: d[k] for k in ("shoulder", "chest", "waist", "hip")}
+    avatar.measurements = with_shoulder_width({k: d[k] for k in ("shoulder", "chest", "waist", "hip")},
+                                              avatar.landmarks, avatar.height_cm, d.get("shoulder_width"))
     avatar.save()
     return Response({**_data(avatar, request), "warnings": processed.warnings}, status=201 if created else 200)

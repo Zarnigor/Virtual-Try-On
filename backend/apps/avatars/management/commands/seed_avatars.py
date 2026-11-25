@@ -18,6 +18,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.core.files.base import ContentFile
 from apps.avatars.models import Avatar
+from apps.avatars.sizes import with_shoulder_width
 
 SEED_JSON = Path(__file__).resolve().parents[4] / "seed" / "avatars.reference.json"
 CANVAS_W, CANVAS_H = 600, 1200
@@ -166,6 +167,8 @@ class Command(BaseCommand):
             save_processed(avatar, processed, f"avatar_{sex}_{build}.png")
             avatar.measurements = avatar.measurements or MEASUREMENTS[f"{sex}_{build}"]  # nominal, staff edits them
             avatar.height_cm = avatar.height_cm or NOMINAL_HEIGHT[sex]
+            # new landmarks -> new shoulder_width for the fit check (docs/09 #129)
+            avatar.measurements = with_shoulder_width(avatar.measurements, avatar.landmarks, avatar.height_cm)
             avatar.save()
             self.stdout.write(
                 f"{f.name} -> {sex} {build} (avatar {avatar.pk}, {'created' if created else 'updated'}): "
@@ -193,7 +196,7 @@ class Command(BaseCommand):
 
             avatar, created = Avatar.objects.get_or_create(sex=sex, build=build)
             avatar.landmarks = av_data["landmarks"]
-            avatar.measurements = MEASUREMENTS.get(key, {})
+            avatar.measurements = with_shoulder_width(MEASUREMENTS.get(key, {}), avatar.landmarks, avatar.height_cm)
             _replace_image(avatar, f"avatar_{key}.png", img_bytes)
             avatar.save()
             self.stdout.write(f"{'Created' if created else 'Updated'}: {key}")

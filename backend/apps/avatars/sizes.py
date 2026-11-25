@@ -26,3 +26,14 @@ def shoulder_width_cm(landmarks, height_cm):
     if width_px is None or width_px <= 0 or figure_px <= 0:
         return None
     return round(width_px * height_cm / figure_px, 1)
+
+
+def with_shoulder_width(measurements, landmarks, height_cm, explicit=None) -> dict:
+    """A copy of `measurements` with shoulder_width set: `explicit` when given, else computed from the (new)
+    landmarks; unchanged when it cannot be computed. Used after an avatar gets new auto landmarks (staff upload,
+    seed_avatars), so a re-upload keeps a shoulder_width for the fit check (docs/09 #129)."""
+    out = dict(measurements or {})
+    value = explicit if explicit is not None else shoulder_width_cm(landmarks, height_cm)
+    if value is not None:
+        out["shoulder_width"] = value
+    return out

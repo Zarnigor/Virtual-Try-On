@@ -76,3 +76,53 @@ class StaffLandmarkSaveTests(MediaTestCase):
         self.assertEqual(r.status_code, 200, r.data)
         self.avatar.refresh_from_db()
         self.assertEqual(self.avatar.measurements["shoulder_width"], 45)
+
+
+class UploadKeepsShoulderWidthTests(MediaTestCase):
+    """POST staff/avatars/ and seed_avatars set shoulder_width from the new landmarks (docs/09 #129)."""
+
+    def setUp(self):
+        super().setUp()
+        self.staff = self.make_user("staff@test.uz")
+        self.staff.is_staff = True
+        self.staff.save()
+        self.login(self.staff)
+
+    def post(self, **over):
+        from unittest import mock
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.bodies.tests_pipeline import body_photo
+        data, mask = body_photo()
+        form = {"sex": "female", "build": "slim", "height_cm": 165, "shoulder": 96, "chest": 82, "waist": 64,
+                "hip": 90, "photo": SimpleUploadedFile("f.jpg", data, content_type="image/jpeg"), **over}
+        with mock.patch("rembg.remove", return_value=mask), mock.patch("rembg.new_session"):
+            return self.client.post("/api/staff/avatars/", form, format="multipart")
+
+    def test_reupload_keeps_a_computed_shoulder_width(self):
+        self.assertEqual(self.post().status_code, 201)
+        a = Avatar.objects.get()
+        first = a.measurements["shoulder_width"]
+        self.assertEqual(first, shoulder_width_cm(a.landmarks, 165))
+        r = self.post(waist=66, height_cm=170)  # re-upload of the same (sex, build)
+        self.assertEqual(r.status_code, 200, r.data)
+        a.refresh_from_db()
+        self.assertEqual(a.measurements["shoulder_width"], shoulder_width_cm(a.landmarks, 170))
+        self.assertEqual(a.measurements["waist"], 66)
+
+    def test_explicit_value_wins(self):
+        self.assertEqual(self.post(shoulder_width=37.5).status_code, 201)
+        self.assertEqual(Avatar.objects.get().measurements["shoulder_width"], 37.5)
+
+    def test_seed_from_photos_sets_it(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from apps.bodies.tests_pipeline import body_photo
+        folder = Path(tempfile.mkdtemp())
+        data, mask = body_photo()
+        (folder / "female_slim.jpg").write_bytes(data)
+        Avatar.objects.create(sex="female", build="slim", height_cm=165, measurements={"chest": 82})
+        with mock.patch("rembg.remove", return_value=mask), mock.patch("rembg.new_session"):
+            call_command("seed_avatars", src=str(folder), stdout=StringIO())
+        a = Avatar.objects.get(sex="female", build="slim")
+        self.assertEqual(a.measurements, {"chest": 82, "shoulder_width": shoulder_width_cm(a.landmarks, 165)})

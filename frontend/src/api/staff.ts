@@ -19,6 +19,8 @@ export interface StaffAvatarUpload {
   chest: number
   waist: number
   hip: number
+  /** cm, a WIDTH; default: computed from the new landmarks (docs/09 #129). */
+  shoulder_width?: number
 }
 
 /** POST staff/avatars/ (multipart). 201 new, 200 replaced (landmarks reset to auto); 400 {code, detail}. */
