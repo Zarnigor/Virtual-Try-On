@@ -12,13 +12,17 @@ body/avatar. Before rendering, the backend checks whether the garment really fit
 ## Hard boundary: the render engine is NOT touched
 - New app `apps/sizing/`. Pure function, no I/O:
   `check_fit(garment_type, garment_sizes, stretch, fit_mode, body_sizes) -> FitResult`.
-- `sizing` imports nothing from `tryon_engine`; `tryon_engine` imports nothing from `sizing`.
-- The only coupling point: the `POST tryon/` view calls `check_fit` before creating the render job.
+- **Import boundary (owner, docs/09 #126):** `apps.sizing` imports no models and nothing from `tryon_engine`. Only the
+  tryon_engine **view layer** (`views.py`, `fit_gate.py`) imports `apps.sizing`; `warp`, `mls` and `tasks` never do.
+- The only coupling point: `apps/tryon_engine/fit_gate.py`, used by `POST tryon/` (before the job) and
+  `GET tryon/fit-check/`.
 - MLS, parts, warp, hem rules, regression fixtures: unchanged (0 px difference).
 - Phase 1 limit (say it in the demo): the render does not know the cm. An `adapt` garment that is 2 cm or 18 cm loose
   looks the same on the body; only the yes/no answer reflects size. `FitResult` carries `ease_cm` per zone so a later
   phase could pass it to the render; not used now.
-- Flag `FIT_CHECK_ENABLED` (env, default 1). 0 = today's behaviour (no check, sizes still stored).
+- Flag `FIT_CHECK_ENABLED` (env, **default 0; switched to 1 in step 5**, docs/09 #126). 0 = today's behaviour for
+  `POST tryon/` (no check; sizes stored, request `measurements` validated but not used). `GET tryon/fit-check/` works
+  either way.
 
 ## Decisions (owner, 2026-11-25)
 1. **Too small -> always "mos emas". Too large -> "mos emas" only for `adapt`.** `keep_shape` (oversized, wide-leg)
@@ -55,7 +59,10 @@ estimate). Missing -> 400 `BODY_SIZE_MISSING`.
 **Interpretation (step 2, 2026-11-25):** the existing `measurements.shoulder` (Body, Avatar, docs/09 #13) is a
 **circumference** (seeded avatars: 96-126 cm). The fit check never converts it: it reads a separate body key
 `shoulder_width` (cm, a width). Missing `shoulder_width` -> `SizesMissing(side="body", keys=["shoulder_width"])`.
-Step 3 / the frontend collect it (where it is stored is decided in step 3).
+Stored (step 3, docs/09 #126) as `Body.measurements.shoulder_width` (and optional `inseam`), validated with the other
+keys by `apps/sizing/measurements.py` (docs/11 ranges, all optional; `MEASUREMENTS_INVALID`) at `body/confirm/` and
+`PATCH body/measurements/` (yearly lock unchanged). Avatar: no change, the avatar path sends the user's sizes in
+`POST tryon/` `measurements`.
 
 ## Rules (proposed thresholds, calibrate in step 5)
 `garment_circ = 2 x flat_width`, `ease = garment_circ - body_circ`. Widths (shoulder) are compared directly.
@@ -86,20 +93,27 @@ Step 3 / the frontend collect it (where it is stored is decided in step 3).
 - `POST garments/` multipart: adds `sizes` (JSON string) and `stretch`; `sizes` required. 400 `SIZES_INVALID`.
 - `PATCH garments/{id}/sizes/` `{sizes, stretch?}` -> `Garment` (owner only, others 404).
 - Garment fields: + `sizes`, `stretch`, `sizes_complete`.
-- `POST tryon/`: before the job, for every garment: `GARMENT_SIZE_MISSING` / `BODY_SIZE_MISSING` /
-  400 `SIZE_MISMATCH` `{garment_id, checks: [{zone, garment_cm, body_cm, ease_cm, verdict}], detail}`.
-  Checked after `GENDER_MISMATCH`. No job and no outfit is created on failure.
-- `GET tryon/fit-check/?base=avatar|body&avatar_id=&garment_ids=` -> `{results: [{garment_id, fits, checks}]}`
-  (UI: disable the try-on button early). Same function as `POST tryon/`.
+- `POST tryon/` order (flag 1): existing checks (`BODY_SEX_REQUIRED`, `GENDER_MISMATCH`, duplicate types, ...) ->
+  fit gate -> demo short-circuit -> job. Every garment is checked; the first failing one in `garment_ids` order is
+  reported: 400 `GARMENT_SIZE_MISSING` `{garment_id, keys, detail}` / `BODY_SIZE_MISSING` `{keys, detail}` /
+  `SIZE_MISMATCH` `{garment_id, checks: [{zone, garment_cm, body_cm, ease_cm, verdict, limit_cm}], detail}`.
+  No job and no outfit is created on failure. Base=body uses `Body.height_cm` + `Body.measurements`; base=avatar
+  uses the request `measurements` (400 `MEASUREMENTS_INVALID` outside the ranges).
+- `GET tryon/fit-check/?base=avatar|body&avatar_id=&garment_ids=1,2` (+ the measurement keys as query params for
+  avatar) -> 200 `{results: [{garment_id, fits, checks, code?, keys?}]}` (UI: disable the try-on button early). Same
+  gate as `POST tryon/`. Not fitting = a result; missing sizes = `fits: false, checks: []` + code + keys. 400 only for
+  bad params; a garment the user cannot see -> 404.
 - Avatar path: the check uses the measurements the user entered (the ones the avatar was chosen by), not the avatar's
   nominal measurements. Proposed: pass them in `POST tryon/` as `measurements` (same shape as body).
 - Contract rule (docs/04): views, serializers and `frontend/src/api/types.ts` change in the same commit.
 
 ## User messages (Uzbek, backend-produced, docs/02 rule 18)
-- `SIZE_MISMATCH`: "Bu kiyim sizga mos emas: {zone} {n} sm {tor|keng}." (one line per failing zone)
+- `SIZE_MISMATCH`: "Bu kiyim sizga mos emas: {zone} {n} sm {tor|keng}." (one line per failing zone; inseam uses
+  `qisqa|uzun`; n = |garment_cm - limit_cm|, 1 decimal, trailing .0 dropped). Code: `apps/sizing/messages.py`.
+- `MEASUREMENTS_INVALID`: "{field}: {min} dan {max} sm gacha boʻlishi kerak." (or "{field}: son kiriting.")
 - `GARMENT_SIZE_MISSING`: "Bu kiyimning oʻlchamlari kiritilmagan."
 - `BODY_SIZE_MISSING`: "Kiyimni tekshirish uchun oʻlchamlaringizni kiriting."
-- Zone names: koʻkrak, yelka, bel, son (hip), uzunlik (inseam).
+- Zone names: koʻkrak (chest), yelka (shoulder), bel (waist), son (hip), uzunlik (inseam).
 
 ## Plan (about 3-4 days)
 0. Decisions + this doc (done 2026-11-25).

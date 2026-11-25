@@ -315,6 +315,11 @@ AI_DEV_BYPASS = DEBUG and os.environ.get("AI_DEV_BYPASS", "0") == "1"
 # Staff avatar uploads never call the AI (apps/bodies/pipeline.py).
 BODY_AI_CHECK_ENABLED = os.environ.get("BODY_AI_CHECK_ENABLED", "1") == "1" or not DEBUG
 
+# Fit check before try-on (docs/11, docs/09 #125, #126). 1 = POST tryon/ runs apps/sizing.check_fit and refuses a
+# garment that does not fit; 0 (default until docs/11 step 5) = today's behaviour (measurements validated, not used).
+# GET tryon/fit-check/ works either way.
+FIT_CHECK_ENABLED = os.environ.get("FIT_CHECK_ENABLED", "0") == "1"
+
 # Fit check thresholds (docs/11 "Rules", docs/09 #125; PROPOSED, calibrated in step 5). cm. Per zone:
 # ease = garment - body (garment circumference = 2 x flat width for chest / waist / hip; shoulder width and inseam
 # compared directly). too_small if ease < min_ease (min_ease_stretch for a stretch garment, when the zone has one);

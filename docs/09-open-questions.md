@@ -769,3 +769,11 @@ _(none blocking P0)_
     once; `Garment.stretch` bool added; both body sources supported in code (own-body measurements become required for
     try-on). Thresholds (`FIT_RULES`) are proposed, calibrated in step 5. Step 1 (data model + API) built 2026-11-25:
     `Garment.sizes` / `stretch`, `apps/garments/size_checks.py`, `PATCH garments/{id}/sizes/` (full replace).
+126. **2026-11-25: fit check wired into try-on (docs/11 step 3, owner decisions).** Import boundary: only the
+    tryon_engine view layer (`views.py`, `fit_gate.py`) imports `apps.sizing`; warp, mls and tasks never do;
+    `apps.sizing` imports no models. One measurement validator `apps/sizing/measurements.py` (docs/11 ranges, all
+    optional, 400 `MEASUREMENTS_INVALID`) for `POST tryon/` `measurements` and Body (`confirm/`, `PATCH
+    measurements/`); staff avatar measurements unchanged. Body gets `shoulder_width` (width) and `inseam`; the
+    circumference `shoulder` is never converted. `FIT_CHECK_ENABLED` default 0 (code, .env.example, docker-compose),
+    switched to 1 in step 5. Order: existing checks -> fit gate -> demo -> job; first failing garment reported.
+    `GET tryon/fit-check/` answers regardless of the flag.

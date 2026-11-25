@@ -4,7 +4,8 @@ import { getBody, updateMeasurements, type Body } from '../api/bodies'
 import type { Measurements as MeasurementsT } from '../api/types'
 import Spinner from '../components/Spinner'
 
-type Key = keyof MeasurementsT
+// The circumference fields this page edits; shoulder_width / inseam (fit check, docs/11) come with step 4.
+type Key = 'shoulder' | 'chest' | 'waist' | 'hip'
 
 const FIELDS: Array<{ key: Key; label: string; placeholder: string }> = [
   { key: 'shoulder', label: 'Yelka aylanasi (sm)', placeholder: 'masalan: 112' },

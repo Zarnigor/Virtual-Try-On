@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from apps.sizing.measurements import MeasurementsInvalid, validate_measurements
 
 from .models import Body
 from .serializers import (
@@ -29,6 +30,19 @@ ERROR_CODES = {
 
 def _err(code, status, **extra):
     return Response({"code": code, "detail": ERROR_CODES[code], **extra}, status=status)
+
+
+def _measurements_problem(data):
+    """docs/11 ranges (apps/sizing/measurements.py) for height_cm and the fit-check keys; the circumference
+    `shoulder` keeps its old rule (> 0). A Response (400 MEASUREMENTS_INVALID) or None."""
+    fit_part = {k: v for k, v in (data.get("measurements") or {}).items() if k != "shoulder"}
+    if data.get("height_cm") is not None:
+        fit_part["height_cm"] = data["height_cm"]
+    try:
+        validate_measurements(fit_part)
+    except MeasurementsInvalid as e:
+        return Response({"code": "MEASUREMENTS_INVALID", "detail": e.detail, "field": e.key}, status=400)
+    return None
 
 
 def _own_body(request):
@@ -112,6 +126,9 @@ def confirm_body(request):
     s = BodyConfirmSerializer(data=request.data)
     s.is_valid(raise_exception=True)
     data = s.validated_data
+    bad = _measurements_problem(data)
+    if bad is not None:
+        return bad
 
     try:  # docs/03 "Body landmark checks": the same rules as the staff avatar editor
         validate_body_landmarks(data["landmarks"])
@@ -140,6 +157,9 @@ def update_measurements(request):
 
     s = MeasurementsSerializer(data=request.data)
     s.is_valid(raise_exception=True)
+    bad = _measurements_problem(s.validated_data)
+    if bad is not None:
+        return bad
     if "height_cm" in s.validated_data:
         body.height_cm = s.validated_data["height_cm"]
     if "measurements" in s.validated_data:

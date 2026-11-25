@@ -2,7 +2,9 @@ from rest_framework import serializers
 from .models import Body
 from apps.users.media_views import make_signed_url
 
-MEASUREMENT_KEYS = ("shoulder", "chest", "waist", "hip")
+# shoulder, chest, waist, hip = circumferences (docs/09 #13); shoulder_width = a WIDTH and inseam = length, both for
+# the fit check (docs/11, docs/09 #126). Ranges: apps/sizing/measurements.py (the views run it; shoulder has none).
+MEASUREMENT_KEYS = ("shoulder", "chest", "waist", "hip", "shoulder_width", "inseam")
 
 
 class BodySerializer(serializers.ModelSerializer):
@@ -45,7 +47,7 @@ class BodyUploadSerializer(serializers.Serializer):
 
 
 class MeasurementsField(serializers.DictField):
-    """Circumferences in cm: {shoulder?, chest?, waist?, hip?}. Unknown keys are rejected."""
+    """cm: {shoulder?, chest?, waist?, hip?, shoulder_width?, inseam?}. Unknown keys are rejected."""
 
     child = serializers.FloatField(min_value=1)
 

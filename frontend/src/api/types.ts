@@ -138,12 +138,15 @@ export type GarmentLandmarks = TshirtLandmarks | PantsLandmarks | Record<string,
 
 // ---------- body ----------
 
-/** Circumferences in cm (decision 13). All optional for the own body. */
+/** cm. shoulder, chest, waist, hip = circumferences (decision 13); shoulder_width = a WIDTH and inseam, both for
+ *  the fit check (docs/11). All optional for the own body. 400 MEASUREMENTS_INVALID outside the docs/11 ranges. */
 export interface Measurements {
   shoulder?: number
   chest?: number
   waist?: number
   hip?: number
+  shoulder_width?: number
+  inseam?: number
 }
 
 export interface Body {
@@ -294,7 +297,50 @@ export interface TryOnRequest {
   avatar_id?: number
   /** At most one garment per type (max 2). */
   garment_ids: number[]
+  /** base=avatar only: the user's own sizes for the fit check (docs/11); ignored for base=body. */
+  measurements?: FitMeasurements
 }
+
+/** The user's sizes for the fit check (cm, docs/11 ranges). */
+export interface FitMeasurements {
+  height_cm?: number
+  chest?: number
+  waist?: number
+  hip?: number
+  shoulder_width?: number
+  inseam?: number
+}
+
+export type FitZone = 'chest' | 'shoulder' | 'waist' | 'hip' | 'inseam'
+export type FitVerdict = 'ok' | 'too_small' | 'too_large'
+
+/** One zone of the fit check. For chest / waist / hip garment_cm is the circumference (2 x flat width). */
+export interface FitZoneCheck {
+  zone: FitZone
+  garment_cm: number
+  body_cm: number
+  ease_cm: number
+  verdict: FitVerdict
+  /** The broken limit (same unit as garment_cm); null when ok. */
+  limit_cm: number | null
+}
+
+/** POST tryon/ 400 from the fit gate (only with FIT_CHECK_ENABLED=1); nothing is created. */
+export type FitError =
+  | { code: 'GARMENT_SIZE_MISSING'; garment_id: number; keys: string[]; detail: string }
+  | { code: 'BODY_SIZE_MISSING'; keys: string[]; detail: string }
+  | { code: 'SIZE_MISMATCH'; garment_id: number; checks: FitZoneCheck[]; detail: string }
+
+/** GET tryon/fit-check/ item; a garment that does not fit is a result (fits false), not an error. */
+export interface FitCheckResult {
+  garment_id: number
+  fits: boolean
+  checks: FitZoneCheck[]
+  code?: 'GARMENT_SIZE_MISSING' | 'BODY_SIZE_MISSING'
+  keys?: string[]
+}
+
+export interface FitCheckResponse { results: FitCheckResult[] }
 
 /** GET /api/config/ (public). */
 export interface AppConfig {
