@@ -61,7 +61,8 @@ estimate). Missing -> 400 `BODY_SIZE_MISSING`.
 `shoulder_width` (cm, a width). Missing `shoulder_width` -> `SizesMissing(side="body", keys=["shoulder_width"])`.
 Stored (step 3, docs/09 #126) as `Body.measurements.shoulder_width` (and optional `inseam`), validated with the other
 keys by `apps/sizing/measurements.py` (docs/11 ranges, all optional; `MEASUREMENTS_INVALID`) at `body/confirm/` and
-`PATCH body/measurements/` (yearly lock unchanged). Avatar: no change, the avatar path sends the user's sizes in
+`PATCH body/measurements/` (yearly lock unchanged). The PATCH **merges** (docs/09 #127): sent keys replace the stored
+values, the rest stay; `null` is rejected (no key removal); an identical PATCH does not start the lock. Avatar: no change, the avatar path sends the user's sizes in
 `POST tryon/` `measurements`.
 
 ## Rules (proposed thresholds, calibrate in step 5)
@@ -102,7 +103,7 @@ keys by `apps/sizing/measurements.py` (docs/11 ranges, all optional; `MEASUREMEN
 - `GET tryon/fit-check/?base=avatar|body&avatar_id=&garment_ids=1,2` (+ the measurement keys as query params for
   avatar) -> 200 `{results: [{garment_id, fits, checks, code?, keys?}]}` (UI: disable the try-on button early). Same
   gate as `POST tryon/`. Not fitting = a result; missing sizes = `fits: false, checks: []` + code + keys. 400 only for
-  bad params; a garment the user cannot see -> 404.
+  bad params; a garment the user cannot see -> 404. base=body needs a confirmed body (same 400 as `POST tryon/`).
 - Avatar path: the check uses the measurements the user entered (the ones the avatar was chosen by), not the avatar's
   nominal measurements. Proposed: pass them in `POST tryon/` as `measurements` (same shape as body).
 - Contract rule (docs/04): views, serializers and `frontend/src/api/types.ts` change in the same commit.

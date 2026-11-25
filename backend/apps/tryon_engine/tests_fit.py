@@ -236,3 +236,15 @@ class FitCheckEndpointTests(FitBase):
         g = self.garment()
         self.assertEqual(self.get([g], avatar_id=99999).status_code, 404)
         self.assertEqual(self.get([g], base="body").status_code, 404)
+
+
+class FitCheckUnconfirmedBodyTests(FitBase):
+    def test_unconfirmed_body_same_answer_as_post(self):
+        b = self.body(measurements={"chest": 100, "shoulder_width": 44})
+        Body.objects.filter(pk=b.pk).update(confirmed_at=None)
+        g = self.garment()
+        r = self.client.get("/api/tryon/fit-check/", {"base": "body", "garment_ids": str(g.id)})
+        with mock.patch("apps.tryon_engine.views.run_tryon.delay"):
+            post = self.post([g], base="body")
+        self.assertEqual((r.status_code, r.data), (post.status_code, post.data))
+        self.assertEqual(r.status_code, 400)

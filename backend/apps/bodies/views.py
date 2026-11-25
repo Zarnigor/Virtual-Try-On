@@ -148,22 +148,45 @@ def confirm_body(request):
 @api_view(["PATCH"])
 @permission_classes([IsAuthenticated])
 def update_measurements(request):
-    """PATCH /api/body/measurements/ {height_cm?, measurements?}: once per 365 days."""
+    """PATCH /api/body/measurements/ {height_cm?, measurements?}: MERGE (docs/09 #127). Sent keys replace the stored
+    values, keys not sent stay; null is rejected (no key removal). Once per 365 days; the lock starts only when at
+    least one value actually changes."""
     body = _own_body(request)
     if body is None:
         return _err("BODY_NOT_FOUND", 404)
     if not body.can_change_measurements:
         return _err("MEASUREMENTS_LOCKED", 403, unlock_at=body.measurements_unlock_at)
 
+    null_field = _null_field(request.data)
+    if null_field is not None:
+        return Response({"code": "MEASUREMENTS_INVALID", "detail": "Oʻlchamni oʻchirib boʻlmaydi: qiymat kiriting.",
+                         "field": null_field}, status=400)
     s = MeasurementsSerializer(data=request.data)
     s.is_valid(raise_exception=True)
     bad = _measurements_problem(s.validated_data)
     if bad is not None:
         return bad
-    if "height_cm" in s.validated_data:
-        body.height_cm = s.validated_data["height_cm"]
-    if "measurements" in s.validated_data:
-        body.measurements = s.validated_data["measurements"]
+    height = s.validated_data.get("height_cm", body.height_cm)
+    merged = {**(body.measurements or {}), **s.validated_data.get("measurements", {})}
+    if height == body.height_cm and merged == (body.measurements or {}):
+        return Response(BodySerializer(body, context={"request": request}).data)  # nothing changed: no lock
+    body.height_cm = height
+    body.measurements = merged
     body.measurements_changed_at = timezone.now()
     body.save(update_fields=["height_cm", "measurements", "measurements_changed_at"])
     return Response(BodySerializer(body, context={"request": request}).data)
+
+
+def _null_field(data):
+    """The first null in a PATCH body/measurements/ payload ("height_cm", "measurements" or a measurement key)."""
+    if not hasattr(data, "get"):
+        return None
+    for key in ("height_cm", "measurements"):
+        if key in data and data.get(key) is None:
+            return key
+    m = data.get("measurements")
+    if isinstance(m, dict):
+        for key, value in m.items():
+            if value is None:
+                return key
+    return None

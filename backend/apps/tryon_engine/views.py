@@ -191,6 +191,8 @@ def fit_check(request):
         body_obj = Body.objects.filter(user=request.user).first()
         if body_obj is None:
             return Response(status=404)
+        if not body_obj.is_confirmed:  # same answer as POST tryon/
+            return Response({"detail": "Body not confirmed yet"}, status=400)
         sizes = fit_gate.body_sizes_from_body(body_obj)
     else:
         avatar_id = params.get("avatar_id")

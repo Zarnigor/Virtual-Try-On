@@ -777,3 +777,8 @@ _(none blocking P0)_
     circumference `shoulder` is never converted. `FIT_CHECK_ENABLED` default 0 (code, .env.example, docker-compose),
     switched to 1 in step 5. Order: existing checks -> fit gate -> demo -> job; first failing garment reported.
     `GET tryon/fit-check/` answers regardless of the flag.
+127. **2026-11-25: `PATCH body/measurements/` merges** (owner, before the fit-check frontend, docs/11 step 4). Sent keys
+    (shared validator) replace the stored values, keys not sent (incl. `height_cm`) stay; `null` is rejected with 400
+    `MEASUREMENTS_INVALID` (no key removal: a removal plus the yearly lock would lose a value for a year); the lock
+    starts only when at least one value actually changes. `GET tryon/fit-check/` base=body requires a confirmed body,
+    same 400 as `POST tryon/`.
