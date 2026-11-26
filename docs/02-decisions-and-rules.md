@@ -44,7 +44,7 @@ These come from the product owner. Do not change them without asking. Log: `09-o
     when missing, computed from the confirmed landmarks with the avatars' rule and marked `shoulder_width_estimated`
     (recomputed on a height change while estimated, never once the user enters it). The fit check and the render
     use the body's own sizes and landmarks.
-20. **Model path (avatar): gender only (changed 2026-11-23, docs/09 #124; before: numeric measurements required).** The backend `avatars/nearest/` and the measurement fields stay, unused by the frontend. **Fit check (docs/11, docs/09 #125) needs the user's measurements for try-on; how the avatar path supplies them is still to be settled.**
+20. **Model path (avatar): gender only (changed 2026-11-23, docs/09 #124; before: numeric measurements required).** The backend `avatars/nearest/` and the measurement fields stay, unused by the frontend. **Fit check (docs/11, docs/09 #125, #129): the avatar path uses the AVATAR's own sizes** (`Avatar.height_cm` + `measurements`: chest, waist, hip, `shoulder_width` from the shoulder landmarks; inseam estimated from height). The user enters no sizes on this path; a request `measurements` is accepted and ignored. Avatars are the demo / fallback path since docs/09 #130.
 21. **SUPERSEDED 2026-11-25 by `docs/11-fit-check.md` (docs/09 #125): garment real size (cm) IS entered and a fit
     check runs before try-on.** The render rules below are unchanged. Fit is set per garment (`fit_mode`, docs/09 #93, decided 2026-11-11):
     `adapt` (default) = the garment is fully deformed to the body's landmarks; `keep_shape` = the garment keeps its own
