@@ -34,6 +34,11 @@ body/avatar. Before rendering, the backend checks whether the garment really fit
 3. **`Garment.stretch: bool`** (default false). Stretch garments allow a small negative ease (see thresholds).
 4. **Both body sources are supported in code** (avatar now, own body when its flow resumes). Own-body measurements
    become required for try-on (changes docs/02 rule 19 for the fit check; the yearly lock, rule 2, is unchanged).
+   **2026-11-26 (docs/09 #130): the own body is the main path, avatars the demo / fallback.** `POST body/confirm/`
+   requires `height_cm`, `chest`, `waist`, `hip`; `shoulder_width` is computed from the confirmed landmarks when not
+   sent (`apps/sizing/body_sizes.py`, the same function the avatars use, moved from `apps/avatars/sizes.py`) and
+   marked `Body.shoulder_width_estimated`; while estimated, a `PATCH body/measurements/` that changes `height_cm`
+   recomputes it; a user-entered value is never recomputed. The gate itself is unchanged (`sizes_from(body)`).
 
 ## Data model
 - `Garment.sizes` JSON (cm, flat-lay: garment laid flat, measured on one side), nullable for old rows.
@@ -64,6 +69,9 @@ Stored (step 3, docs/09 #126) as `Body.measurements.shoulder_width` (and optiona
 keys by `apps/sizing/measurements.py` (docs/11 ranges, all optional; `MEASUREMENTS_INVALID`) at `body/confirm/` and
 `PATCH body/measurements/` (yearly lock unchanged). The PATCH **merges** (docs/09 #127): sent keys replace the stored
 values, the rest stay; `null` is rejected (no key removal); an identical PATCH does not start the lock.
+**Own body (docs/09 #130):** confirm requires `height_cm`, `chest`, `waist`, `hip` (missing -> 400
+`MEASUREMENTS_INVALID` naming it); `shoulder_width` not sent -> computed with the avatars' rule below from the
+confirmed landmarks, `shoulder_width_estimated` = true (the UI labels it "taxmin").
 **Avatar (docs/09 #129): `Avatar.measurements.shoulder_width`** (cm, width) = shoulder px width x height_cm /
 (foot_bottom.y - head_top.y) (#76), filled by `manage.py fill_avatar_shoulder_width [--dry-run]` (never overwrites)
 and recomputed when staff save the avatar landmarks (unless the request sets it). Seeded values: 38.5, 41.9, 46.7

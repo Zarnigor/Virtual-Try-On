@@ -9,6 +9,15 @@ from apps.bodies.models import Body
 from apps.sizing.measurements import RANGES
 from apps.testing import MediaTestCase, upload
 
+# Required at confirm (docs/09 #130); the range tests override one key at a time.
+REQUIRED = {"height_cm": 175, "chest": 98, "waist": 86, "hip": 98}
+
+
+def confirm_payload(height_cm=None, measurements=None):
+    m = {k: v for k, v in REQUIRED.items() if k != "height_cm"}
+    m.update(measurements or {})
+    return {"height_cm": REQUIRED["height_cm"] if height_cm is None else height_cm, "measurements": m}
+
 
 @mock.patch("apps.bodies.views.run_body_validation.delay")
 class BodyMeasurementRangeTests(MediaTestCase):
@@ -22,7 +31,8 @@ class BodyMeasurementRangeTests(MediaTestCase):
                          format="multipart")
 
     def _confirm(self, **extra):
-        return self.client.post("/api/body/confirm/", {"landmarks": full_landmarks(), **extra}, format="json")
+        payload = {"landmarks": full_landmarks(), **confirm_payload(extra.get("height_cm"), extra.get("measurements"))}
+        return self.client.post("/api/body/confirm/", payload, format="json")
 
     @staticmethod
     def _payload(key, value):
@@ -48,7 +58,7 @@ class BodyMeasurementRangeTests(MediaTestCase):
         m = {"shoulder": 116, "chest": 98, "shoulder_width": 44, "inseam": 80}
         r = self._confirm(measurements=m, height_cm=175)
         self.assertEqual(r.status_code, 200, r.data)
-        self.assertEqual(Body.objects.get(user=self.user).measurements, m)
+        self.assertEqual(Body.objects.get(user=self.user).measurements, {**confirm_payload()["measurements"], **m})
 
     def test_patch_each_key_min_max_outside(self, _):
         self._upload()
@@ -77,7 +87,8 @@ class BodyMeasurementRangeTests(MediaTestCase):
         Body.objects.filter(user=self.user).update(measurements_changed_at=timezone.now() - timedelta(days=366))
         r = self.client.patch("/api/body/measurements/", {"measurements": {"shoulder_width": 45}}, format="json")
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(Body.objects.get(user=self.user).measurements, {"shoulder_width": 45})
+        self.assertEqual(Body.objects.get(user=self.user).measurements,
+                         {**confirm_payload()["measurements"], "shoulder_width": 45})
 
 
 @mock.patch("apps.bodies.views.run_body_validation.delay")
@@ -93,7 +104,7 @@ class BodyMeasurementMergeTests(MediaTestCase):
         self.client.post("/api/body/", {"photo": upload(), "is_adult_confirmed": "true", "sex": "male"},
                          format="multipart")
         r = self.client.post("/api/body/confirm/", {"landmarks": full_landmarks(), "height_cm": 175,
-                                                     "measurements": self.START}, format="json")
+                                                     "measurements": self.START}, format="json")  # has all required
         assert r.status_code == 200, r.data
 
     def patch(self, payload):

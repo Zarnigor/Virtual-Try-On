@@ -264,7 +264,8 @@ class FitCheckUnconfirmedBodyTests(FitBase):
         with mock.patch("apps.tryon_engine.views.run_tryon.delay"):
             post = self.post([g], base="body")
         self.assertEqual((r.status_code, r.data), (post.status_code, post.data))
-        self.assertEqual(r.status_code, 400)
+        self.assertEqual((r.status_code, r.data["code"]), (400, "BODY_NOT_CONFIRMED"))  # docs/09 #130
+        self.assertEqual(r.data["detail"], "Avval tanangizni tasdiqlang.")
 
 
 class ConfigFlagTests(MediaTestCase):
@@ -273,3 +274,57 @@ class ConfigFlagTests(MediaTestCase):
             with override_settings(FIT_CHECK_ENABLED=flag):
                 r = self.client.get("/api/config/")
             self.assertEqual((r.status_code, r.data["fit_check_enabled"]), (200, flag))
+
+
+@override_settings(FIT_CHECK_ENABLED=True)
+@mock.patch("apps.tryon_engine.views.run_tryon.delay")
+@mock.patch("apps.bodies.views.run_body_validation.delay")
+class OwnBodyFitGateTests(FitBase):
+    """docs/09 #130: upload -> confirm with sizes (shoulder_width computed) -> POST tryon/ base=body through the gate."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.avatars.tests_staff import full_landmarks
+        from apps.testing import upload
+        with mock.patch("apps.bodies.views.run_body_validation.delay"):
+            self.client.post("/api/body/", {"photo": upload(), "is_adult_confirmed": "true", "sex": "male"},
+                             format="multipart")
+        r = self.client.post("/api/body/confirm/", {"landmarks": full_landmarks(), "height_cm": 178,
+                                                     "measurements": {"chest": 100, "waist": 80, "hip": 100}},
+                             format="json")
+        assert r.status_code == 200, r.data
+        self.sw = r.data["measurements"]["shoulder_width"]  # computed: estimated
+        assert r.data["shoulder_width_estimated"] is True
+
+    def tshirt(self, **sizes):
+        return self.garment(sizes={"chest_width": 55, "length": 70, "shoulder_width": round(self.sw) + 1, **sizes})
+
+    def test_fitting_garments_render(self, _upload, delay):
+        r = self.post([self.tshirt(), self.garment("pants")], base="body")
+        self.assertEqual(r.status_code, 202, r.data)
+        self.assertEqual(Job.objects.get(pk=r.data["job_id"]).result, {"fit_warnings": []})
+        self.assertEqual(Outfit.objects.get(pk=r.data["outfit_id"]).body.user, self.user)
+        delay.assert_called_once()
+
+    def test_too_small_is_size_mismatch_and_nothing_is_created(self, _upload, delay):
+        g = self.tshirt(chest_width=45)  # 90 vs body 100
+        r = self.post([g], base="body")
+        self.assertEqual((r.status_code, r.data["code"], r.data["garment_id"]), (400, "SIZE_MISMATCH", g.id))
+        self.assertEqual(r.data["detail"], "Bu kiyim sizga mos emas: koʻkrak 10 sm tor.")
+        self.assert_nothing_created()
+        delay.assert_not_called()
+
+    def test_too_large_only_is_rendered_with_fit_warnings(self, _upload, delay):
+        g = self.tshirt(chest_width=62)  # 124 vs limit 120: 4 cm big
+        r = self.post([g], base="body")
+        self.assertEqual(r.status_code, 202, r.data)
+        warnings = Job.objects.get(pk=r.data["job_id"]).result["fit_warnings"]
+        self.assertEqual([(w["garment_id"], w["detail"]) for w in warnings],
+                         [(g.id, "Bu kiyim sizga katta: koʻkrak 4 sm keng.")])
+
+    def test_fit_check_endpoint_gives_the_same_answers(self, _upload, delay):
+        ok, small, big = self.tshirt(), self.tshirt(chest_width=45), self.tshirt(chest_width=62)
+        r = self.client.get("/api/tryon/fit-check/", {"base": "body", "garment_ids": f"{ok.id},{small.id},{big.id}"})
+        self.assertEqual(r.status_code, 200, r.data)
+        got = [(x["garment_id"], x["fits"], bool(x["warnings"])) for x in r.data["results"]]
+        self.assertEqual(got, [(ok.id, True, False), (small.id, False, False), (big.id, True, True)])

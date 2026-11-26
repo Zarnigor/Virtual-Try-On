@@ -131,6 +131,12 @@ export const TRYON_GENDER = {
   noMatching: 'Bu asos uchun mos kiyim yoʻq.',
 } as const
 
+/** Try-on with the own body (docs/09 #130). notConfirmed = backend BODY_NOT_CONFIRMED detail. */
+export const TRYON_BODY = {
+  notConfirmed: 'Avval tanangizni tasdiqlang.',
+  confirmLink: 'Tanani tasdiqlash',
+} as const
+
 export const BODY_UPLOAD = {
   sexTitle: 'Jinsingiz',
   sexHelp: 'Kiyimlar shunga qarab saralanadi. Keyin oʻzgartirib boʻlmaydi.',
@@ -157,6 +163,25 @@ export const BODY_TEXT = {
   confirm: 'Tasdiqlash',
   unconfirmed: 'Tasdiqlanmagan',
 }
+
+/** Body confirm, two steps: landmarks, then sizes (docs/09 #130). */
+export const BODY_CONFIRM_TEXT = {
+  step1: '1 / 2',
+  step2: '2 / 2',
+  next: 'Keyingi',
+  back: 'Orqaga',
+  confirm: 'Tasdiqlash',
+  confirming: 'Tasdiqlanmoqda…',
+  sizesTitle: 'Oʻlchamlaringiz',
+  sizesHelp: 'Kiyim sizga mos kelishini tekshirish uchun. Barchasi santimetrda. Aylana: lenta tana atrofida.',
+  estimated: 'taxmin, tuzatishingiz mumkin',
+  estimatedHelp: 'Yelka kengligi nuqtalar va boʻyingizdan hisoblandi.',
+  needHeight: 'Yelka kengligini hisoblash uchun boʻyingizni kiriting.',
+  lockNote: 'Tasdiqlangandan soʻng rasm va nuqtalarni oʻzgartirib boʻlmaydi. Oʻlchamlarni yilda bir marta yangilash mumkin.',
+  confirmQuestion: 'Tasdiqlangandan soʻng rasm va nuqtalarni oʻzgartirib boʻlmaydi. Tasdiqlaysizmi?',
+  error: 'Tasdiqlashda xato. Qayta urinib koʻring.',
+  fixFields: 'Belgilangan maydonlarni toʻgʻrilang.',
+} as const
 
 export const PROFILE_TEXT = {
   title: 'Profil va maxfiylik',

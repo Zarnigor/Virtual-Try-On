@@ -81,10 +81,19 @@ try:
     img = fetch(body["image_url"])
     check("body image 600x1200", img is not None and img.shape[:2] == (1200, 600), str(None if img is None else img.shape))
     check("auto landmarks", len(body["landmarks"]) >= 10, ", ".join(sorted(body["landmarks"])))
-    r = c.post("/body/confirm/", json={"landmarks": {"head_top": {"y": 50}}})
+    r = c.post("/tryon/", json={"base": "body", "garment_ids": [GARMENTS[0]]})  # body checked before garments
+    check("tryon on an unconfirmed body 400 BODY_NOT_CONFIRMED", r.json().get("code") == "BODY_NOT_CONFIRMED", r.text[:120])
+    r = c.post("/body/confirm/", json={"landmarks": {"head_top": {"y": 50}}, **BODY_SIZES})
     check("confirm with broken landmarks 400", r.status_code == 400 and r.json().get("code") == "LANDMARKS_INVALID")
+    r = c.post("/body/confirm/", json={"landmarks": body["landmarks"]})
+    check("confirm without sizes 400 (docs/09 #130)",
+          r.status_code == 400 and (r.json().get("code"), r.json().get("field")) == ("MEASUREMENTS_INVALID", "height_cm"))
     r = c.post("/body/confirm/", json={"landmarks": body["landmarks"], **BODY_SIZES})
     check("confirm 200", r.status_code == 200, r.text[:200])
+    if r.status_code == 200:
+        sw = r.json()["measurements"].get("shoulder_width")
+        check("shoulder_width estimated from the landmarks", r.json()["shoulder_width_estimated"] is True and sw,
+              f"{sw} cm")
     with open(PHOTO, "rb") as fh:
         r = c.post("/body/", files={"photo": ("p.jpg", fh.read(), "image/jpeg")},
                    data={"is_adult_confirmed": "true", "sex": SEX})

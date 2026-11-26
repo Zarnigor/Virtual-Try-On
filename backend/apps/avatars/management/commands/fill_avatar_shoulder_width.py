@@ -5,7 +5,7 @@ Never overwrites a value already set. --dry-run prints what would be written.
 from django.core.management.base import BaseCommand
 
 from apps.avatars.models import Avatar
-from apps.avatars.sizes import shoulder_width_cm
+from apps.sizing.body_sizes import shoulder_width_cm
 
 
 class Command(BaseCommand):

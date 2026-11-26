@@ -13,7 +13,8 @@ import { GenderBadge, Segmented } from '../components/GarmentSettingsPanel'
 import FitNotice, { FitLines, type FitAnswer } from '../components/FitNotice'
 import type { FitZoneCheck, Sex } from '../api/types'
 import { fitWarningBlocks } from '../fit/fitNotice'
-import { FIT_TEXT, GARMENT_TYPE_NAMES, SEX_LABELS, TRYON_GENDER, TRYON_QUALITY } from '../locale/uz'
+import { Link } from 'react-router-dom'
+import { FIT_TEXT, GARMENT_TYPE_NAMES, SEX_LABELS, TRYON_BODY, TRYON_GENDER, TRYON_QUALITY } from '../locale/uz'
 
 const FIT_CODES = ['GARMENT_SIZE_MISSING', 'BODY_SIZE_MISSING', 'SIZE_MISMATCH']
 const FIT_DEBOUNCE_MS = 400
@@ -25,6 +26,10 @@ const TRYON_ERRORS: Record<string, string> = {
 
 export default function TryOn() {
   const [base, setBase] = useState<'body' | 'avatar'>('avatar')
+  // The user picked a base by hand: the confirmed-body default must not override it when getBody answers late.
+  const baseTouched = useRef(false)
+  // 400 BODY_NOT_CONFIRMED (docs/09 #130): its detail, shown with a link to the confirm page
+  const [notConfirmedDetail, setNotConfirmedDetail] = useState('')
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null)
   // Model (avatar) path: gender only (docs/09 #124). Choosing a gender selects that sex's "average" avatar.
@@ -58,12 +63,20 @@ export default function TryOn() {
     getConfig()
       .then((c) => { setScope(c.demo_mode ? 'all' : 'mine'); setFitEnabled(c.fit_check_enabled) })
       .catch(() => setScope('mine'))
+    // The own body is the main path (docs/09 #130): a confirmed body is the default base; avatars stay selectable.
+    getBody()
+      .then(({ data }) => {
+        setBody(data)
+        if (data.confirmed_at && !baseTouched.current) setBase('body')
+      })
+      .catch(() => setBody(null))
   }, [])
 
   useEffect(() => {
     if (base !== 'body') return
     getBody().then(({ data }) => setBody(data)).catch(() => setBody(null))
   }, [base])
+  const bodyUnconfirmed = base === 'body' && body !== null && !body.confirmed_at
 
   const baseSex: Sex | null =
     base === 'avatar' ? (avatars.find((a) => a.id === selectedAvatar)?.sex ?? null) : (body?.sex ?? null)
@@ -103,9 +116,10 @@ export default function TryOn() {
         })
         .catch((err: unknown) => {
           if (seq !== fitSeq.current) return
-          const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+          const data = (err as { response?: { data?: { code?: string; detail?: string } } })?.response?.data
           setFitAnswers({})
-          setFitError(detail ?? '')
+          setFitError(data?.code === 'BODY_NOT_CONFIRMED' ? '' : (data?.detail ?? ''))  // shown with its link below
+          if (data?.code === 'BODY_NOT_CONFIRMED') setNotConfirmedDetail(data.detail ?? TRYON_BODY.notConfirmed)
         })
         .finally(() => { if (seq === fitSeq.current) setChecking(false) })
     }, FIT_DEBOUNCE_MS)
@@ -167,6 +181,7 @@ export default function TryOn() {
     }
     if (fitBlocked) return  // the button is disabled too; the backend refuses it as well (flag on)
     setError('')
+    setNotConfirmedDetail('')
     setStarting(true)
     setJobId(null)
     setResultUrl(null)
@@ -194,6 +209,10 @@ export default function TryOn() {
       }
       // base=avatar: the backend detail asks the user to enter their sizes, which they cannot do for an avatar.
       const avatarSizes = base === 'avatar' && data?.code === 'BODY_SIZE_MISSING'
+      if (data?.code === 'BODY_NOT_CONFIRMED') {
+        setNotConfirmedDetail(data.detail || TRYON_BODY.notConfirmed)
+        return
+      }
       setError((avatarSizes && FIT_TEXT.avatarSizeMissing)
         || (data?.code && TRYON_ERRORS[data.code]) || data?.detail || 'Xato yuz berdi')
     } finally {
@@ -244,7 +263,7 @@ export default function TryOn() {
                     name="base"
                     value={b}
                     checked={base === b}
-                    onChange={() => setBase(b)}
+                    onChange={() => { baseTouched.current = true; setBase(b); setNotConfirmedDetail('') }}
                     style={{ display: 'none' }}
                   />
                   {b === 'body' ? 'Mening tanam' : 'Model'}
@@ -393,6 +412,12 @@ export default function TryOn() {
             <p style={{ fontSize: 12, color: 'var(--muted)' }}>{FIT_TEXT.fitInfoOnly}</p>
           )}
           {error && <p className="error-text" role="alert">{error}</p>}
+          {(notConfirmedDetail || bodyUnconfirmed) && (
+            <p className="error-text" role="alert">
+              {notConfirmedDetail || TRYON_BODY.notConfirmed}{' '}
+              <Link to="/body/confirm">{TRYON_BODY.confirmLink}</Link>
+            </p>
+          )}
 
           <button
             className="btn btn-primary"

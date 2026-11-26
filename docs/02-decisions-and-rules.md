@@ -39,6 +39,11 @@ These come from the product owner. Do not change them without asking. Log: `09-o
 ## Measurements and fit
 19. Own body: marked landmarks on the photo are the required input; numeric measurements and height are optional.
     **Changed 2026-11-25 (docs/11, docs/09 #125):** measurements are required for try-on because of the fit check.
+    **Changed 2026-11-26 (docs/09 #130):** the own body is the main try-on path; `POST body/confirm/` requires
+    `height_cm`, `chest`, `waist`, `hip` (inseam optional, estimated from height); `shoulder_width` is optional and,
+    when missing, computed from the confirmed landmarks with the avatars' rule and marked `shoulder_width_estimated`
+    (recomputed on a height change while estimated, never once the user enters it). The fit check and the render
+    use the body's own sizes and landmarks.
 20. **Model path (avatar): gender only (changed 2026-11-23, docs/09 #124; before: numeric measurements required).** The backend `avatars/nearest/` and the measurement fields stay, unused by the frontend. **Fit check (docs/11, docs/09 #125) needs the user's measurements for try-on; how the avatar path supplies them is still to be settled.**
 21. **SUPERSEDED 2026-11-25 by `docs/11-fit-check.md` (docs/09 #125): garment real size (cm) IS entered and a fit
     check runs before try-on.** The render rules below are unchanged. Fit is set per garment (`fit_mode`, docs/09 #93, decided 2026-11-11):

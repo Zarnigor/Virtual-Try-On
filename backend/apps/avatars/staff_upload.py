@@ -13,7 +13,7 @@ from apps.bodies.pipeline import BodyPhotoRejected, process_body_photo
 from apps.images import ImageRejected, validate_image_upload
 
 from .models import Avatar
-from .sizes import with_shoulder_width
+from apps.sizing.body_sizes import with_shoulder_width
 
 MIN_SIDE_PX = 600
 

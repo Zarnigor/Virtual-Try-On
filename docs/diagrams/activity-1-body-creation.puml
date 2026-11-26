@@ -15,7 +15,8 @@ repeat
       |Tizim|
       :Fon olib tashlash,\nbelgilarni aniqlash;
       |Foydalanuvchi|
-      :Belgilarni tuzatish,\nboʻy (ixtiyoriy);
+      :1 / 2: belgilarni tuzatish;
+      :2 / 2: oʻlchamlar — boʻy, koʻkrak, bel, son (majburiy);\nyelka kengligi (taxmin, tuzatish mumkin), ichki uzunlik (ixtiyoriy);
       if (Tasdiqlash?) then (ha)
         |Tizim|
         :Tanani saqlash\n(qulflanadi, user_id unique);
