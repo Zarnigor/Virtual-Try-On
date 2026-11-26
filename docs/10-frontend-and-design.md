@@ -55,11 +55,15 @@ with a `deleted` flag.
   (`neck_hole_invalid`, `mls_fallback`, locale `TRYON_QUALITY`).
 - Fit check (docs/11 step 4, not in the design): garment upload has a sizes form with a "where to measure" inline SVG
   (`components/SizesForm`, `SizeDiagram`) + stretch checkbox; `/garments/:id/sizes` (view + edit, owner only; the
-  wardrobe card shows "Oʻlchamlar kiritilmagan" and an "Oʻlchamlar" link); the avatar path asks "Sizning
-  oʻlchamlaringiz" after the gender pick (sessionStorage, only for the fit check, not for the avatar choice, #124);
-  the try-on page calls `GET tryon/fit-check/` (debounced 400 ms) and shows per selected garment "Sizga mos emas" +
-  zone lines or a missing-size message with a link to the right form; the button is disabled by them only when
-  `GET config/` says `fit_check_enabled`. The body measurements page has shoulder_width + inseam and sends only the
+  wardrobe card shows "Oʻlchamlar kiritilmagan" and an "Oʻlchamlar" link). The avatar path has no sizes form: the
+  check uses the rendered avatar's / body's own sizes (docs/09 #129), and no `measurements` are sent to `POST tryon/`
+  or `GET tryon/fit-check/`. The try-on page calls `GET tryon/fit-check/` (debounced 400 ms) and shows per selected
+  garment: red "Sizga mos emas" + zone lines (too_small; the button is disabled only when `GET config/` says
+  `fit_check_enabled`), yellow "Sizga katta" + zone lines (warnings only, #128; the button stays enabled), or a
+  missing-size message: garment sizes -> link to `/garments/:id/sizes` (owner); body sizes on base=body -> link to the
+  measurements page; on base=avatar -> "Bu avatarning oʻlchamlari toʻliq emas. Boshqa avatar tanlang." (no link,
+  also for a `POST tryon/` 400 `BODY_SIZE_MISSING`). The job result `fit_warnings` shows the same yellow notice under
+  the result image (garment name per block when more than one garment was tried on). The body measurements page has shoulder_width + inseam and sends only the
   changed keys (PATCH merges, docs/09 #127). Pure helpers: `src/fit/`.
 
 ## Behaviour notes

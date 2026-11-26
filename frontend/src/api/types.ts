@@ -297,8 +297,7 @@ export interface TryOnRequest {
   avatar_id?: number
   /** At most one garment per type (max 2). */
   garment_ids: number[]
-  /** Accepted and IGNORED since docs/09 #129: the fit check uses the rendered Body's / Avatar's own sizes. */
-  measurements?: FitMeasurements
+  // `measurements` is accepted and ignored by the backend (docs/09 #129); the frontend no longer sends it.
 }
 
 /** The user's sizes for the fit check (cm, docs/11 ranges). */

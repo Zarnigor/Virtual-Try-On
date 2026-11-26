@@ -226,6 +226,9 @@ export const FIT_ZONE_NAMES = {
   chest: 'koʻkrak', shoulder: 'yelka', waist: 'bel', hip: 'son', inseam: 'uzunlik',
 } as const
 
+/** Fallback garment title when a garment has no name. */
+export const GARMENT_TYPE_NAMES = { tshirt: 'Futbolka', pants: 'Shim' } as const
+
 export const FIT_TEXT = {
   required: (label: string) => `${label}: kiriting.`,
   notNumber: (label: string) => `${label}: son kiriting.`,
@@ -261,9 +264,9 @@ export const FIT_TEXT = {
   saveError: 'Saqlab boʻlmadi',
   stretchYes: 'Ha',
   stretchNo: 'Yoʻq',
-  yourSizesTitle: 'Sizning oʻlchamlaringiz',
-  yourSizesHelp: 'Kiyim sizga mos kelishini tekshirish uchun. Model tanloviga taʼsir qilmaydi. Barchasi santimetrda.',
   notFits: 'Sizga mos emas',
+  tooLarge: 'Sizga katta',
+  avatarSizeMissing: 'Bu avatarning oʻlchamlari toʻliq emas. Boshqa avatar tanlang.',
   garmentSizeMissing: 'Bu kiyimning oʻlchamlari kiritilmagan.',
   bodySizeMissing: 'Kiyimni tekshirish uchun oʻlchamlaringizni kiriting.',
   diagramAlt: 'Oʻlchash sxemasi',

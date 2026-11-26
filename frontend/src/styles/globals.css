@@ -195,6 +195,7 @@ input, textarea, select {
 .banner { padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.45; }
 ul.banner { padding-left: 30px; }
 .banner-warning { background: rgba(217, 115, 13, 0.12); color: #8a4a08; border: 1px solid rgba(217, 115, 13, 0.35); }
+.banner-danger { background: rgba(200, 40, 40, 0.10); color: #9b1c1c; border: 1px solid rgba(200, 40, 40, 0.35); }
 
 /* Segmented controls (garment fit mode / gender, catalog gender filter). */
 .garment-settings { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }

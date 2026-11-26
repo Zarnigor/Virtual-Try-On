@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { FitZoneCheck } from '../api/types'
 import { fitLines, formatCm, zoneLine } from './fitMessages'
-import {
-  changedKeys, loadSessionSizes, saveSessionSizes, validateFitMeasurements, FIT_MEASUREMENT_FIELDS,
-} from './measurementFields'
+import { changedKeys, validateFitMeasurements, FIT_MEASUREMENT_FIELDS } from './measurementFields'
+import { fitNotice, fitWarningBlocks } from './fitNotice'
 import { GARMENT_SIZE_FIELDS, parseCm, sizesToValues, validateSizes } from './sizeFields'
 
 const check = (over: Partial<FitZoneCheck>): FitZoneCheck => ({
@@ -60,11 +59,11 @@ describe('fit message rendering (same as backend messages.py)', () => {
   it('tor / keng, qisqa / uzun, ok zones skipped', () => {
     expect(zoneLine(check({}))).toBe('Bu kiyim sizga mos emas: koʻkrak 6 sm tor.')
     expect(zoneLine(check({ garment_cm: 122.5, limit_cm: 120, verdict: 'too_large' })))
-      .toBe('Bu kiyim sizga mos emas: koʻkrak 2.5 sm keng.')
+      .toBe('Bu kiyim sizga katta: koʻkrak 2.5 sm keng.')
     expect(zoneLine(check({ zone: 'inseam', garment_cm: 70, limit_cm: 75 })))
       .toBe('Bu kiyim sizga mos emas: uzunlik 5 sm qisqa.')
     expect(zoneLine(check({ zone: 'inseam', garment_cm: 90, limit_cm: 88, verdict: 'too_large' })))
-      .toBe('Bu kiyim sizga mos emas: uzunlik 2 sm uzun.')
+      .toBe('Bu kiyim sizga katta: uzunlik 2 sm uzun.')
     expect(zoneLine(check({ verdict: 'ok', limit_cm: null }))).toBeNull()
   })
 
@@ -80,7 +79,7 @@ describe('fit message rendering (same as backend messages.py)', () => {
   })
 })
 
-describe('your sizes (avatar path)', () => {
+describe('body sizes validation (measurements page)', () => {
   const full = { height_cm: '175', chest: '100', waist: '80', hip: '100', shoulder_width: '44' }
 
   it('complete when every required value is valid; inseam optional', () => {
@@ -99,20 +98,6 @@ describe('your sizes (avatar path)', () => {
     expect(validateFitMeasurements({}, false).errors).toEqual({})
   })
 
-  it('session storage round-trip, and broken storage never throws', () => {
-    const mem = new Map<string, string>()
-    const storage = {
-      getItem: (k: string) => mem.get(k) ?? null, setItem: (k: string, v: string) => void mem.set(k, v),
-    } as unknown as Storage
-    saveSessionSizes(full, storage)
-    expect(loadSessionSizes(storage)).toEqual(full)
-    const broken = { getItem: () => { throw new Error('x') }, setItem: () => { throw new Error('x') } } as unknown as Storage
-    expect(() => saveSessionSizes(full, broken)).not.toThrow()
-    expect(loadSessionSizes(broken)).toEqual({})
-    mem.set('tryon.fitSizes', '{bad json')
-    expect(loadSessionSizes(storage)).toEqual({})
-    expect(loadSessionSizes(undefined)).toEqual({})
-  })
 })
 
 describe('which body keys changed (PATCH merges)', () => {
@@ -130,5 +115,58 @@ describe('which body keys changed (PATCH merges)', () => {
     expect(changedKeys(stored, { height_cm: '175', measurements: { chest: '98', shoulder_width: '44' } })).toEqual({})
     expect(changedKeys(stored, { height_cm: '', measurements: { chest: '', shoulder_width: 'x' } })).toEqual({})
     expect(changedKeys({ height_cm: null, measurements: null }, { height_cm: '', measurements: {} })).toEqual({})
+  })
+})
+
+describe('fit notice (red / yellow / none)', () => {
+  const small = check({})
+  const big = check({ zone: 'shoulder', garment_cm: 54, body_cm: 44, ease_cm: 10, verdict: 'too_large', limit_cm: 50 })
+  const ok = check({ zone: 'shoulder', garment_cm: 45, body_cm: 44, ease_cm: 1, verdict: 'ok', limit_cm: null })
+
+  it('too small -> red with the zone lines', () => {
+    expect(fitNotice({ fits: false, checks: [small, ok], warnings: [] })).toEqual({
+      kind: 'red', lines: ['Bu kiyim sizga mos emas: koʻkrak 6 sm tor.'],
+    })
+  })
+
+  it('too small + too large -> red with both lines, in check order', () => {
+    expect(fitNotice({ fits: false, checks: [small, big], warnings: [big] })).toEqual({
+      kind: 'red', lines: ['Bu kiyim sizga mos emas: koʻkrak 6 sm tor.', 'Bu kiyim sizga katta: yelka 4 sm keng.'],
+    })
+  })
+
+  it('warnings only -> yellow; warnings taken from checks when absent', () => {
+    const yellow = { kind: 'yellow', lines: ['Bu kiyim sizga katta: yelka 4 sm keng.'] }
+    expect(fitNotice({ fits: true, checks: [ok, big], warnings: [big] })).toEqual(yellow)
+    expect(fitNotice({ fits: true, checks: [ok, big] })).toEqual(yellow)
+  })
+
+  it('fits without warnings -> none', () => {
+    expect(fitNotice({ fits: true, checks: [ok], warnings: [] })).toEqual({ kind: 'none', lines: [] })
+    expect(fitNotice({ fits: true, checks: [] })).toEqual({ kind: 'none', lines: [] })
+  })
+})
+
+describe('job result fit_warnings -> yellow blocks', () => {
+  const big = check({ zone: 'hip', garment_cm: 130, body_cm: 100, ease_cm: 30, verdict: 'too_large', limit_cm: 120 })
+  const names = (id: number) => (id === 7 ? 'Koʻk shim' : `#${id}`)
+
+  it('one garment: no title; several: the garment name', () => {
+    const result = { fit_warnings: [{ garment_id: 7, checks: [big], detail: 'x' }] }
+    expect(fitWarningBlocks(result, 1, names)).toEqual([
+      { garmentId: 7, title: null, lines: ['Bu kiyim sizga katta: son 10 sm keng.'] },
+    ])
+    expect(fitWarningBlocks(result, 2, names)[0].title).toBe('Koʻk shim')
+  })
+
+  it('missing / empty / malformed -> nothing; detail used when checks are missing', () => {
+    expect(fitWarningBlocks(null, 1, names)).toEqual([])
+    expect(fitWarningBlocks({}, 1, names)).toEqual([])
+    expect(fitWarningBlocks({ fit_warnings: [] }, 1, names)).toEqual([])
+    expect(fitWarningBlocks({ fit_warnings: 'x' }, 1, names)).toEqual([])
+    expect(fitWarningBlocks({ fit_warnings: [null, { checks: [big] }, { garment_id: 3, checks: [] }] }, 1, names))
+      .toEqual([])
+    expect(fitWarningBlocks({ fit_warnings: [{ garment_id: 3, detail: 'A\nB' }] }, 1, names))
+      .toEqual([{ garmentId: 3, title: null, lines: ['A', 'B'] }])
   })
 })
