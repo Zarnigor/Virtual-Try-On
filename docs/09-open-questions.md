@@ -795,3 +795,26 @@ _(none blocking P0)_
     `Avatar.measurements.shoulder_width` (cm, width) = shoulder px x height_cm / (foot_bottom.y - head_top.y) (#76):
     `manage.py fill_avatar_shoulder_width [--dry-run]` (never overwrites), recomputed on the staff landmark save
     unless sent. Seeded: 38.5 / 41.9 / 46.7 (male slim / average / plus), 35.8 / 41.6 / 39.9 (female).
+
+## Decided 2026-11-26: own body is the main try-on path
+130. **2026-11-26: the own body is the main try-on path; avatars stay as demo / fallback** (owner; ends the
+    2026-11-12 own-body pause, docs/01 "Current focus"). The user uploads their own body photo and enters their
+    sizes; the fit check and the render use that body's own sizes and landmarks.
+    - `POST body/confirm/` requires `height_cm`, `chest`, `waist`, `hip` (shared validator ranges); missing -> 400
+      `MEASUREMENTS_INVALID` `{field, detail: "{name}: kiriting."}`, nothing locked. `inseam` optional.
+      `shoulder_width` optional: when missing it is computed from the confirmed landmarks with the avatars' function
+      (`apps/avatars/sizes.py` moved to `apps/sizing/body_sizes.py`, pure, no copy) and stored.
+    - `Body.shoulder_width_estimated` (bool, in the Body response): true when computed. A `PATCH body/measurements/`
+      that changes `height_cm` and does not send `shoulder_width` recomputes it while true (flag stays true); a sent
+      `shoulder_width` sets it to false and is never recomputed. Sending the estimate itself only clears the flag
+      (no value changed: no yearly lock, #127).
+    - `POST tryon/` and `GET tryon/fit-check/` for an unconfirmed own body: 400 `{code: "BODY_NOT_CONFIRMED",
+      detail: "Avval tanangizni tasdiqlang."}` (before: `{detail: "Body not confirmed yet"}`, English, no code).
+    - Frontend: two-step confirm (landmarks, then sizes with the shoulder width prefilled and labelled "taxmin");
+      the try-on page opens on the confirmed own body, avatars stay selectable.
+    - Audit (2026-11-26, real API + worker, `tools/tryon_check/own_body_path.py`): upload -> 600x1200 -> auto
+      landmarks -> confirm -> try-on works on `TRYON_WARP=mls` (T-shirt on MLS with the full adapt config, no
+      fallback) and `parts`; with `FIT_CHECK_ENABLED=1` every T-shirt on an own body was blocked
+      (`BODY_SIZE_MISSING ["shoulder_width"]`) until this change. The check tool was stale (pants #51 deleted, no
+      sizes): fixed. Neck-gap fill: source="body" on both engines, tested.
+    - Not changed: MLS rules, `FIT_RULES`, the fit gate logic, `flags.py`, prompt 02 still not wired (#110).

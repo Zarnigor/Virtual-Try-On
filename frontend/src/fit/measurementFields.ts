@@ -12,7 +12,7 @@ export interface MeasurementField {
   max: number
 }
 
-/** Avatar path "Your sizes" form: required as docs/11 lists them; inseam optional (estimated from height). */
+/** Body measurements fields: required for the fit check as docs/11 lists them; inseam optional (estimated from height). */
 export const FIT_MEASUREMENT_FIELDS: MeasurementField[] = [
   { key: 'height_cm', required: true, min: 140, max: 210 },
   { key: 'chest', required: true, min: 70, max: 150 },
@@ -73,38 +73,3 @@ export function changedKeys(
   return out
 }
 
-const SESSION_KEY = 'tryon.fitSizes'
-
-/** sessionStorage can be missing or throw (private mode, quota): every access is wrapped. */
-export function loadSessionSizes(storage: Storage | undefined = safeSession()): MeasurementValues {
-  try {
-    const raw = storage?.getItem(SESSION_KEY)
-    if (!raw) return {}
-    const parsed: unknown = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return {}
-    const out: MeasurementValues = {}
-    for (const f of FIT_MEASUREMENT_FIELDS) {
-      const v = (parsed as Record<string, unknown>)[f.key]
-      if (typeof v === 'string') out[f.key] = v
-    }
-    return out
-  } catch {
-    return {}
-  }
-}
-
-export function saveSessionSizes(values: MeasurementValues, storage: Storage | undefined = safeSession()): void {
-  try {
-    storage?.setItem(SESSION_KEY, JSON.stringify(values))
-  } catch {
-    // ignore: the sizes then only live in the page state
-  }
-}
-
-function safeSession(): Storage | undefined {
-  try {
-    return typeof window !== 'undefined' ? window.sessionStorage : undefined
-  } catch {
-    return undefined
-  }
-}

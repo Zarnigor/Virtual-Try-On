@@ -39,7 +39,12 @@ These come from the product owner. Do not change them without asking. Log: `09-o
 ## Measurements and fit
 19. Own body: marked landmarks on the photo are the required input; numeric measurements and height are optional.
     **Changed 2026-11-25 (docs/11, docs/09 #125):** measurements are required for try-on because of the fit check.
-20. **Model path (avatar): gender only (changed 2026-11-23, docs/09 #124; before: numeric measurements required).** The backend `avatars/nearest/` and the measurement fields stay, unused by the frontend. **Fit check (docs/11, docs/09 #125) needs the user's measurements for try-on; how the avatar path supplies them is still to be settled.**
+    **Changed 2026-11-26 (docs/09 #130):** the own body is the main try-on path; `POST body/confirm/` requires
+    `height_cm`, `chest`, `waist`, `hip` (inseam optional, estimated from height); `shoulder_width` is optional and,
+    when missing, computed from the confirmed landmarks with the avatars' rule and marked `shoulder_width_estimated`
+    (recomputed on a height change while estimated, never once the user enters it). The fit check and the render
+    use the body's own sizes and landmarks.
+20. **Model path (avatar): gender only (changed 2026-11-23, docs/09 #124; before: numeric measurements required).** The backend `avatars/nearest/` and the measurement fields stay, unused by the frontend. **Fit check (docs/11, docs/09 #125, #129): the avatar path uses the AVATAR's own sizes** (`Avatar.height_cm` + `measurements`: chest, waist, hip, `shoulder_width` from the shoulder landmarks; inseam estimated from height). The user enters no sizes on this path; a request `measurements` is accepted and ignored. Avatars are the demo / fallback path since docs/09 #130.
 21. **SUPERSEDED 2026-11-25 by `docs/11-fit-check.md` (docs/09 #125): garment real size (cm) IS entered and a fit
     check runs before try-on.** The render rules below are unchanged. Fit is set per garment (`fit_mode`, docs/09 #93, decided 2026-11-11):
     `adapt` (default) = the garment is fully deformed to the body's landmarks; `keep_shape` = the garment keeps its own

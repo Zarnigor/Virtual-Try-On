@@ -12,6 +12,8 @@ from apps.avatars.tests_staff import full_landmarks
 from apps.bodies.landmark_checks import complete_body_landmarks
 
 LANDMARKS = full_landmarks()
+# Required at confirm (docs/09 #130).
+SIZES = {"height_cm": 175, "measurements": {"chest": 98, "waist": 86, "hip": 98}}
 
 
 @mock.patch("apps.bodies.views.run_body_validation.delay")
@@ -29,7 +31,7 @@ class BodyRulesTests(MediaTestCase):
 
     def _confirmed_body(self, **extra):
         self._upload()
-        return self.client.post("/api/body/confirm/", {"landmarks": LANDMARKS, **extra}, format="json")
+        return self.client.post("/api/body/confirm/", {"landmarks": LANDMARKS, **SIZES, **extra}, format="json")
 
     # --- upload / one body per user ---
     def test_upload_requires_adult_confirmation(self, _):
@@ -58,7 +60,7 @@ class BodyRulesTests(MediaTestCase):
 
     def test_confirm_runs_the_landmark_checks(self, _):
         self._upload()
-        r = self.client.post("/api/body/confirm/", {"landmarks": {"head_top": {"y": 50}}}, format="json")
+        r = self.client.post("/api/body/confirm/", {"landmarks": {"head_top": {"y": 50}}, **SIZES}, format="json")
         self.assertEqual((r.status_code, r.data["code"]), (400, "LANDMARKS_INVALID"))
         self.assertIsNone(Body.objects.get(user=self.user).confirmed_at)
 
@@ -77,9 +79,9 @@ class BodyRulesTests(MediaTestCase):
 
     # --- yearly measurements ---
     def test_measurements_at_confirm_do_not_start_the_lock(self, _):
-        self._confirmed_body(measurements={"chest": 96})
+        self._confirmed_body(measurements={"chest": 96, "waist": 80, "hip": 96, "shoulder_width": 42})
         body = Body.objects.get(user=self.user)
-        self.assertEqual(body.measurements, {"chest": 96})
+        self.assertEqual(body.measurements, {"chest": 96, "waist": 80, "hip": 96, "shoulder_width": 42})
         self.assertTrue(body.can_change_measurements)
 
     def test_measurements_change_once_per_365_days(self, _):

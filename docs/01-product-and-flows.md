@@ -6,6 +6,12 @@ Core goal: **the clothes must fit the person's exact body size** (not just "look
 Context: this is a project for a job application. 3 days to build, the 4th day only for checking.
 Demo-ability matters: the demo must not depend on live AI speed (keep prepared results as fallback).
 
+## Current focus
+**2026-11-26 (owner, docs/09 #130): the own body is the main try-on path** (ends the 2026-11-12 own-body pause).
+The user uploads their own body photo, checks the landmarks and enters their sizes; the fit check and the render use
+that body's own sizes and landmarks. Avatars (models) stay as the demo / fallback path. The try-on page opens on the
+own body when it is confirmed.
+
 ## Actors
 - **User**: signs in, has at most one private body, uploads garments, tries on, saves outfits.
 - **Admin** (the developer): prepares 6 avatars and the starter catalog, handles the moderation queue.
@@ -15,8 +21,8 @@ Demo-ability matters: the demo must not depend on live AI speed (keep prepared r
 | Page | Purpose | Priority |
 |---|---|---|
 | Sign in / register | Account (required: body and garments are per-user and private) | P0 |
-| Create my body | Choose sex (required), upload once (A-pose), checks, mark landmarks, optional height, confirm | P0 |
-| Choose model | Gender + optional measurements -> nearest avatar | P0 |
+| Create my body (main path, docs/09 #130) | Choose sex (required), upload once (A-pose), checks, mark landmarks, sizes (height, chest, waist, hip required; shoulder width estimated from the landmarks, editable; inseam optional), confirm | P0 |
+| Choose model (demo / fallback) | Gender only -> that sex's average avatar (docs/09 #124) | P0 |
 | Garments | Catalog (public) + My garments | P0 |
 | Upload garment | Upload, cleaning (rembg; AI hanger removal is off for now, docs/09 #55), preview, mark landmarks, visibility, fit mode, gender | P0 |
 | Try on | Body + garment (matching gender only, docs/09 #97), result, quality warnings (no fit label) | P0 |
@@ -41,10 +47,10 @@ Details: `03-landmarks-and-coordinates.md`.
 
 ### Body source
 User chooses either:
-- **My body**: one photo, once, A-pose, tight clothing. After confirmation it can never be changed.
-  (Deleting the account/body for privacy is a separate decision, see open questions.)
-- **Model**: 6 prepared avatars (male/female x slim/average/plus). Pick gender; the nearest build is
-  chosen from optional measurements; the garment is deformed to the entered measurements.
+- **My body** (the main path, docs/09 #130): one photo, once, A-pose, tight clothing, plus the user's sizes. After
+  confirmation the photo and landmarks can never be changed (sizes: once per 365 days; the body may be deleted).
+- **Model** (demo / fallback): 6 prepared avatars (male/female x slim/average/plus). Pick gender; that sex's average
+  avatar is used (docs/09 #124); the fit check uses the avatar's own sizes (docs/09 #129).
 
 ### Garment source
 - **Catalog**: admin-prepared + approved public garments. MVP garment types: T-shirt (`tshirt`) and pants (`pants`).

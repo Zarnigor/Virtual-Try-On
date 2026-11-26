@@ -125,7 +125,7 @@ class StaffAvatarApiTests(MediaTestCase):
         self.avatar.refresh_from_db()
         self.assertIsNotNone(self.avatar.landmarks_confirmed_at)
         self.assertEqual(self.avatar.height_cm, 178)
-        from apps.avatars.sizes import shoulder_width_cm  # recomputed on save (docs/09 #129)
+        from apps.sizing.body_sizes import shoulder_width_cm  # recomputed on save (docs/09 #129)
         self.assertEqual(self.avatar.measurements, {
             "chest": 90, "waist": 80, "shoulder_width": shoulder_width_cm(self.avatar.landmarks, 178)})
         self.assertEqual(self.avatar.landmarks["waist"]["width"], 160)

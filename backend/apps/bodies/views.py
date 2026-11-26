@@ -3,7 +3,9 @@ from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from apps.sizing.body_sizes import with_shoulder_width
 from apps.sizing.measurements import MeasurementsInvalid, validate_measurements
+from apps.sizing.messages import measurement_missing_detail
 
 from .models import Body
 from .serializers import (
@@ -116,7 +118,8 @@ def set_body_sex(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def confirm_body(request):
-    """POST /api/body/confirm/ {landmarks, height_cm?, measurements?}: locks photo + landmarks."""
+    """POST /api/body/confirm/ {landmarks, height_cm, measurements: {chest, waist, hip, shoulder_width?, inseam?, shoulder?}}:
+    locks photo + landmarks. Missing required size -> 400 MEASUREMENTS_INVALID naming it (docs/09 #130)."""
     body = _own_body(request)
     if body is None:
         return _err("BODY_NOT_FOUND", 404)
@@ -130,19 +133,40 @@ def confirm_body(request):
     if bad is not None:
         return bad
 
+    missing = _missing_confirm_size(data)
+    if missing is not None:
+        return Response({"code": "MEASUREMENTS_INVALID", "detail": measurement_missing_detail(missing),
+                         "field": missing}, status=400)
+
     try:  # docs/03 "Body landmark checks": the same rules as the staff avatar editor
         validate_body_landmarks(data["landmarks"])
     except BodyLandmarksInvalid as e:
         return Response({"code": "LANDMARKS_INVALID", "detail": e.detail}, status=400)
     body.landmarks = complete_body_landmarks(data["landmarks"])
-    if "height_cm" in data:
-        body.height_cm = data["height_cm"]
-    if "measurements" in data:
-        body.measurements = data["measurements"]
+    body.height_cm = data["height_cm"]
+    given = dict(data["measurements"])
+    # shoulder_width optional: computed from the confirmed landmarks (the avatars' rule, docs/09 #129, #130)
+    body.measurements = with_shoulder_width(given, body.landmarks, body.height_cm, given.get("shoulder_width"))
+    body.shoulder_width_estimated = "shoulder_width" not in given and "shoulder_width" in body.measurements
     # First entry of measurements does not start the 365-day lock.
     body.confirmed_at = timezone.now()
-    body.save(update_fields=["landmarks", "height_cm", "measurements", "confirmed_at"])
+    body.save(update_fields=["landmarks", "height_cm", "measurements", "shoulder_width_estimated", "confirmed_at"])
     return Response(BodySerializer(body, context={"request": request}).data)
+
+
+# Required at confirm (docs/09 #130): the own body is the main try-on path and the fit check needs them.
+# inseam stays optional (estimated from height), shoulder_width is computed when missing.
+CONFIRM_REQUIRED = ("height_cm", "chest", "waist", "hip")
+
+
+def _missing_confirm_size(data):
+    """The first required size that is missing (or null) in a confirm payload, else None."""
+    m = data.get("measurements") or {}
+    for key in CONFIRM_REQUIRED:
+        value = data.get("height_cm") if key == "height_cm" else m.get(key)
+        if value is None:
+            return key
+    return None
 
 
 @api_view(["PATCH"])
@@ -167,13 +191,22 @@ def update_measurements(request):
     if bad is not None:
         return bad
     height = s.validated_data.get("height_cm", body.height_cm)
-    merged = {**(body.measurements or {}), **s.validated_data.get("measurements", {})}
-    if height == body.height_cm and merged == (body.measurements or {}):
-        return Response(BodySerializer(body, context={"request": request}).data)  # nothing changed: no lock
+    sent = s.validated_data.get("measurements", {})
+    merged = {**(body.measurements or {}), **sent}
+    estimated = body.shoulder_width_estimated and "shoulder_width" not in sent  # a sent value is the user's own
+    if estimated and height != body.height_cm:
+        # docs/09 #130: an estimated shoulder_width follows the new height (never a user-entered one)
+        merged = with_shoulder_width(merged, body.landmarks, height)
+    if height == body.height_cm and merged == (body.measurements or {}):  # no value changed: no lock (#127)
+        if estimated != body.shoulder_width_estimated:  # the user sent the estimate as their own value
+            body.shoulder_width_estimated = estimated
+            body.save(update_fields=["shoulder_width_estimated"])
+        return Response(BodySerializer(body, context={"request": request}).data)
     body.height_cm = height
     body.measurements = merged
+    body.shoulder_width_estimated = estimated
     body.measurements_changed_at = timezone.now()
-    body.save(update_fields=["height_cm", "measurements", "measurements_changed_at"])
+    body.save(update_fields=["height_cm", "measurements", "shoulder_width_estimated", "measurements_changed_at"])
     return Response(BodySerializer(body, context={"request": request}).data)
 
 

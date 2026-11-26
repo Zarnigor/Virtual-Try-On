@@ -51,3 +51,8 @@ def measurement_invalid_detail(key: str, lo=None, hi=None) -> str:
     if lo is None:
         return f"{name}: son kiriting."
     return f"{name}: {format_cm(lo)} dan {format_cm(hi)} sm gacha boʻlishi kerak."
+
+
+def measurement_missing_detail(key: str) -> str:
+    """A required body size that was not sent (POST body/confirm/, docs/09 #130)."""
+    return f"{FIELD_NAMES.get(key, key)}: kiriting."

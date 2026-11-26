@@ -8,13 +8,15 @@ export function formatCm(value: number): string {
   return text.endsWith('.0') ? text.slice(0, -2) : text
 }
 
-/** "Bu kiyim sizga mos emas: koʻkrak 6 sm tor." for a failing zone; null when the zone is ok. */
+/** "Bu kiyim sizga mos emas: koʻkrak 6 sm tor." (too_small) or "Bu kiyim sizga katta: koʻkrak 2.5 sm keng."
+ *  (too_large, docs/09 #128); null when the zone is ok. */
 export function zoneLine(c: FitZoneCheck): string | null {
   if (c.verdict === 'ok' || c.limit_cm == null) return null
   const [small, large] = c.zone === 'inseam' ? ['qisqa', 'uzun'] : ['tor', 'keng']
   const word = c.verdict === 'too_small' ? small : large
   const n = formatCm(Math.abs(c.garment_cm - c.limit_cm))
-  return `Bu kiyim sizga mos emas: ${FIT_ZONE_NAMES[c.zone]} ${n} sm ${word}.`
+  const head = c.verdict === 'too_small' ? 'Bu kiyim sizga mos emas' : 'Bu kiyim sizga katta'
+  return `${head}: ${FIT_ZONE_NAMES[c.zone]} ${n} sm ${word}.`
 }
 
 /** One line per failing zone, in the backend's zone order (the order of `checks`). */

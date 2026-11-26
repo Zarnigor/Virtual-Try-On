@@ -23,12 +23,12 @@ silhouettes and flat T-shirt/pants shapes only as placeholders. In the app:
 | 2 | Bosh sahifa | / | GET /body (status), GET /garments?limit, GET /outfits?limit | body image, garment thumbs, outfit result thumbs |
 | 3 | Tana tanlash | /body | GET /body (exists?), GET /avatars | avatar images for the 3 builds |
 | 4 | Oʻz rasmini yuklash | /body/new | POST /body (file, sex, 18+ flag), GET /jobs/{id} | requirement sample image (served by the backend), uploaded-photo preview while checking |
-| 5 | Belgilash sahifasi | /body/landmarks | GET /body (normalized image + landmarks), POST /body/confirm | normalized body image |
+| 5 | Belgilash sahifasi | /body/confirm, two steps: "1 / 2" landmarks, "2 / 2" sizes (docs/09 #130) | GET /body (normalized image + landmarks), POST /body/confirm | normalized body image |
 | 6 | Model tanlash | /model | GET /avatars/nearest?... | nearest avatar image |
 | 7 | Kiyimlar | /garments | GET /garments?scope=mine\|catalog&type= | garment thumbnails; DELETE /garments/{id} |
 | 8 | Kiyim yuklash va tozalash | /garments/new | POST /garments (file, type), GET /jobs/{id}, then Save/Cancel | uploaded original (temporary preview) and cleaned result |
 | 9 | Kiyimni belgilash, **two steps for T-shirts** (docs/09 #102) | step 1 `/garments/{id}/landmarks` ("1 / 2", "Keyingi"; pants: one step, "Saqlash"); step 2 `/garments/{id}/neck` ("2 / 2") | PATCH landmarks (full object both steps), PATCH visibility, PATCH fit_mode / gender | cleaned garment image (editor: design artboard VariantC, `components/landmark-editor/`). Step 1: every point except the collar. Step 2: auto-zoom to the top centre, the 3 collar points + the "Yoqa teshigi" polygon (created once from the collar points, shape buttons V / Dumaloq / Toʻrtburchak with a guessed default, inner-edge inset, closed along the garment top; edit modes "Yoqa nuqtalari" / "Yoqa teshigi"; drag a vertex, click an edge to add one, delete one, "Qayta tiklash"); "Orqaga", "Saqlash" (needs 3 points + a valid polygon), "Oʻtkazib yuborish" (r7 neckline, hint) |
-| 10 | Kiyib koʻrish | /try-on | GET /garments?for_sex, POST /tryon, POST /tryon/{id}/realistic, POST /outfits | body or avatar image, garment thumbs, result image, realistic image |
+| 10 | Kiyib koʻrish | /tryon (default base: the confirmed own body, docs/09 #130) | GET /garments?for_sex, POST /tryon, POST /tryon/{id}/realistic, POST /outfits | body or avatar image, garment thumbs, result image, realistic image |
 | 11 | Mening obrazlarim | /outfits | GET /outfits, DELETE /outfits/{id} | result and realistic images |
 | 12 | Profil va maxfiylik | /profile | GET /body, PATCH /body/measurements, DELETE /body, DELETE /me | none |
 
@@ -55,12 +55,24 @@ with a `deleted` flag.
   (`neck_hole_invalid`, `mls_fallback`, locale `TRYON_QUALITY`).
 - Fit check (docs/11 step 4, not in the design): garment upload has a sizes form with a "where to measure" inline SVG
   (`components/SizesForm`, `SizeDiagram`) + stretch checkbox; `/garments/:id/sizes` (view + edit, owner only; the
-  wardrobe card shows "Oʻlchamlar kiritilmagan" and an "Oʻlchamlar" link); the avatar path asks "Sizning
-  oʻlchamlaringiz" after the gender pick (sessionStorage, only for the fit check, not for the avatar choice, #124);
-  the try-on page calls `GET tryon/fit-check/` (debounced 400 ms) and shows per selected garment "Sizga mos emas" +
-  zone lines or a missing-size message with a link to the right form; the button is disabled by them only when
-  `GET config/` says `fit_check_enabled`. The body measurements page has shoulder_width + inseam and sends only the
+  wardrobe card shows "Oʻlchamlar kiritilmagan" and an "Oʻlchamlar" link). The avatar path has no sizes form: the
+  check uses the rendered avatar's / body's own sizes (docs/09 #129), and no `measurements` are sent to `POST tryon/`
+  or `GET tryon/fit-check/`. The try-on page calls `GET tryon/fit-check/` (debounced 400 ms) and shows per selected
+  garment: red "Sizga mos emas" + zone lines (too_small; the button is disabled only when `GET config/` says
+  `fit_check_enabled`), yellow "Sizga katta" + zone lines (warnings only, #128; the button stays enabled), or a
+  missing-size message: garment sizes -> link to `/garments/:id/sizes` (owner); body sizes on base=body -> link to the
+  measurements page; on base=avatar -> "Bu avatarning oʻlchamlari toʻliq emas. Boshqa avatar tanlang." (no link,
+  also for a `POST tryon/` 400 `BODY_SIZE_MISSING`). The job result `fit_warnings` shows the same yellow notice under
+  the result image (garment name per block when more than one garment was tried on). The body measurements page has shoulder_width + inseam and sends only the
   changed keys (PATCH merges, docs/09 #127). Pure helpers: `src/fit/`.
+- Own body = the main path (docs/09 #130): `/body/confirm` is two steps. "1 / 2" is the landmark editor ("Keyingi"),
+  "2 / 2" the sizes form: height, chest, waist, hip required (red *), inseam optional, shoulder width prefilled from
+  the edited landmarks + height (`fit/bodySizes.ts`, the backend formula) with "taxmin, tuzatishingiz mumkin"; an
+  untouched estimate is not sent (the backend computes the same value and marks it estimated), a typed value is.
+  "Orqaga" returns to the editor with the edited points; "Tasdiqlash" (irreversible-confirm dialog) -> `/tryon`.
+  A `LANDMARKS_INVALID` answer goes back to step 1; `MEASUREMENTS_INVALID` marks its field. The try-on page opens on
+  base=body when the body is confirmed (a manual base choice wins); an unconfirmed body (or a 400
+  `BODY_NOT_CONFIRMED`) shows "Avval tanangizni tasdiqlang." + a link to `/body/confirm`.
 
 ## Behaviour notes
 - Screen 4: the uploaded original is only a temporary preview and is deleted after processing (docs/02 rule 6).

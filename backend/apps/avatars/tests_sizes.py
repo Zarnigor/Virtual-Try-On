@@ -5,7 +5,7 @@ from django.core.management import call_command
 from django.test import SimpleTestCase
 
 from apps.avatars.models import Avatar
-from apps.avatars.sizes import shoulder_width_cm
+from apps.sizing.body_sizes import shoulder_width_cm
 from apps.avatars.tests_staff import full_landmarks
 from apps.testing import MediaTestCase
 

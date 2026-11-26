@@ -20,6 +20,9 @@ class Body(models.Model):
     height_cm = models.FloatField(null=True, blank=True)
     measurements = models.JSONField(null=True, blank=True)
     measurements_changed_at = models.DateTimeField(null=True, blank=True)
+    # measurements.shoulder_width was computed from the landmarks at confirm (docs/09 #130), not entered by the user.
+    # A PATCH that changes height_cm recomputes it while this is true; a user-entered value sets it to False.
+    shoulder_width_estimated = models.BooleanField(default=False)
     confirmed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -1670,3 +1670,46 @@ class KeepNeckTests(SimpleTestCase):
         self.assertIn("keep_neck_dy", d["tshirt_config"])
         _, _, d = warp.render_tryon(self.base, self.lm, [("tshirt", self.g, self.glm)], warp_engine="mls")
         self.assertNotIn("keep_neck_dy", d["tshirt_config"])
+
+
+class OwnBodyRenderTests(MediaTestCase):
+    """docs/09 #130: the own body is the main path. Its outfits render with source="body" on both T-shirt engines,
+    so the neck-gap fill (admin avatars only, docs/02 rule 12, docs/09 #89) never runs, whatever the flag."""
+
+    def setUp(self):
+        super().setUp()
+        from django.utils import timezone
+        from apps.bodies.models import Body
+        self.user = self.make_user()
+        base, lm = body()
+        _, buf = cv2.imencode(".png", base)
+        self.body = Body(user=self.user, sex="male", landmarks=lm, confirmed_at=timezone.now())
+        self.body.image.save("b.png", ContentFile(buf.tobytes()), save=True)
+
+    def _outfit(self):
+        g_img, g_lm = shirt()
+        _, buf = cv2.imencode(".png", g_img)
+        g = Garment(owner=self.user, type="tshirt", landmarks=g_lm)
+        g.image.save("g.png", ContentFile(buf.tobytes()), save=True)
+        outfit = Outfit.objects.create(user=self.user, body=self.body)
+        outfit.garments.add(g)
+        return Outfit.objects.get(pk=outfit.pk)
+
+    def test_body_outfit_renders_with_source_body_on_mls_and_parts(self):
+        for engine in ("mls", "parts"):
+            with self.subTest(engine=engine), override_settings(TRYON_WARP=engine, TRYON_NECK_GAP_FILL=True):
+                calls = []
+
+                real = warp.render_tryon
+
+                def spy(*a, real=real, **kw):
+                    out = real(*a, **kw)
+                    calls.append((kw, out[2] or {}))
+                    return out
+
+                with mock.patch("apps.tryon_engine.warp.render_tryon", side_effect=spy):
+                    report = tasks._do_warp(self._outfit())
+                kw, debug = calls[0]
+                self.assertEqual((kw["source"], kw["neck_gap_fill"]), ("body", True))  # the flag is on ...
+                self.assertNotIn("neck_gap", debug)  # ... and still never runs for an own body
+                self.assertEqual((report["engine"], report["quality_warnings"]), (engine, []))

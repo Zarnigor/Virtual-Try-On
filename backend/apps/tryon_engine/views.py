@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 GENDER_MISMATCH_DETAIL = "Bu kiyim boshqa jins uchun moʻljallangan. Mos kiyim yoki boshqa asos tanlang."
 BODY_SEX_REQUIRED_DETAIL = "Avval tanangiz jinsini tanlang."
+BODY_NOT_CONFIRMED_DETAIL = "Avval tanangizni tasdiqlang."  # docs/09 #130
 
 
 def garment_fits_sex(garment_gender: str, sex: str) -> bool:
@@ -77,7 +78,7 @@ def start_tryon(request):
         try:
             body_obj = Body.objects.get(user=request.user)
             if not body_obj.is_confirmed:
-                return Response({"detail": "Body not confirmed yet"}, status=400)
+                return Response({"code": "BODY_NOT_CONFIRMED", "detail": BODY_NOT_CONFIRMED_DETAIL}, status=400)
         except Body.DoesNotExist:
             return Response({"detail": "No confirmed body found"}, status=404)
         if body_obj.sex is None:  # bodies created before sex was required: the UI asks once, never guessed
@@ -176,7 +177,7 @@ def fit_check(request):
         if body_obj is None:
             return Response(status=404)
         if not body_obj.is_confirmed:  # same answer as POST tryon/
-            return Response({"detail": "Body not confirmed yet"}, status=400)
+            return Response({"code": "BODY_NOT_CONFIRMED", "detail": BODY_NOT_CONFIRMED_DETAIL}, status=400)
         sizes = fit_gate.sizes_from(body_obj)
     else:
         avatar_id = params.get("avatar_id")

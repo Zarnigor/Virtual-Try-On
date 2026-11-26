@@ -18,7 +18,7 @@ from pathlib import Path
 from django.core.management.base import BaseCommand
 from django.core.files.base import ContentFile
 from apps.avatars.models import Avatar
-from apps.avatars.sizes import with_shoulder_width
+from apps.sizing.body_sizes import with_shoulder_width
 
 SEED_JSON = Path(__file__).resolve().parents[4] / "seed" / "avatars.reference.json"
 CANVAS_W, CANVAS_H = 600, 1200

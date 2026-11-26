@@ -15,7 +15,7 @@ class BodySerializer(serializers.ModelSerializer):
     class Meta:
         model = Body
         fields = (
-            "id", "image_url", "sex", "landmarks", "height_cm", "measurements",
+            "id", "image_url", "sex", "landmarks", "height_cm", "measurements", "shoulder_width_estimated",
             "confirmed_at", "measurements_unlock_at", "can_change_measurements", "created_at",
         )
         read_only_fields = fields

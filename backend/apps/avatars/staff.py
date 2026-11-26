@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from apps.bodies.landmark_checks import BodyLandmarksInvalid, complete_body_landmarks, validate_body_landmarks
 
 from .models import Avatar
-from .sizes import shoulder_width_cm
+from apps.sizing.body_sizes import shoulder_width_cm
 from .serializers import AvatarSerializer
 
 # shoulder, chest, waist, hip = circumferences; shoulder_width = a WIDTH for the fit check (docs/09 #129).

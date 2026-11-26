@@ -32,7 +32,11 @@ but the frontend must fully work too (React is required). The owner works and re
   Garment gender is enforced in try-on (#97): body `sex` is required at upload; mismatch -> 400 `GENDER_MISMATCH`.
 - **Model (avatar) path: gender only (docs/09 #124, 2026-11-23, owner).** The user picks Erkak/Ayol; the frontend selects that sex's
   `average` avatar (any avatar of that sex if none, else an inline error). No measurements are sent; `avatars/nearest/` stays in the
-  backend, unused (may return later). Own-body path: measurements optional.
+  backend, unused (may return later).
+- **Own body is the main try-on path, avatars are demo / fallback (docs/09 #130, 2026-11-26, owner).** Confirm requires
+  height_cm, chest, waist, hip; shoulder_width is computed from the landmarks when not sent (`apps/sizing/body_sizes.py`,
+  `Body.shoulder_width_estimated`, recomputed on a height change while estimated). Unconfirmed body in try-on ->
+  400 `BODY_NOT_CONFIRMED`.
 - Garment AI cleaning (hanger/background removal, prompt 04) is in P0 but **off for now** (`AI_CLEANING_ENABLED=0`, no prepaid
   image credits, docs/09 #55): garments are cleaned by rembg only.
 - Realistic render is saved with the outfit. Originals are deleted after processing.
@@ -146,6 +150,9 @@ Work it top to bottom, one step per turn, and tick the box when a step is done a
       original deleted); upload over an unconfirmed body replaces it; confirm runs the landmark checks. **Prompt 02
       is still not wired:** the submission runs with `AI_DEV_BYPASS=1` + `BODY_AI_CHECK_ENABLED=0` (owner decision).
       Check: `tools/tryon_check/own_body_path.py` (17 checks ok). 401 backend tests.
+      **2026-11-26 (docs/09 #130): own body = the main path.** Audit ok on mls + parts; confirm requires the sizes
+      (shoulder_width estimated from the landmarks), two-step BodyConfirm, try-on defaults to the confirmed body,
+      `BODY_NOT_CONFIRMED`. Prompt 02 still not wired.
 - [ ] 5. One `LandmarkEditor` (port of `tools/landmark-editor-prototype`) for body + garments; sanity checks client + server.
       **Partly done (2026-11-09, branch `landmark-editor-variant-c`):** garment editor rebuilt from design artboard VariantC in
       `frontend/src/components/landmark-editor/` (pure `geometry.ts` + `garmentGroups.ts` + component), used by

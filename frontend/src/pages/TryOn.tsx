@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { listAvatars, type Avatar } from '../api/avatars'
 import { garmentFitsSex, listGarments, type Garment } from '../api/garments'
 import { getBody, setBodySex, type Body } from '../api/bodies'
@@ -10,12 +10,11 @@ import Spinner from '../components/Spinner'
 import DevAiWarning from '../components/DevAiWarning'
 import StatusChip from '../components/StatusChip'
 import { GenderBadge, Segmented } from '../components/GarmentSettingsPanel'
-import FitNotice, { type FitAnswer } from '../components/FitNotice'
+import FitNotice, { FitLines, type FitAnswer } from '../components/FitNotice'
 import type { FitZoneCheck, Sex } from '../api/types'
-import {
-  FIT_MEASUREMENT_FIELDS, loadSessionSizes, saveSessionSizes, validateFitMeasurements, type MeasurementValues,
-} from '../fit/measurementFields'
-import { BODY_SIZE_LABELS, FIT_TEXT, SEX_LABELS, TRYON_GENDER, TRYON_QUALITY } from '../locale/uz'
+import { fitWarningBlocks } from '../fit/fitNotice'
+import { Link } from 'react-router-dom'
+import { FIT_TEXT, GARMENT_TYPE_NAMES, SEX_LABELS, TRYON_BODY, TRYON_GENDER, TRYON_QUALITY } from '../locale/uz'
 
 const FIT_CODES = ['GARMENT_SIZE_MISSING', 'BODY_SIZE_MISSING', 'SIZE_MISMATCH']
 const FIT_DEBOUNCE_MS = 400
@@ -27,6 +26,10 @@ const TRYON_ERRORS: Record<string, string> = {
 
 export default function TryOn() {
   const [base, setBase] = useState<'body' | 'avatar'>('avatar')
+  // The user picked a base by hand: the confirmed-body default must not override it when getBody answers late.
+  const baseTouched = useRef(false)
+  // 400 BODY_NOT_CONFIRMED (docs/09 #130): its detail, shown with a link to the confirm page
+  const [notConfirmedDetail, setNotConfirmedDetail] = useState('')
   const [avatars, setAvatars] = useState<Avatar[]>([])
   const [selectedAvatar, setSelectedAvatar] = useState<number | null>(null)
   // Model (avatar) path: gender only (docs/09 #124). Choosing a gender selects that sex's "average" avatar.
@@ -43,9 +46,10 @@ export default function TryOn() {
   const [resultUrl, setResultUrl] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [starting, setStarting] = useState(false)
+  // The garments of the last started try-on (names for the fit_warnings notice).
+  const [triedIds, setTriedIds] = useState<number[]>([])
   // Fit check (docs/11). The flag only decides whether a non-fitting garment blocks the button; results always show.
   const [fitEnabled, setFitEnabled] = useState(false)
-  const [sizes, setSizes] = useState<MeasurementValues>(() => loadSessionSizes())
   const [fitAnswers, setFitAnswers] = useState<Record<number, FitAnswer>>({})
   const [fitError, setFitError] = useState('')
   const [checking, setChecking] = useState(false)
@@ -59,12 +63,20 @@ export default function TryOn() {
     getConfig()
       .then((c) => { setScope(c.demo_mode ? 'all' : 'mine'); setFitEnabled(c.fit_check_enabled) })
       .catch(() => setScope('mine'))
+    // The own body is the main path (docs/09 #130): a confirmed body is the default base; avatars stay selectable.
+    getBody()
+      .then(({ data }) => {
+        setBody(data)
+        if (data.confirmed_at && !baseTouched.current) setBase('body')
+      })
+      .catch(() => setBody(null))
   }, [])
 
   useEffect(() => {
     if (base !== 'body') return
     getBody().then(({ data }) => setBody(data)).catch(() => setBody(null))
   }, [base])
+  const bodyUnconfirmed = base === 'body' && body !== null && !body.confirmed_at
 
   const baseSex: Sex | null =
     base === 'avatar' ? (avatars.find((a) => a.id === selectedAvatar)?.sex ?? null) : (body?.sex ?? null)
@@ -80,14 +92,6 @@ export default function TryOn() {
       .catch(() => {})
   }, [scope, baseSex, showAll])
 
-  // The user's own sizes (avatar path): kept for the session; only valid values are sent.
-  const sizeCheck = useMemo(() => validateFitMeasurements(sizes, false), [sizes])
-  const measurementsKey = JSON.stringify(sizeCheck.measurements)
-  const updateSizes = (next: MeasurementValues) => {
-    setSizes(next)
-    saveSessionSizes(next)
-  }
-
   // GET tryon/fit-check/ whenever the base or the selection changes (debounced; stale answers dropped).
   const garmentKey = selectedGarments.join(',')
   const bodyReady = body !== null && body.confirmed_at !== null
@@ -102,25 +106,26 @@ export default function TryOn() {
     }
     setChecking(true)
     const timer = setTimeout(() => {
-      fitCheck(base, selectedGarments, selectedAvatar ?? undefined, JSON.parse(measurementsKey))
+      fitCheck(base, selectedGarments, selectedAvatar ?? undefined)
         .then(({ data }) => {
           if (seq !== fitSeq.current) return
           setFitAnswers(Object.fromEntries(data.results.map((r) => [r.garment_id, {
-            garmentId: r.garment_id, fits: r.fits, checks: r.checks, code: r.code,
+            garmentId: r.garment_id, fits: r.fits, checks: r.checks, warnings: r.warnings ?? [], code: r.code,
           }])))
           setFitError('')
         })
         .catch((err: unknown) => {
           if (seq !== fitSeq.current) return
-          const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+          const data = (err as { response?: { data?: { code?: string; detail?: string } } })?.response?.data
           setFitAnswers({})
-          setFitError(detail ?? '')
+          setFitError(data?.code === 'BODY_NOT_CONFIRMED' ? '' : (data?.detail ?? ''))  // shown with its link below
+          if (data?.code === 'BODY_NOT_CONFIRMED') setNotConfirmedDetail(data.detail ?? TRYON_BODY.notConfirmed)
         })
         .finally(() => { if (seq === fitSeq.current) setChecking(false) })
     }, FIT_DEBOUNCE_MS)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [base, selectedAvatar, garmentKey, measurementsKey, bodyReady])
+  }, [base, selectedAvatar, garmentKey, bodyReady])
 
   const notFitting = selectedGarments.filter((id) => fitAnswers[id] && !fitAnswers[id].fits)
   const fitBlocked = fitEnabled && notFitting.length > 0
@@ -176,6 +181,7 @@ export default function TryOn() {
     }
     if (fitBlocked) return  // the button is disabled too; the backend refuses it as well (flag on)
     setError('')
+    setNotConfirmedDetail('')
     setStarting(true)
     setJobId(null)
     setResultUrl(null)
@@ -184,8 +190,8 @@ export default function TryOn() {
         base,
         avatar_id: base === 'avatar' ? (selectedAvatar ?? undefined) : undefined,
         garment_ids: selectedGarments,
-        measurements: base === 'avatar' ? sizeCheck.measurements : undefined,
       })
+      setTriedIds(selectedGarments)
       setJobId(data.job_id)
       setOutfitId(data.outfit_id)
     } catch (err: unknown) {
@@ -193,21 +199,34 @@ export default function TryOn() {
         code?: string; detail?: string; garment_id?: number; checks?: FitZoneCheck[]
       } } })?.response?.data
       if (data?.code && FIT_CODES.includes(data.code)) {
-        // Race (sizes changed after the last fit-check) with the flag on: show it like a fit-check result.
+        // Race (garment sizes changed after the last fit-check) with the flag on: show it like a fit-check result.
         const code = data.code === 'SIZE_MISMATCH' ? undefined : data.code as FitAnswer['code']
         const ids = data.code === 'BODY_SIZE_MISSING' ? selectedGarments : [data.garment_id ?? -1]
         setFitAnswers((prev) => ({
           ...prev,
-          ...Object.fromEntries(ids.map((id) => [id, { garmentId: id, fits: false, checks: data.checks ?? [], code }])),
+          ...Object.fromEntries(ids.map((id) => [id, { garmentId: id, fits: false, checks: data.checks ?? [], warnings: [], code }])),
         }))
       }
-      setError((data?.code && TRYON_ERRORS[data.code]) || data?.detail || 'Xato yuz berdi')
+      // base=avatar: the backend detail asks the user to enter their sizes, which they cannot do for an avatar.
+      const avatarSizes = base === 'avatar' && data?.code === 'BODY_SIZE_MISSING'
+      if (data?.code === 'BODY_NOT_CONFIRMED') {
+        setNotConfirmedDetail(data.detail || TRYON_BODY.notConfirmed)
+        return
+      }
+      setError((avatarSizes && FIT_TEXT.avatarSizeMissing)
+        || (data?.code && TRYON_ERRORS[data.code]) || data?.detail || 'Xato yuz berdi')
     } finally {
       setStarting(false)
     }
   }
 
   const isPolling = jobId !== null && job?.status !== 'done' && job?.status !== 'failed'
+  const garmentName = (id: number) => {
+    const g = garments.find((x) => x.id === id)
+    return g ? (g.name || GARMENT_TYPE_NAMES[g.type]) : `#${id}`
+  }
+  // Job result fit_warnings (docs/09 #128): rendered, but big; the garment name only when several were tried on.
+  const fitWarnings = fitWarningBlocks(job?.result, triedIds.length, garmentName)
 
   return (
     <div className="page">
@@ -244,7 +263,7 @@ export default function TryOn() {
                     name="base"
                     value={b}
                     checked={base === b}
-                    onChange={() => setBase(b)}
+                    onChange={() => { baseTouched.current = true; setBase(b); setNotConfirmedDetail('') }}
                     style={{ display: 'none' }}
                   />
                   {b === 'body' ? 'Mening tanam' : 'Model'}
@@ -266,29 +285,6 @@ export default function TryOn() {
                 </p>
                 <Segmented<Sex> title="Jins" value={avSex} options={SEX_LABELS} onChange={chooseAvatarSex} />
                 {avError && <p className="error-text" role="alert" style={{ marginTop: 8 }}>{avError}</p>}
-                {avSex && !avError && (
-                  <div id="fit-sizes" style={{ marginTop: 16 }}>
-                    <h3 style={{ fontSize: 14, marginBottom: 4 }}>{FIT_TEXT.yourSizesTitle}</h3>
-                    <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{FIT_TEXT.yourSizesHelp}</p>
-                    {FIT_MEASUREMENT_FIELDS.map((f) => (
-                      <div className="field" key={f.key} style={{ marginBottom: 8 }}>
-                        <label className="label" htmlFor={`fit-${f.key}`}>
-                          {BODY_SIZE_LABELS[f.key]} ({FIT_TEXT.cm})
-                          {f.required
-                            ? <span style={{ color: 'var(--danger)' }} title={FIT_TEXT.requiredMark}> *</span>
-                            : <span style={{ color: 'var(--muted)', fontWeight: 400 }}> ({FIT_TEXT.optional})</span>}
-                        </label>
-                        <input id={`fit-${f.key}`} className="input" type="number" inputMode="decimal" step="0.1"
-                          min={f.min} max={f.max} placeholder={`${f.min}–${f.max}`} value={sizes[f.key] ?? ''}
-                          aria-invalid={sizeCheck.errors[f.key] ? true : undefined}
-                          onChange={(e) => updateSizes({ ...sizes, [f.key]: e.target.value })} />
-                        {sizeCheck.errors[f.key] && (
-                          <p className="error-text" style={{ marginTop: 4 }}>{sizeCheck.errors[f.key]}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
                 {avSex && !avError && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 260, overflowY: 'auto', marginTop: 12 }}>
                     {avatars.filter((av) => av.sex === avSex).map((av) => (
@@ -416,6 +412,12 @@ export default function TryOn() {
             <p style={{ fontSize: 12, color: 'var(--muted)' }}>{FIT_TEXT.fitInfoOnly}</p>
           )}
           {error && <p className="error-text" role="alert">{error}</p>}
+          {(notConfirmedDetail || bodyUnconfirmed) && (
+            <p className="error-text" role="alert">
+              {notConfirmedDetail || TRYON_BODY.notConfirmed}{' '}
+              <Link to="/body/confirm">{TRYON_BODY.confirmLink}</Link>
+            </p>
+          )}
 
           <button
             className="btn btn-primary"
@@ -473,6 +475,11 @@ export default function TryOn() {
                   background: 'var(--inset)',
                 }}
               />
+              {fitWarnings.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  {fitWarnings.map((w) => <FitLines key={w.garmentId} kind="yellow" title={w.title} lines={w.lines} />)}
+                </div>
+              )}
               <div style={{ marginTop: 16, display: 'flex', gap: 10 }}>
                 <a
                   href={resultUrl}

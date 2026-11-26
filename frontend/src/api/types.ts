@@ -139,7 +139,7 @@ export type GarmentLandmarks = TshirtLandmarks | PantsLandmarks | Record<string,
 // ---------- body ----------
 
 /** cm. shoulder, chest, waist, hip = circumferences (decision 13); shoulder_width = a WIDTH and inseam, both for
- *  the fit check (docs/11). All optional for the own body. 400 MEASUREMENTS_INVALID outside the docs/11 ranges. */
+ *  the fit check (docs/11). At confirm height_cm, chest, waist, hip are required (docs/09 #130). 400 MEASUREMENTS_INVALID outside the docs/11 ranges. */
 export interface Measurements {
   shoulder?: number
   chest?: number
@@ -159,6 +159,9 @@ export interface Body {
   landmarks: Partial<BodyLandmarks>
   height_cm: number | null
   measurements: Measurements | null
+  /** measurements.shoulder_width was computed from the landmarks (label it "taxmin"); false once the user enters it.
+   *  While true, a PATCH that changes height_cm recomputes it (docs/09 #130). */
+  shoulder_width_estimated: boolean
   /** null until confirmed; after that photo + landmarks are immutable. */
   confirmed_at: string | null
   /** When the yearly measurements lock ends; null if never changed. */
@@ -173,11 +176,12 @@ export interface BodyUploadResponse {
   job_id: number
 }
 
-/** POST body/confirm/ */
+/** POST body/confirm/ (docs/09 #130): height_cm, chest, waist, hip required (400 MEASUREMENTS_INVALID naming the
+ *  missing one); inseam optional; shoulder_width optional (computed from the landmarks when not sent). */
 export interface BodyConfirmRequest {
   landmarks: BodyLandmarks
-  height_cm?: number | null
-  measurements?: Measurements | null
+  height_cm: number | null
+  measurements: Measurements
 }
 
 /** PATCH body/measurements/ (once per 365 days). MERGE: send only the changed keys; null is rejected (docs/09 #127). */
@@ -297,8 +301,7 @@ export interface TryOnRequest {
   avatar_id?: number
   /** At most one garment per type (max 2). */
   garment_ids: number[]
-  /** Accepted and IGNORED since docs/09 #129: the fit check uses the rendered Body's / Avatar's own sizes. */
-  measurements?: FitMeasurements
+  // `measurements` is accepted and ignored by the backend (docs/09 #129); the frontend no longer sends it.
 }
 
 /** The user's sizes for the fit check (cm, docs/11 ranges). */
@@ -340,6 +343,9 @@ export type FitError =
   | { code: 'GARMENT_SIZE_MISSING'; garment_id: number; keys: string[]; detail: string }
   | { code: 'BODY_SIZE_MISSING'; keys: string[]; detail: string }
   | { code: 'SIZE_MISMATCH'; garment_id: number; checks: FitZoneCheck[]; detail: string }
+
+/** POST tryon/ and GET tryon/fit-check/ with base=body when the own body is not confirmed yet (docs/09 #130). */
+export interface BodyNotConfirmedError { code: 'BODY_NOT_CONFIRMED'; detail: string }
 
 /** GET tryon/fit-check/ item; a garment that does not fit is a result (fits false), not an error. */
 export interface FitCheckResult {
