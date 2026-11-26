@@ -5,7 +5,7 @@
 
 A temporary user: POST body/ (PHOTO, default /avatars/male_average.jpg) -> job -> GET body/ (600x1200, auto
 landmarks) -> POST body/confirm/ -> second upload 409 -> avatars/nearest/ (400 without measurements, 200 with) ->
-POST tryon/ base=body with copies of GARMENTS (default 28, 51) -> outfit image -> GET outfits/ -> garment upload
+POST tryon/ base=body with copies of GARMENTS (default 28, 49; the copies get COPY_SIZES) -> outfit image -> GET outfits/ -> garment upload
 (clean job, original deleted, 404 for another user). The user and
 everything it owns is deleted at the end. Prints one line per check; exit status 1 when one fails.
 """
@@ -25,11 +25,16 @@ from apps.garments.models import Garment
 API = "http://localhost:8000/api"
 PHOTO = os.environ.get("PHOTO", "/avatars/male_average.jpg")
 SEX = os.environ.get("SEX", "male")
-GARMENTS = [int(v) for v in os.environ.get("GARMENTS", "28,51").split(",")]
+GARMENTS = [int(v) for v in os.environ.get("GARMENTS", "28,49").split(",")]
 SIZES = {  # valid placeholder sizes for the upload check only (docs/11)
     "tshirt": '{"chest_width": 52, "length": 70, "shoulder_width": 46}',
     "pants": '{"waist_width": 40, "hip_width": 50, "inseam": 78}',
 }
+COPY_SIZES = {  # sizes that fit BODY_SIZES (docs/11), so the path also runs with FIT_CHECK_ENABLED=1
+    "tshirt": {"chest_width": 56, "length": 72, "shoulder_width": 46},
+    "pants": {"waist_width": 44, "hip_width": 56, "inseam": 80},
+}
+BODY_SIZES = {"height_cm": 178, "measurements": {"chest": 100, "waist": 86, "hip": 100}}  # confirm (docs/09 #130)
 OUT = "/tmp/own_body"
 os.makedirs(OUT, exist_ok=True)
 fails = []
@@ -78,7 +83,7 @@ try:
     check("auto landmarks", len(body["landmarks"]) >= 10, ", ".join(sorted(body["landmarks"])))
     r = c.post("/body/confirm/", json={"landmarks": {"head_top": {"y": 50}}})
     check("confirm with broken landmarks 400", r.status_code == 400 and r.json().get("code") == "LANDMARKS_INVALID")
-    r = c.post("/body/confirm/", json={"landmarks": body["landmarks"]})
+    r = c.post("/body/confirm/", json={"landmarks": body["landmarks"], **BODY_SIZES})
     check("confirm 200", r.status_code == 200, r.text[:200])
     with open(PHOTO, "rb") as fh:
         r = c.post("/body/", files={"photo": ("p.jpg", fh.read(), "image/jpeg")},
@@ -93,7 +98,7 @@ try:
     for gid in GARMENTS:  # private copies for the temporary user
         g = Garment.objects.get(pk=gid)
         mine = Garment(owner=user, name=f"check {gid}", type=g.type, landmarks=g.landmarks, status=g.status,
-                       fit_mode=g.fit_mode, gender="unisex")
+                       fit_mode=g.fit_mode, gender="unisex", sizes=COPY_SIZES[g.type])
         mine.image.save(f"check_{gid}.png", ContentFile(g.image.read()), save=True)
         ids.append(mine.pk)
     for base, extra in (("body", {}), ("avatar", {"avatar_id": avatar_id})):
